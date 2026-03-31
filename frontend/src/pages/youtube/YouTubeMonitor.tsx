@@ -1,6 +1,7 @@
 import { Button, DatePicker, Input, InputNumber, Modal, Pagination, Select, Spin, Table, Tag, message } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import { Eye, MessageCircle, ThumbsUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   analyzeYouTubeBatchApi,
@@ -333,10 +334,19 @@ export default function YouTubeMonitor() {
                     {video.published_at ? dayjs(video.published_at).fromNow() : "-"}
                   </div>
                 </div>
-                <div className="w-56 border border-slate-200 rounded-md p-2 text-sm">
-                  <div className="text-blue-600">播放量：{formatNumber(video.view_count)}</div>
-                  <div className="text-emerald-600">点赞数：{formatNumber(video.like_count)}</div>
-                  <div className="text-orange-500">评论数：{formatNumber(video.comment_count)}</div>
+                <div className="w-56 border border-slate-200 rounded-md p-2 text-sm space-y-1">
+                  <div className="text-blue-600 flex items-center gap-1.5">
+                    <Eye className="h-4 w-4 shrink-0" aria-hidden />
+                    <span>播放量：{formatNumber(video.view_count)}</span>
+                  </div>
+                  <div className="text-emerald-600 flex items-center gap-1.5">
+                    <ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />
+                    <span>点赞数：{formatNumber(video.like_count)}</span>
+                  </div>
+                  <div className="text-orange-500 flex items-center gap-1.5">
+                    <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
+                    <span>评论数：{formatNumber(video.comment_count)}</span>
+                  </div>
                 </div>
                 <div className="text-slate-500">⋯</div>
               </div>

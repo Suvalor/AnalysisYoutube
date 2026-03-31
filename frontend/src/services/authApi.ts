@@ -25,6 +25,9 @@ export type YouTubeAnalyzeResponse = {
     subscriber_count: number;
     total_views: number;
     video_count: number;
+    ai_tags: string[] | null;
+    ai_audience_age: string | null;
+    ai_summary: string | null;
     published_at: string | null;
     created_at: string;
     updated_at: string;
@@ -41,6 +44,7 @@ export type YouTubeAnalyzeResponse = {
     definition: string;
     privacy_status: string;
     category_id: string | null;
+    tags: string[];
     view_count: number;
     like_count: number;
     comment_count: number;
@@ -64,14 +68,36 @@ export async function analyzeYouTubeBatchApi(payload: { urls: string; group_name
   return res.data as YouTubeBatchAnalyzeResponse;
 }
 
-export async function listYouTubeChannelsApi() {
-  const res = await apiClient.get("/api/youtube/channels");
+export async function listYouTubeChannelsApi(params?: { sort_by?: string }) {
+  const searchParams = new URLSearchParams();
+  if (params?.sort_by) searchParams.append("sort_by", params.sort_by);
+  const q = searchParams.toString();
+  const res = await apiClient.get(`/api/youtube/channels${q ? `?${q}` : ""}`);
   return res.data as Array<{
     pool_id: number;
     group_name: string;
     added_at: string;
     channel: YouTubeAnalyzeResponse["channel"];
   }>;
+}
+
+export async function getYouTubeChannelDetailApi(channelId: number) {
+  const res = await apiClient.get(`/api/youtube/channels/detail/${channelId}`);
+  return res.data as YouTubeAnalyzeResponse["channel"];
+}
+
+export async function analyzeYouTubeChannelAiApi(channelId: number) {
+  const res = await apiClient.post(`/api/youtube/channels/${channelId}/ai-analyze`);
+  return res.data as {
+    tags: string[];
+    age_group: string;
+    summary: string;
+  };
+}
+
+export async function scrapeVideoCommentsApi(videoId: number, keyword: string) {
+  const res = await apiClient.post(`/api/youtube/videos/${videoId}/comments/scrape`, { keyword });
+  return res.data as { scraped_count: number; quota_used: number };
 }
 
 export async function deleteYouTubeChannelApi(poolId: number) {
@@ -107,16 +133,32 @@ export async function batchUpdateChannelsApi() {
   };
 }
 
+export type VideoListItem = YouTubeAnalyzeResponse["videos"][number] & {
+  channel_title?: string | null;
+};
+
 export async function listYouTubeVideosApi(params: {
   keyword?: string;
   start_date?: string;
   end_date?: string;
   min_duration?: number;
   max_duration?: number;
+  min_view_count?: number;
+  max_view_count?: number;
+  min_like_count?: number;
+  max_like_count?: number;
+  min_comment_count?: number;
+  max_comment_count?: number;
   channel_id?: number;
   definition?: string;
   privacy_status?: string;
+  /** 单列排序（未传多列参数时使用） */
   sort_by?: string;
+  /** 多列同时排序，与 sort_by 二选一：任意一项有值则按多列 ORDER BY（优先级见后端说明） */
+  publish_time_sort?: "asc" | "desc";
+  view_count_sort?: "asc" | "desc";
+  like_count_sort?: "asc" | "desc";
+  comment_count_sort?: "asc" | "desc";
   page?: number;
   page_size?: number;
 }) {
@@ -128,7 +170,23 @@ export async function listYouTubeVideosApi(params: {
   });
   const res = await apiClient.get(`/api/youtube/videos?${searchParams.toString()}`);
   return res.data as {
-    items: YouTubeAnalyzeResponse["videos"];
+    items: VideoListItem[];
+    total: number;
+    page: number;
+    page_size: number;
+  };
+}
+
+export async function listYouTubeVideosAllApi(params: Parameters<typeof listYouTubeVideosApi>[0]) {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && `${v}` !== "") {
+      searchParams.append(k, String(v));
+    }
+  });
+  const res = await apiClient.get(`/api/youtube/videos/all?${searchParams.toString()}`);
+  return res.data as {
+    items: VideoListItem[];
     total: number;
     page: number;
     page_size: number;

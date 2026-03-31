@@ -11,6 +11,7 @@ from app.models.youtube import (  # noqa: F401,E402
     YouTubeChannel,
     YouTubeChannelHistory,
     UserCompetitorPool,
+    YouTubeComment,
     YouTubeVideo,
 )
 

@@ -7,6 +7,7 @@ API_POINTS = {
     "search": 100,
     "videos": 1,
     "playlistItems": 1,
+    "commentThreads": 1,
 }
 
 

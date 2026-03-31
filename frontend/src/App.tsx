@@ -1,24 +1,12 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
-import YouTubeMonitor from "./pages/youtube/YouTubeMonitor";
-import CompetitorAnalysis from "./pages/youtube/CompetitorAnalysis";
-import AICreator from "./pages/ai/AICreator";
-import AppLayout from "./components/layout/Layout";
-import VideoBoard from "./pages/board/VideoBoard";
-import Dashboard from "./pages/dashboard/Dashboard";
-import KnowledgeBase from "./pages/knowledge/KnowledgeBase";
-import AssetLibraryPage from "./pages/knowledge/AssetLibrary";
-import YouTubeQuotaDashboard from "./pages/youtube/YouTubeQuotaDashboard";
+import TabbedShell from "./components/Layout/TabbedShell";
 
 function ProtectedLayout() {
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
   if (!token) return <Navigate to="/login" replace />;
-  return (
-    <AppLayout>
-      <Outlet />
-    </AppLayout>
-  );
+  return <Outlet />;
 }
 
 export default function App() {
@@ -28,19 +16,8 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
 
       <Route element={<ProtectedLayout />}>
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/youtube-monitor" element={<YouTubeMonitor />} />
-        <Route path="/youtube-quota" element={<YouTubeQuotaDashboard />} />
-        <Route path="/competitor-analysis" element={<CompetitorAnalysis />} />
-        <Route path="/ai-creator" element={<AICreator />} />
-        <Route path="/knowledge-base" element={<KnowledgeBase />} />
-        <Route path="/assets" element={<AssetLibraryPage />} />
-        <Route path="/video-board" element={<VideoBoard />} />
+        <Route path="*" element={<TabbedShell />} />
       </Route>
-
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }
-

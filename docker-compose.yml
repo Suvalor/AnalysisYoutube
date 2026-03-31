@@ -1,6 +1,7 @@
+# MySQL 使用与后端相同思路的 Hub 同步源，避免首次 pull 时访问 docker.io 超时
 services:
   mysql:
-    image: mysql:8.0
+    image: docker.m.daocloud.io/library/mysql:8.0
     container_name: creator_mysql
     restart: unless-stopped
     environment:
