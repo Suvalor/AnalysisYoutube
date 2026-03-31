@@ -23,6 +23,7 @@ from app.schemas.youtube import (
     YouTubeAnalyzeRequest,
     YouTubeAnalyzeResponse,
     YouTubeChannelRead,
+    YouTubeVideoPageResponse,
     YouTubeVideoRead,
 )
 from app.services.youtube_service import (
@@ -121,7 +122,7 @@ async def quota_dashboard(db: DBSessionDep, current_user: CurrentUserDep) -> Quo
     )
 
 
-@router.get("/videos", response_model=list[YouTubeVideoRead])
+@router.get("/videos", response_model=YouTubeVideoPageResponse)
 async def list_videos(
     db: DBSessionDep,
     current_user: CurrentUserDep,
@@ -130,17 +131,20 @@ async def list_videos(
     end_date: str | None = Query(None),
     min_duration: int | None = Query(None),
     max_duration: int | None = Query(None),
+    channel_id: int | None = Query(None),
     definition: str | None = Query(None),
     privacy_status: str | None = Query(None),
     sort_by: str = Query("publish_time_desc"),
-) -> list[YouTubeVideoRead]:
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+) -> YouTubeVideoPageResponse:
     start_dt = None
     end_dt = None
     if start_date:
         start_dt = parse_datetime(f"{start_date}T00:00:00Z")
     if end_date:
         end_dt = parse_datetime(f"{end_date}T23:59:59Z")
-    rows = await query_videos(
+    rows, total = await query_videos(
         db,
         user_id=current_user.id,
         keyword=keyword,
@@ -148,11 +152,19 @@ async def list_videos(
         end_date=end_dt,
         min_duration=min_duration,
         max_duration=max_duration,
+        channel_id=channel_id,
         definition=definition,
         privacy_status=privacy_status,
         sort_by=sort_by,
+        page=page,
+        page_size=page_size,
     )
-    return [YouTubeVideoRead.model_validate(x) for x in rows]
+    return YouTubeVideoPageResponse(
+        items=[YouTubeVideoRead.model_validate(x) for x in rows],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get(

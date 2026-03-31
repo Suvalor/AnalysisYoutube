@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -168,10 +168,13 @@ async def query_videos(
     end_date=None,
     min_duration: int | None = None,
     max_duration: int | None = None,
+    channel_id: int | None = None,
     definition: str | None = None,
     privacy_status: str | None = None,
     sort_by: str = "publish_time_desc",
-) -> list[YouTubeVideo]:
+    page: int = 1,
+    page_size: int = 20,
+) -> tuple[list[YouTubeVideo], int]:
     stmt: Select = (
         select(YouTubeVideo)
         .join(YouTubeChannel, YouTubeChannel.id == YouTubeVideo.channel_id)
@@ -189,6 +192,8 @@ async def query_videos(
         stmt = stmt.where(YouTubeVideo.duration_sec >= min_duration)
     if max_duration is not None:
         stmt = stmt.where(YouTubeVideo.duration_sec <= max_duration)
+    if channel_id is not None:
+        stmt = stmt.where(YouTubeVideo.channel_id == channel_id)
     if definition:
         stmt = stmt.where(YouTubeVideo.definition == definition)
     if privacy_status:
@@ -203,8 +208,11 @@ async def query_videos(
     else:
         stmt = stmt.order_by(YouTubeVideo.published_at.desc())
 
+    count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
+    total = int((await session.execute(count_stmt)).scalar_one())
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
     result = await session.execute(stmt)
-    return list(result.scalars().unique().all())
+    return list(result.scalars().unique().all()), total
 
 
 async def upsert_channel_history(

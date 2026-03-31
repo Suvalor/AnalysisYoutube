@@ -61,3 +61,10 @@ class QuotaDashboardResponse(BaseModel):
     today_remaining: int
     history: list[dict]
 
+
+class YouTubeVideoPageResponse(BaseModel):
+    items: list[YouTubeVideoRead]
+    total: int
+    page: int
+    page_size: int
+
