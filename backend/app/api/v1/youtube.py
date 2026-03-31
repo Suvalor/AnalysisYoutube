@@ -5,6 +5,8 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.crud.youtube import (
+    bulk_upsert_channels_from_api_items,
+    bulk_upsert_videos_from_api_items,
     delete_user_competitor_channel,
     ensure_competitor_pool,
     get_channel_histories_for_compare,
@@ -22,6 +24,8 @@ from app.schemas.youtube import (
     UserCompetitorChannelItem,
     YouTubeAnalyzeRequest,
     YouTubeAnalyzeResponse,
+    YouTubeBatchAnalyzeRequest,
+    YouTubeBatchAnalyzeResponse,
     YouTubeChannelRead,
     YouTubeVideoPageResponse,
     YouTubeVideoRead,
@@ -32,8 +36,10 @@ from app.services.youtube_service import (
     fetch_recent_videos,
     parse_datetime,
     parse_youtube_identifier,
+    run_bulk_analyze_pipeline,
+    run_refresh_pipeline_for_youtube_channel_ids,
 )
-from app.services.quota_service import record_api_quota_usage
+from app.services.quota_service import record_api_quota_usage, record_bulk_pipeline_quota
 
 
 router = APIRouter()
@@ -68,9 +74,16 @@ async def analyze_youtube_channel(
         published_at=parse_datetime(snippet.get("publishedAt")),
     )
 
-    recent_videos_raw = await fetch_recent_videos(channel_id=channel_id, limit=10)
-    await record_api_quota_usage(db, "search")
-    await record_api_quota_usage(db, "videos")
+    recent_videos_raw, fr_quota = await fetch_recent_videos(
+        channel_id=channel_id, limit=10, return_quota=True
+    )
+    await record_bulk_pipeline_quota(
+        db,
+        for_handle_calls=0,
+        channels_list_calls=fr_quota.channels_calls,
+        playlist_items_calls=fr_quota.playlist_items_calls,
+        videos_list_calls=fr_quota.videos_list_calls,
+    )
     for video in recent_videos_raw:
         video.setdefault("_parsed_published_at", parse_datetime(video.get("snippet", {}).get("publishedAt")))
 
@@ -103,6 +116,67 @@ async def analyze_youtube_channel(
         channel=YouTubeChannelRead.model_validate(channel),
         recent_avg_views=calc_recent_avg_views(recent_videos_raw),
         videos=[YouTubeVideoRead.model_validate(v) for v in videos],
+    )
+
+
+@router.post(
+    "/analyze/batch",
+    response_model=YouTubeBatchAnalyzeResponse,
+    summary="批量分析并导入 YouTube 频道（省流：无 Search API）",
+)
+async def analyze_youtube_batch(
+    payload: YouTubeBatchAnalyzeRequest,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> YouTubeBatchAnalyzeResponse:
+    pipeline = await run_bulk_analyze_pipeline(payload.urls)
+    if not pipeline.channel_items:
+        raise HTTPException(
+            status_code=400,
+            detail="; ".join(pipeline.errors) if pipeline.errors else "未能获取任何频道数据",
+        )
+
+    quota_used = await record_bulk_pipeline_quota(
+        db,
+        for_handle_calls=pipeline.for_handle_calls,
+        channels_list_calls=pipeline.channels_list_calls,
+        playlist_items_calls=pipeline.playlist_items_calls,
+        videos_list_calls=pipeline.videos_list_calls,
+    )
+
+    yt_to_db = await bulk_upsert_channels_from_api_items(db, pipeline.channel_items)
+    videos_count = await bulk_upsert_videos_from_api_items(
+        db, pipeline.video_items, yt_to_db
+    )
+
+    for item in pipeline.channel_items:
+        yt_id = item.get("id")
+        db_id = yt_to_db.get(yt_id or "")
+        if not db_id:
+            continue
+        statistics = item.get("statistics", {})
+        await upsert_channel_history(
+            session=db,
+            channel_id=db_id,
+            record_date=date.today(),
+            subscriber_count=int(statistics.get("subscriberCount", 0)),
+            total_views=int(statistics.get("viewCount", 0)),
+            video_count=int(statistics.get("videoCount", 0)),
+        )
+        await ensure_competitor_pool(
+            session=db,
+            user_id=current_user.id,
+            channel_id=db_id,
+            group_name=payload.group_name,
+        )
+
+    await db.commit()
+
+    return YouTubeBatchAnalyzeResponse(
+        channels_count=len(yt_to_db),
+        videos_count=videos_count,
+        quota_used=quota_used,
+        errors=pipeline.errors,
     )
 
 
@@ -211,50 +285,46 @@ async def batch_update_channels(
     _ = current_user
     channels = await list_distinct_monitored_channels(db)
     if not channels:
-        return {"estimated_points": 0, "updated_channels": 0, "updated_videos": 0}
+        return {"estimated_points": 0, "updated_channels": 0, "updated_videos": 0, "quota_used": 0}
 
-    # 粗略估算：每个频道 search(100) + videos(1) + channels(1)
-    estimated_points = len(channels) * 102
+    n = len(channels)
+    # 最坏情况：channels 分块 + 每频道 playlistItems + 视频按 50 分块
+    estimated_points = (n + 49) // 50 + 2 * n
 
-    updated_channels = 0
-    updated_videos = 0
-    for c in channels:
-        item = await fetch_channel_info({"channel_id": c.yt_channel_id})
-        await record_api_quota_usage(db, "channels")
-        snippet = item.get("snippet", {})
+    pipeline = await run_refresh_pipeline_for_youtube_channel_ids([c.yt_channel_id for c in channels])
+
+    quota_used = await record_bulk_pipeline_quota(
+        db,
+        for_handle_calls=0,
+        channels_list_calls=pipeline.channels_list_calls,
+        playlist_items_calls=pipeline.playlist_items_calls,
+        videos_list_calls=pipeline.videos_list_calls,
+    )
+
+    yt_to_db = await bulk_upsert_channels_from_api_items(db, pipeline.channel_items)
+    updated_videos = await bulk_upsert_videos_from_api_items(db, pipeline.video_items, yt_to_db)
+
+    for item in pipeline.channel_items:
+        yt_id = item.get("id")
+        db_id = yt_to_db.get(yt_id or "")
+        if not db_id:
+            continue
         statistics = item.get("statistics", {})
-        channel = await upsert_channel(
+        await upsert_channel_history(
             session=db,
-            yt_channel_id=item.get("id", c.yt_channel_id),
-            title=snippet.get("title", ""),
-            description=snippet.get("description", ""),
-            thumbnail_url=(snippet.get("thumbnails", {}).get("high", {}) or {}).get("url"),
+            channel_id=db_id,
+            record_date=date.today(),
             subscriber_count=int(statistics.get("subscriberCount", 0)),
             total_views=int(statistics.get("viewCount", 0)),
             video_count=int(statistics.get("videoCount", 0)),
-            published_at=parse_datetime(snippet.get("publishedAt")),
         )
-        recent_videos = await fetch_recent_videos(channel.yt_channel_id, 10)
-        await record_api_quota_usage(db, "search")
-        await record_api_quota_usage(db, "videos")
-        for v in recent_videos:
-            v.setdefault("_parsed_published_at", parse_datetime(v.get("snippet", {}).get("publishedAt")))
-        saved = await upsert_videos(db, channel_id=channel.id, videos=recent_videos)
-        await upsert_channel_history(
-            session=db,
-            channel_id=channel.id,
-            record_date=date.today(),
-            subscriber_count=channel.subscriber_count,
-            total_views=channel.total_views,
-            video_count=channel.video_count,
-        )
-        updated_channels += 1
-        updated_videos += len(saved)
+
     await db.commit()
     return {
         "estimated_points": estimated_points,
-        "updated_channels": updated_channels,
+        "updated_channels": len(yt_to_db),
         "updated_videos": updated_videos,
+        "quota_used": quota_used,
     }
 
 

@@ -8,6 +8,18 @@ class YouTubeAnalyzeRequest(BaseModel):
     group_name: str = Field(default="默认分组", description="监控分组名称")
 
 
+class YouTubeBatchAnalyzeRequest(BaseModel):
+    urls: str = Field(..., description="多个频道链接，分号或换行分隔")
+    group_name: str = Field(default="默认分组", description="监控分组名称")
+
+
+class YouTubeBatchAnalyzeResponse(BaseModel):
+    channels_count: int = Field(..., description="成功分析并入库的频道数")
+    videos_count: int = Field(..., description="写入或更新的视频条数")
+    quota_used: int = Field(..., description="本次消耗的 API 配额点数")
+    errors: list[str] = Field(default_factory=list, description="解析或部分频道失败时的提示")
+
+
 class YouTubeVideoRead(BaseModel):
     id: int
     yt_video_id: str
