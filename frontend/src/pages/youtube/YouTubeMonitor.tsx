@@ -1,9 +1,9 @@
-import { Button, DatePicker, Input, InputNumber, Modal, Pagination, Select, Table, Tag, message } from "antd";
+import { Button, DatePicker, Input, InputNumber, Modal, Pagination, Select, Spin, Table, Tag, message } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { useEffect, useMemo, useState } from "react";
 import {
-  analyzeYouTubeApi,
+  analyzeYouTubeBatchApi,
   batchUpdateChannelsApi,
   deleteYouTubeChannelApi,
   getYouTubeQuotaDashboardApi,
@@ -21,6 +21,7 @@ function formatNumber(value: number) {
 export default function YouTubeMonitor() {
   const [tableLoading, setTableLoading] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [pool, setPool] = useState<Array<{ pool_id: number; group_name: string; channel: YouTubeAnalyzeResponse["channel"] }>>([]);
   const [videos, setVideos] = useState<YouTubeAnalyzeResponse["videos"]>([]);
@@ -96,21 +97,32 @@ export default function YouTubeMonitor() {
       message.warning("请输入 YouTube 频道链接");
       return;
     }
+    setAnalyzing(true);
     try {
-      await analyzeYouTubeApi({ youtube_url: youtubeUrl.trim() });
-      message.success("添加并抓取成功");
+      const res = await analyzeYouTubeBatchApi({ urls: youtubeUrl.trim() });
+      const detail =
+        res.errors?.length > 0
+          ? `（部分提示：${res.errors.slice(0, 3).join("；")}${res.errors.length > 3 ? "…" : ""}）`
+          : "";
+      message.success(
+        `成功分析 ${res.channels_count} 个频道，共获取 ${res.videos_count} 个视频。本次消耗 API 额度 ${res.quota_used} 点。${detail}`
+      );
       setYoutubeUrl("");
       await loadPool();
       await loadVideos();
       await loadQuota();
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? "添加失败");
+      const d = e?.response?.data?.detail;
+      message.error(typeof d === "string" ? d : Array.isArray(d) ? d.map((x: { msg?: string }) => x.msg).join(" ") : "添加失败");
+    } finally {
+      setAnalyzing(false);
     }
   };
 
   const onBatchUpdate = async () => {
     const q = await loadQuota();
-    const estimated = pool.length * 102;
+    const n = pool.length;
+    const estimated = n === 0 ? 0 : Math.floor((n + 49) / 50) + 2 * n;
     Modal.confirm({
       title: "确认一键更新",
       content: `本次预计消耗 API 额度: ${estimated} 点，今日剩余额度: ${q.today_remaining} 点，是否继续？`,
@@ -120,7 +132,9 @@ export default function YouTubeMonitor() {
         setUpdating(true);
         try {
           const res = await batchUpdateChannelsApi();
-          message.success(`更新完成：频道 ${res.updated_channels}，视频 ${res.updated_videos}`);
+          message.success(
+            `更新完成：频道 ${res.updated_channels}，视频 ${res.updated_videos}。本次消耗 API 额度 ${res.quota_used} 点。`
+          );
           await loadPool();
           await loadVideos();
           await loadQuota();
@@ -177,16 +191,18 @@ export default function YouTubeMonitor() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] p-6 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-4">
+      <Spin spinning={analyzing} tip="批量分析中，请稍候…" size="large">
+        <div className="max-w-7xl mx-auto space-y-4">
         <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
-          <div className="flex flex-col md:flex-row gap-2 md:items-center md:justify-end">
-            <Input
-              className="max-w-[420px]"
-              placeholder="输入 YouTube 频道链接"
+          <div className="flex flex-col md:flex-row gap-2 md:items-start md:justify-end">
+            <Input.TextArea
+              className="max-w-[520px]"
+              rows={4}
+              placeholder="请输入 YouTube 频道主页链接，支持输入多个，请使用分号 (;) 或换行分隔。例如：https://youtube.com/@a; https://youtube.com/channel/b"
               value={youtubeUrl}
               onChange={(e) => setYoutubeUrl(e.target.value)}
             />
-            <Button type="primary" onClick={onAddChannel}>
+            <Button type="primary" loading={analyzing} onClick={() => void onAddChannel()}>
               添加关注
             </Button>
             <Button type="primary" loading={updating} onClick={onBatchUpdate}>
@@ -338,7 +354,8 @@ export default function YouTubeMonitor() {
             }}
           />
         </div>
-      </div>
+        </div>
+      </Spin>
     </div>
   );
 }

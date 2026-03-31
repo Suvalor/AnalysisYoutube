@@ -52,6 +52,18 @@ export async function analyzeYouTubeApi(payload: { youtube_url: string; group_na
   return res.data as YouTubeAnalyzeResponse;
 }
 
+export type YouTubeBatchAnalyzeResponse = {
+  channels_count: number;
+  videos_count: number;
+  quota_used: number;
+  errors: string[];
+};
+
+export async function analyzeYouTubeBatchApi(payload: { urls: string; group_name?: string }) {
+  const res = await apiClient.post("/api/youtube/analyze/batch", payload);
+  return res.data as YouTubeBatchAnalyzeResponse;
+}
+
 export async function listYouTubeChannelsApi() {
   const res = await apiClient.get("/api/youtube/channels");
   return res.data as Array<{
@@ -91,6 +103,7 @@ export async function batchUpdateChannelsApi() {
     estimated_points: number;
     updated_channels: number;
     updated_videos: number;
+    quota_used: number;
   };
 }
 
