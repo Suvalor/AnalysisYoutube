@@ -39,6 +39,7 @@ services:
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 60
       BACKEND_CORS_ORIGINS: http://localhost:5173
+      YOUTUBE_API_KEY: literal:REDACTED_YOUTUBE_API_KEY
     ports:
       - "8000:8000"
 

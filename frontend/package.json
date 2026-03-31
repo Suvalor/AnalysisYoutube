@@ -9,6 +9,7 @@
     "lint": "echo \"no lint configured\""
   },
   "dependencies": {
+    "@chenglou/pretext": "^0.0.3",
     "antd": "^5.21.0",
     "axios": "^1.7.9",
     "react": "^18.3.1",

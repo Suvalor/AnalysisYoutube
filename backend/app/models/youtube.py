@@ -1,0 +1,80 @@
+from __future__ import annotations
+
+from datetime import datetime
+
+from sqlalchemy import BIGINT, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.base_class import Base
+
+
+class YouTubeChannel(Base):
+    __tablename__ = "youtube_channels"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    yt_channel_id: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    thumbnail_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    subscriber_count: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
+    total_views: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
+    video_count: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    videos: Mapped[list["YouTubeVideo"]] = relationship(
+        "YouTubeVideo", back_populates="channel", cascade="all, delete-orphan"
+    )
+    users_in_pool: Mapped[list["UserCompetitorPool"]] = relationship(
+        "UserCompetitorPool", back_populates="channel", cascade="all, delete-orphan"
+    )
+
+
+class UserCompetitorPool(Base):
+    __tablename__ = "user_competitor_pools"
+    __table_args__ = (
+        UniqueConstraint("user_id", "channel_id", name="uq_user_competitor_channel"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    channel_id: Mapped[int] = mapped_column(
+        ForeignKey("youtube_channels.id", ondelete="CASCADE"), nullable=False
+    )
+    group_name: Mapped[str] = mapped_column(String(100), nullable=False, default="默认分组")
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="competitor_pools")
+    channel: Mapped["YouTubeChannel"] = relationship("YouTubeChannel", back_populates="users_in_pool")
+
+
+class YouTubeVideo(Base):
+    __tablename__ = "youtube_videos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    yt_video_id: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)
+    channel_id: Mapped[int] = mapped_column(
+        ForeignKey("youtube_channels.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    thumbnail_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    view_count: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
+    like_count: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
+    comment_count: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    channel: Mapped["YouTubeChannel"] = relationship("YouTubeChannel", back_populates="videos")
+
