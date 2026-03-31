@@ -6,6 +6,7 @@ from app.models.user import User  # noqa: F401,E402
 from app.models.yt_channel import YtChannel  # noqa: F401,E402
 from app.models.library import AssetLibrary, PromptLibrary, ScriptLibrary, StyleLibrary  # noqa: F401,E402
 from app.models.video_project import VideoProject  # noqa: F401,E402
+from app.models.quota import ApiQuotaUsage  # noqa: F401,E402
 from app.models.youtube import (  # noqa: F401,E402
     YouTubeChannel,
     YouTubeChannelHistory,

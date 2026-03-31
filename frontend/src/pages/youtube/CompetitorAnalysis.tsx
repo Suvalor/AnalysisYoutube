@@ -69,13 +69,13 @@ export default function CompetitorAnalysis() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 p-6 md:p-10 text-slate-100">
+    <div className="min-h-screen bg-[#F8F9FA] p-6 md:p-10 text-slate-900">
       <div className="max-w-7xl mx-auto space-y-6">
-        <Card className="!bg-slate-900/80 !border-slate-800 shadow-2xl">
-          <Title level={3} style={{ color: "#f8fafc", marginBottom: 8 }}>
+        <Card className="!bg-white !border-slate-200 !shadow-sm">
+          <Title level={3} style={{ color: "#0f172a", marginBottom: 8 }}>
             对标分析图表
           </Title>
-          <Text style={{ color: "#94a3b8" }}>
+          <Text style={{ color: "#64748b" }}>
             勾选 2-3 个监控频道，生成总播放量与订阅量增长趋势图。
           </Text>
           <div className="mt-4 flex flex-col gap-4">
@@ -86,15 +86,15 @@ export default function CompetitorAnalysis() {
             >
               {pool.map((item) => (
                 <Checkbox key={item.pool_id} value={item.channel.id}>
-                  <span className="text-slate-200">
+                  <span className="text-slate-800">
                     {item.channel.title}
-                    <span className="text-slate-400 ml-1">({item.group_name})</span>
+                    <span className="text-slate-500 ml-1">({item.group_name})</span>
                   </span>
                 </Checkbox>
               ))}
             </Checkbox.Group>
             <div className="flex items-center gap-3">
-              <span className="text-slate-300">回溯天数</span>
+              <span className="text-slate-700">回溯天数</span>
               <InputNumber min={7} max={180} value={days} onChange={(v) => setDays(Number(v ?? 30))} />
               <Button type="primary" onClick={onAnalyze} loading={loading}>
                 生成对比图
@@ -105,21 +105,21 @@ export default function CompetitorAnalysis() {
 
         <Spin spinning={loading}>
           {chartData.length === 0 ? (
-            <Card className="!bg-slate-900/80 !border-slate-800 shadow-2xl">
+            <Card className="!bg-white !border-slate-200 !shadow-sm">
               <Empty description="暂无图表数据，请先选择频道并生成" />
             </Card>
           ) : (
             <>
               <Card
-                title={<span className="text-slate-100">播放量增长趋势（total_views）</span>}
-                className="!bg-slate-900/80 !border-slate-800 shadow-2xl"
+                title={<span className="text-slate-900">播放量增长趋势（total_views）</span>}
+                className="!bg-white !border-slate-200 !shadow-sm"
               >
                 <div className="h-[360px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis dataKey="date" stroke="#94a3b8" />
-                      <YAxis stroke="#94a3b8" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="date" stroke="#64748b" />
+                      <YAxis stroke="#64748b" />
                       <Tooltip />
                       <Legend />
                       {selectedChannels.map((item, idx) => (
@@ -138,15 +138,15 @@ export default function CompetitorAnalysis() {
               </Card>
 
               <Card
-                title={<span className="text-slate-100">订阅量增长趋势（subscriber_count）</span>}
-                className="!bg-slate-900/80 !border-slate-800 shadow-2xl"
+                title={<span className="text-slate-900">订阅量增长趋势（subscriber_count）</span>}
+                className="!bg-white !border-slate-200 !shadow-sm"
               >
                 <div className="h-[360px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis dataKey="date" stroke="#94a3b8" />
-                      <YAxis stroke="#94a3b8" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="date" stroke="#64748b" />
+                      <YAxis stroke="#64748b" />
                       <Tooltip />
                       <Legend />
                       {selectedChannels.map((item, idx) => (

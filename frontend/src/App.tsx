@@ -9,6 +9,7 @@ import VideoBoard from "./pages/board/VideoBoard";
 import Dashboard from "./pages/dashboard/Dashboard";
 import KnowledgeBase from "./pages/knowledge/KnowledgeBase";
 import AssetLibraryPage from "./pages/knowledge/AssetLibrary";
+import YouTubeQuotaDashboard from "./pages/youtube/YouTubeQuotaDashboard";
 
 function ProtectedLayout() {
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
@@ -29,6 +30,7 @@ export default function App() {
       <Route element={<ProtectedLayout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/youtube-monitor" element={<YouTubeMonitor />} />
+        <Route path="/youtube-quota" element={<YouTubeQuotaDashboard />} />
         <Route path="/competitor-analysis" element={<CompetitorAnalysis />} />
         <Route path="/ai-creator" element={<AICreator />} />
         <Route path="/knowledge-base" element={<KnowledgeBase />} />

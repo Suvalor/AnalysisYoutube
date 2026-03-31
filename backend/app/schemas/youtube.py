@@ -14,6 +14,11 @@ class YouTubeVideoRead(BaseModel):
     title: str
     thumbnail_url: str | None = None
     published_at: datetime | None = None
+    duration_sec: int
+    duration_str: str
+    definition: str
+    privacy_status: str
+    category_id: str | None = None
     view_count: int
     like_count: int
     comment_count: int
@@ -48,4 +53,11 @@ class UserCompetitorChannelItem(BaseModel):
     group_name: str
     added_at: datetime
     channel: YouTubeChannelRead
+
+
+class QuotaDashboardResponse(BaseModel):
+    today_total: int
+    today_used: int
+    today_remaining: int
+    history: list[dict]
 

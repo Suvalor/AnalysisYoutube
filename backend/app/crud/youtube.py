@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -64,6 +64,8 @@ async def upsert_videos(
         video = result.scalar_one_or_none()
         snippet = item.get("snippet", {})
         statistics = item.get("statistics", {})
+        content_details = item.get("contentDetails", {})
+        status = item.get("status", {})
         if video is None:
             video = YouTubeVideo(
                 yt_video_id=yt_video_id,
@@ -71,6 +73,11 @@ async def upsert_videos(
                 title=snippet.get("title", ""),
                 thumbnail_url=(snippet.get("thumbnails", {}).get("high", {}) or {}).get("url"),
                 published_at=item.get("_parsed_published_at"),
+                duration_sec=int(item.get("_duration_sec", 0)),
+                duration_str=item.get("_duration_str", "00:00"),
+                definition=content_details.get("definition", "sd"),
+                privacy_status=status.get("privacyStatus", "public"),
+                category_id=snippet.get("categoryId"),
                 view_count=int(statistics.get("viewCount", 0)),
                 like_count=int(statistics.get("likeCount", 0)),
                 comment_count=int(statistics.get("commentCount", 0)),
@@ -81,6 +88,11 @@ async def upsert_videos(
             video.title = snippet.get("title", "")
             video.thumbnail_url = (snippet.get("thumbnails", {}).get("high", {}) or {}).get("url")
             video.published_at = item.get("_parsed_published_at")
+            video.duration_sec = int(item.get("_duration_sec", 0))
+            video.duration_str = item.get("_duration_str", "00:00")
+            video.definition = content_details.get("definition", "sd")
+            video.privacy_status = status.get("privacyStatus", "public")
+            video.category_id = snippet.get("categoryId")
             video.view_count = int(statistics.get("viewCount", 0))
             video.like_count = int(statistics.get("likeCount", 0))
             video.comment_count = int(statistics.get("commentCount", 0))
@@ -122,6 +134,21 @@ async def list_user_competitor_channels(session: AsyncSession, user_id: int) -> 
     return list(result.scalars().unique().all())
 
 
+async def delete_user_competitor_channel(session: AsyncSession, *, user_id: int, pool_id: int) -> bool:
+    result = await session.execute(
+        select(UserCompetitorPool).where(
+            UserCompetitorPool.id == pool_id,
+            UserCompetitorPool.user_id == user_id,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        return False
+    await session.delete(row)
+    await session.flush()
+    return True
+
+
 async def list_distinct_monitored_channels(session: AsyncSession) -> list[YouTubeChannel]:
     result = await session.execute(
         select(YouTubeChannel)
@@ -130,6 +157,54 @@ async def list_distinct_monitored_channels(session: AsyncSession) -> list[YouTub
         .order_by(YouTubeChannel.id.asc())
     )
     return list(result.scalars().all())
+
+
+async def query_videos(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    keyword: str | None = None,
+    start_date=None,
+    end_date=None,
+    min_duration: int | None = None,
+    max_duration: int | None = None,
+    definition: str | None = None,
+    privacy_status: str | None = None,
+    sort_by: str = "publish_time_desc",
+) -> list[YouTubeVideo]:
+    stmt: Select = (
+        select(YouTubeVideo)
+        .join(YouTubeChannel, YouTubeChannel.id == YouTubeVideo.channel_id)
+        .join(UserCompetitorPool, UserCompetitorPool.channel_id == YouTubeChannel.id)
+        .where(UserCompetitorPool.user_id == user_id)
+    )
+
+    if keyword:
+        stmt = stmt.where(YouTubeVideo.title.ilike(f"%{keyword}%"))
+    if start_date:
+        stmt = stmt.where(YouTubeVideo.published_at >= start_date)
+    if end_date:
+        stmt = stmt.where(YouTubeVideo.published_at <= end_date)
+    if min_duration is not None:
+        stmt = stmt.where(YouTubeVideo.duration_sec >= min_duration)
+    if max_duration is not None:
+        stmt = stmt.where(YouTubeVideo.duration_sec <= max_duration)
+    if definition:
+        stmt = stmt.where(YouTubeVideo.definition == definition)
+    if privacy_status:
+        stmt = stmt.where(YouTubeVideo.privacy_status == privacy_status)
+
+    if sort_by == "publish_time_asc":
+        stmt = stmt.order_by(YouTubeVideo.published_at.asc())
+    elif sort_by == "view_count_desc":
+        stmt = stmt.order_by(YouTubeVideo.view_count.desc())
+    elif sort_by == "view_count_asc":
+        stmt = stmt.order_by(YouTubeVideo.view_count.asc())
+    else:
+        stmt = stmt.order_by(YouTubeVideo.published_at.desc())
+
+    result = await session.execute(stmt)
+    return list(result.scalars().unique().all())
 
 
 async def upsert_channel_history(
