@@ -1,7 +1,6 @@
 from functools import lru_cache
-from typing import List
+import json
 
-from pydantic import AnyHttpUrl
 from pydantic import Field
 from pydantic import computed_field
 from pydantic_settings import BaseSettings
@@ -21,9 +20,12 @@ class Settings(BaseSettings):
     secret_key: str = Field("change_me", alias="SECRET_KEY")
     algorithm: str = Field("HS256", alias="ALGORITHM")
     access_token_expire_minutes: int = Field(60, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
+    youtube_api_key: str = Field("", alias="YOUTUBE_API_KEY")
 
-    backend_cors_origins: List[AnyHttpUrl] = Field(
-        default_factory=lambda: [AnyHttpUrl("http://localhost:5173")]
+    # 支持单个 URL、逗号分隔字符串，或 JSON 数组字符串
+    backend_cors_origins: str = Field(
+        "http://localhost:5173",
+        alias="BACKEND_CORS_ORIGINS",
     )
 
     @computed_field  # type: ignore[misc]
@@ -36,6 +38,24 @@ class Settings(BaseSettings):
             f"mysql+asyncmy://{self.mysql_user}:{self.mysql_password}"
             f"@{self.mysql_host}:{self.mysql_port}/{self.mysql_db}"
         )
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def cors_origins(self) -> list[str]:
+        """将 CORS 配置解析为 URL 列表。"""
+        raw_value = self.backend_cors_origins.strip()
+        if not raw_value:
+            return []
+
+        if raw_value.startswith("["):
+            try:
+                parsed = json.loads(raw_value)
+                if isinstance(parsed, list):
+                    return [str(item).strip() for item in parsed if str(item).strip()]
+            except json.JSONDecodeError:
+                pass
+
+        return [item.strip() for item in raw_value.split(",") if item.strip()]
 
     class Config:
         env_file = ".env"

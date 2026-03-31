@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import { useEffect, useState } from "react";
+import YouTubeMonitor from "./pages/youtube/YouTubeMonitor";
 
 function useAuthToken() {
   const [token, setToken] = useState<string | null>(() =>
@@ -29,12 +30,18 @@ function ProtectedRoute({ children }: { children: JSX.Element }) {
 
 function Dashboard() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-50">
-      <div className="max-w-xl px-6 py-8 rounded-2xl bg-slate-900/60 border border-slate-800 shadow-xl">
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-50 p-6">
+      <div className="max-w-xl w-full px-6 py-8 rounded-2xl bg-slate-900/60 border border-slate-800 shadow-xl">
         <h1 className="text-2xl font-semibold mb-2">欢迎来到 Creator SaaS</h1>
-        <p className="text-slate-300">
-          登录成功的占位页面，后续这里会接入 YouTube 数据分析、AI 剧本生成、素材管理和进度看板等功能。
+        <p className="text-slate-300 mb-6">
+          你可以进入 YouTube 监控台，完成频道解析与对标分析。
         </p>
+        <a
+          href="/youtube-monitor"
+          className="inline-flex px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 transition-colors"
+        >
+          进入 YouTube 监控台
+        </a>
       </div>
     </div>
   );
@@ -50,6 +57,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/youtube-monitor"
+        element={
+          <ProtectedRoute>
+            <YouTubeMonitor />
           </ProtectedRoute>
         }
       />
