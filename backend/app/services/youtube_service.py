@@ -104,6 +104,32 @@ async def fetch_recent_videos(channel_id: str, limit: int = 10) -> list[dict]:
     return videos_resp.json().get("items", [])
 
 
+async def fetch_channels_by_ids(channel_ids: list[str]) -> list[dict]:
+    """批量按 channel id 拉取频道详情，单次最多 50 个。"""
+    if not channel_ids:
+        return []
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        all_items: list[dict] = []
+        for i in range(0, len(channel_ids), 50):
+            chunk = channel_ids[i : i + 50]
+            resp = await client.get(
+                "https://www.googleapis.com/youtube/v3/channels",
+                params={
+                    "part": "snippet,statistics",
+                    "id": ",".join(chunk),
+                    "key": settings.youtube_api_key,
+                },
+            )
+            if resp.status_code != 200:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"YouTube channels(batch) API 调用失败：{resp.text}",
+                )
+            all_items.extend(resp.json().get("items", []))
+    return all_items
+
+
 def parse_datetime(raw_value: str | None) -> datetime | None:
     if not raw_value:
         return None

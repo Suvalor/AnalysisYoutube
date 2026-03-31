@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import BIGINT, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -32,6 +32,9 @@ class YouTubeChannel(Base):
     )
     users_in_pool: Mapped[list["UserCompetitorPool"]] = relationship(
         "UserCompetitorPool", back_populates="channel", cascade="all, delete-orphan"
+    )
+    histories: Mapped[list["YouTubeChannelHistory"]] = relationship(
+        "YouTubeChannelHistory", back_populates="channel", cascade="all, delete-orphan"
     )
 
 
@@ -77,4 +80,27 @@ class YouTubeVideo(Base):
     )
 
     channel: Mapped["YouTubeChannel"] = relationship("YouTubeChannel", back_populates="videos")
+
+
+class YouTubeChannelHistory(Base):
+    __tablename__ = "youtube_channel_histories"
+    __table_args__ = (
+        UniqueConstraint("channel_id", "record_date", name="uq_channel_record_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    channel_id: Mapped[int] = mapped_column(
+        ForeignKey("youtube_channels.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    record_date: Mapped[date] = mapped_column(nullable=False, index=True)
+    subscriber_count: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
+    total_views: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
+    video_count: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    channel: Mapped["YouTubeChannel"] = relationship("YouTubeChannel", back_populates="histories")
 

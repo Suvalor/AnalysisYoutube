@@ -1,6 +1,13 @@
 from fastapi import APIRouter
 
+from app.api.v1 import ai
+from app.api.v1 import asset_library
 from app.api.v1 import auth
+from app.api.v1 import oss
+from app.api.v1 import prompt_library
+from app.api.v1 import script_library
+from app.api.v1 import style_library
+from app.api.v1 import video_projects
 from app.api.v1 import youtube
 
 
@@ -8,4 +15,12 @@ api_router_v1 = APIRouter()
 
 api_router_v1.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router_v1.include_router(youtube.router, prefix="/youtube", tags=["youtube"])
+api_router_v1.include_router(prompt_library.router, prefix="/libraries/prompts", tags=["prompt-library"])
+api_router_v1.include_router(style_library.router, prefix="/libraries/styles", tags=["style-library"])
+api_router_v1.include_router(asset_library.router, prefix="/libraries/assets", tags=["asset-library"])
+api_router_v1.include_router(asset_library.router, prefix="/assets", tags=["assets"])
+api_router_v1.include_router(script_library.router, prefix="/libraries/scripts", tags=["script-library"])
+api_router_v1.include_router(ai.router, prefix="/ai", tags=["ai"])
+api_router_v1.include_router(video_projects.router, prefix="/video-projects", tags=["video-projects"])
+api_router_v1.include_router(oss.router, prefix="/oss", tags=["oss"])
 

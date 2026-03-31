@@ -1,8 +1,10 @@
+from datetime import date
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.youtube import YouTubeChannel, YouTubeVideo, UserCompetitorPool
+from app.models.youtube import YouTubeChannel, YouTubeChannelHistory, YouTubeVideo, UserCompetitorPool
 
 
 async def upsert_channel(
@@ -118,4 +120,66 @@ async def list_user_competitor_channels(session: AsyncSession, user_id: int) -> 
         .order_by(UserCompetitorPool.added_at.desc())
     )
     return list(result.scalars().unique().all())
+
+
+async def list_distinct_monitored_channels(session: AsyncSession) -> list[YouTubeChannel]:
+    result = await session.execute(
+        select(YouTubeChannel)
+        .join(UserCompetitorPool, UserCompetitorPool.channel_id == YouTubeChannel.id)
+        .distinct()
+        .order_by(YouTubeChannel.id.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def upsert_channel_history(
+    session: AsyncSession,
+    *,
+    channel_id: int,
+    record_date: date,
+    subscriber_count: int,
+    total_views: int,
+    video_count: int,
+) -> YouTubeChannelHistory:
+    result = await session.execute(
+        select(YouTubeChannelHistory).where(
+            YouTubeChannelHistory.channel_id == channel_id,
+            YouTubeChannelHistory.record_date == record_date,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        row = YouTubeChannelHistory(
+            channel_id=channel_id,
+            record_date=record_date,
+            subscriber_count=subscriber_count,
+            total_views=total_views,
+            video_count=video_count,
+        )
+        session.add(row)
+    else:
+        row.subscriber_count = subscriber_count
+        row.total_views = total_views
+        row.video_count = video_count
+    await session.flush()
+    return row
+
+
+async def get_channel_histories_for_compare(
+    session: AsyncSession,
+    *,
+    channel_ids: list[int],
+    start_date: date,
+) -> list[YouTubeChannelHistory]:
+    if not channel_ids:
+        return []
+    result = await session.execute(
+        select(YouTubeChannelHistory)
+        .where(
+            YouTubeChannelHistory.channel_id.in_(channel_ids),
+            YouTubeChannelHistory.record_date >= start_date,
+        )
+        .order_by(YouTubeChannelHistory.record_date.asc(), YouTubeChannelHistory.channel_id.asc())
+    )
+    return list(result.scalars().all())
 

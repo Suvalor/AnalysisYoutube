@@ -12,3 +12,8 @@ python-dotenv==1.0.1
 PyMySQL==1.1.1
 email-validator==2.2.0
 httpx==0.28.1
+APScheduler==3.10.4
+openai==1.52.2
+alibabacloud_sts20150401==1.2.0
+alibabacloud_tea_openapi==0.4.1
+oss2==2.19.1
