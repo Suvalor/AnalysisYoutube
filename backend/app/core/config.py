@@ -21,6 +21,15 @@ class Settings(BaseSettings):
     algorithm: str = Field("HS256", alias="ALGORITHM")
     access_token_expire_minutes: int = Field(60, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     youtube_api_key: str = Field("", alias="YOUTUBE_API_KEY")
+    volcengine_api_key: str = Field("", alias="VOLCENGINE_API_KEY")
+    volcengine_endpoint_id: str = Field("", alias="VOLCENGINE_ENDPOINT_ID")
+    volcengine_base_url: str = Field("", alias="VOLCENGINE_BASE_URL")
+    aliyun_access_key_id: str = Field("", alias="ALIYUN_ACCESS_KEY_ID")
+    aliyun_access_key_secret: str = Field("", alias="ALIYUN_ACCESS_KEY_SECRET")
+    aliyun_role_arn: str = Field("", alias="ALIYUN_ROLE_ARN")
+    aliyun_region_id: str = Field("", alias="ALIYUN_REGION_ID")
+    aliyun_oss_bucket_name: str = Field("", alias="ALIYUN_OSS_BUCKET_NAME")
+    aliyun_oss_endpoint: str = Field("", alias="ALIYUN_OSS_ENDPOINT")
 
     # 支持单个 URL、逗号分隔字符串，或 JSON 数组字符串
     backend_cors_origins: str = Field(

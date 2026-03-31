@@ -57,3 +57,11 @@ export async function listYouTubeChannelsApi() {
   }>;
 }
 
+export async function compareCompetitorsApi(params: { channel_ids: number[]; days?: number }) {
+  const searchParams = new URLSearchParams();
+  params.channel_ids.forEach((id) => searchParams.append("channel_ids", String(id)));
+  searchParams.append("days", String(params.days ?? 30));
+  const res = await apiClient.get(`/api/youtube/competitors/compare?${searchParams.toString()}`);
+  return res.data as Array<Record<string, string | number>>;
+}
+
