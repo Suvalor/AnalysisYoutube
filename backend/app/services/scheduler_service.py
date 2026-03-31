@@ -7,6 +7,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.crud.youtube import list_distinct_monitored_channels, upsert_channel, upsert_channel_history
+from app.services.quota_service import record_api_quota_usage
 from app.db.session import AsyncSessionLocal
 from app.services.youtube_service import fetch_channels_by_ids, parse_datetime
 
@@ -24,7 +25,8 @@ async def sync_channels_daily_stats() -> None:
             return
 
         id_map = {c.yt_channel_id: c.id for c in channels}
-        api_items = await fetch_channels_by_ids(list(id_map.keys()))
+        api_items, calls = await fetch_channels_by_ids(list(id_map.keys()), return_call_count=True)
+        await record_api_quota_usage(session, "channels", times=calls)
         today = date.today()
 
         for item in api_items:

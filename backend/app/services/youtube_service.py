@@ -91,7 +91,7 @@ async def fetch_recent_videos(channel_id: str, limit: int = 10) -> list[dict]:
         videos_resp = await client.get(
             "https://www.googleapis.com/youtube/v3/videos",
             params={
-                "part": "snippet,statistics",
+                "part": "contentDetails,status,statistics,snippet",
                 "id": ",".join(video_ids),
                 "key": settings.youtube_api_key,
             },
@@ -101,18 +101,26 @@ async def fetch_recent_videos(channel_id: str, limit: int = 10) -> list[dict]:
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"YouTube videos API 调用失败：{videos_resp.text}",
         )
-    return videos_resp.json().get("items", [])
+    items = videos_resp.json().get("items", [])
+    for item in items:
+        raw_duration = item.get("contentDetails", {}).get("duration")
+        sec = duration_iso8601_to_seconds(raw_duration)
+        item["_duration_sec"] = sec
+        item["_duration_str"] = seconds_to_duration_str(sec)
+    return items
 
 
-async def fetch_channels_by_ids(channel_ids: list[str]) -> list[dict]:
+async def fetch_channels_by_ids(channel_ids: list[str], return_call_count: bool = False):
     """批量按 channel id 拉取频道详情，单次最多 50 个。"""
     if not channel_ids:
         return []
 
     async with httpx.AsyncClient(timeout=15) as client:
         all_items: list[dict] = []
+        call_count = 0
         for i in range(0, len(channel_ids), 50):
             chunk = channel_ids[i : i + 50]
+            call_count += 1
             resp = await client.get(
                 "https://www.googleapis.com/youtube/v3/channels",
                 params={
@@ -127,6 +135,8 @@ async def fetch_channels_by_ids(channel_ids: list[str]) -> list[dict]:
                     detail=f"YouTube channels(batch) API 调用失败：{resp.text}",
                 )
             all_items.extend(resp.json().get("items", []))
+    if return_call_count:
+        return all_items, call_count
     return all_items
 
 
@@ -146,4 +156,27 @@ def calc_recent_avg_views(video_items: list[dict]) -> int:
     for item in video_items:
         total += int(item.get("statistics", {}).get("viewCount", 0))
     return int(total / len(video_items))
+
+
+def duration_iso8601_to_seconds(value: str | None) -> int:
+    if not value:
+        return 0
+    pattern = re.compile(r"^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$")
+    m = pattern.match(value)
+    if not m:
+        return 0
+    hours = int(m.group(1) or 0)
+    minutes = int(m.group(2) or 0)
+    seconds = int(m.group(3) or 0)
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def seconds_to_duration_str(sec: int) -> str:
+    sec = max(0, int(sec))
+    h = sec // 3600
+    m = (sec % 3600) // 60
+    s = sec % 60
+    if h > 0:
+        return f"{h:02d}:{m:02d}:{s:02d}"
+    return f"{m:02d}:{s:02d}"
 

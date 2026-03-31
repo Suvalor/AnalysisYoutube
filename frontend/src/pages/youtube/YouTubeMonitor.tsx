@@ -1,170 +1,307 @@
-import { Alert, Button, Card, Empty, Input, Spin, Statistic, Tag, Typography } from "antd";
-import { useEffect, useState } from "react";
-import { analyzeYouTubeApi, listYouTubeChannelsApi, YouTubeAnalyzeResponse } from "@/services/authApi";
+import { Button, DatePicker, Input, InputNumber, Modal, Select, Table, Tag, message } from "antd";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+import { useEffect, useMemo, useState } from "react";
+import {
+  analyzeYouTubeApi,
+  batchUpdateChannelsApi,
+  deleteYouTubeChannelApi,
+  getYouTubeQuotaDashboardApi,
+  listYouTubeChannelsApi,
+  listYouTubeVideosApi,
+  type YouTubeAnalyzeResponse,
+} from "@/services/authApi";
 
-const { Title, Paragraph, Text } = Typography;
+dayjs.extend(relativeTime);
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("zh-CN").format(value ?? 0);
 }
 
 export default function YouTubeMonitor() {
+  const [tableLoading, setTableLoading] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<YouTubeAnalyzeResponse | null>(null);
+  const [updating, setUpdating] = useState(false);
   const [pool, setPool] = useState<Array<{ pool_id: number; group_name: string; channel: YouTubeAnalyzeResponse["channel"] }>>([]);
+  const [videos, setVideos] = useState<YouTubeAnalyzeResponse["videos"]>([]);
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [quota, setQuota] = useState<{ today_remaining: number } | null>(null);
+  const [filters, setFilters] = useState({
+    keyword: "",
+    dateRange: null as [dayjs.Dayjs, dayjs.Dayjs] | null,
+    min_duration: undefined as number | undefined,
+    max_duration: undefined as number | undefined,
+    definition: undefined as string | undefined,
+    privacy_status: undefined as string | undefined,
+    sort_by: "publish_time_desc",
+  });
 
   const loadPool = async () => {
     try {
+      setTableLoading(true);
       const data = await listYouTubeChannelsApi();
       setPool(data.map((x) => ({ pool_id: x.pool_id, group_name: x.group_name, channel: x.channel })));
     } catch {
-      // 忽略首屏列表错误，不影响分析能力
+      message.error("加载关注列表失败");
+    } finally {
+      setTableLoading(false);
+    }
+  };
+
+  const loadQuota = async () => {
+    const d = await getYouTubeQuotaDashboardApi();
+    setQuota({ today_remaining: d.today_remaining });
+    return d;
+  };
+
+  const loadVideos = async (nextFilters = filters) => {
+    setVideoLoading(true);
+    try {
+      const data = await listYouTubeVideosApi({
+        keyword: nextFilters.keyword || undefined,
+        start_date: nextFilters.dateRange?.[0]?.format("YYYY-MM-DD"),
+        end_date: nextFilters.dateRange?.[1]?.format("YYYY-MM-DD"),
+        min_duration: nextFilters.min_duration,
+        max_duration: nextFilters.max_duration,
+        definition: nextFilters.definition,
+        privacy_status: nextFilters.privacy_status,
+        sort_by: nextFilters.sort_by,
+      });
+      setVideos(data);
+    } catch {
+      message.error("加载视频列表失败");
+    } finally {
+      setVideoLoading(false);
     }
   };
 
   useEffect(() => {
     void loadPool();
+    void loadVideos();
+    void loadQuota();
   }, []);
 
-  const handleAnalyze = async () => {
+  const onAddChannel = async () => {
     if (!youtubeUrl.trim()) {
-      setError("请输入 YouTube 频道链接");
+      message.warning("请输入 YouTube 频道链接");
       return;
     }
-    setLoading(true);
-    setError(null);
     try {
-      const data = await analyzeYouTubeApi({ youtube_url: youtubeUrl.trim() });
-      setResult(data);
+      await analyzeYouTubeApi({ youtube_url: youtubeUrl.trim() });
+      message.success("添加并抓取成功");
+      setYoutubeUrl("");
       await loadPool();
+      await loadVideos();
+      await loadQuota();
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? e?.message ?? "分析失败，请稍后重试");
-    } finally {
-      setLoading(false);
+      message.error(e?.response?.data?.detail ?? "添加失败");
     }
   };
 
+  const onBatchUpdate = async () => {
+    const q = await loadQuota();
+    const estimated = pool.length * 102;
+    Modal.confirm({
+      title: "确认一键更新",
+      content: `本次预计消耗 API 额度: ${estimated} 点，今日剩余额度: ${q.today_remaining} 点，是否继续？`,
+      okText: "继续",
+      cancelText: "取消",
+      onOk: async () => {
+        setUpdating(true);
+        try {
+          const res = await batchUpdateChannelsApi();
+          message.success(`更新完成：频道 ${res.updated_channels}，视频 ${res.updated_videos}`);
+          await loadPool();
+          await loadVideos();
+          await loadQuota();
+        } catch (e: any) {
+          message.error(e?.response?.data?.detail ?? "更新失败");
+        } finally {
+          setUpdating(false);
+        }
+      },
+    });
+  };
+
+  const columns = useMemo(
+    () => [
+      {
+        title: "博主信息",
+        key: "info",
+        render: (_: unknown, row: (typeof pool)[number]) => (
+          <div className="flex items-center gap-3">
+            <img src={row.channel.thumbnail_url || ""} className="w-10 h-10 rounded-full border border-slate-200" />
+            <div className="text-slate-900 font-medium">{row.channel.title}</div>
+          </div>
+        ),
+      },
+      { title: "订阅数", dataIndex: ["channel", "subscriber_count"], render: (v: number) => formatNumber(v) },
+      { title: "总播放量", dataIndex: ["channel", "total_views"], render: (v: number) => formatNumber(v) },
+      { title: "已收录视频数", dataIndex: ["channel", "video_count"], render: (v: number) => formatNumber(v) },
+      {
+        title: "操作",
+        key: "action",
+        render: (_: unknown, row: (typeof pool)[number]) => (
+          <div className="flex gap-2">
+            <Button size="small" onClick={() => loadVideos({ ...filters, keyword: row.channel.title })}>
+              查看分析
+            </Button>
+            <Button
+              size="small"
+              danger
+              onClick={async () => {
+                await deleteYouTubeChannelApi(row.pool_id);
+                message.success("删除成功");
+                await loadPool();
+                await loadVideos();
+              }}
+            >
+              删除
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [pool, filters]
+  );
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-10">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6">
-          <Title level={3} style={{ color: "#f8fafc", marginBottom: 8 }}>
-            YouTube 对标分析监控台
-          </Title>
-          <Paragraph style={{ color: "#94a3b8", marginBottom: 16 }}>
-            输入频道链接（支持 <Text code>/channel/UC...</Text> 与 <Text code>/@handle</Text>），一键抓取频道与最近 10 条视频数据。
-          </Paragraph>
-          {error && <Alert type="error" message={error} showIcon className="mb-4" />}
-          <div className="flex flex-col md:flex-row gap-3">
+    <div className="min-h-screen bg-[#F8F9FA] p-6 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-4">
+        <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+          <div className="flex flex-col md:flex-row gap-2 md:items-center md:justify-end">
             <Input
-              size="large"
-              placeholder="例如：https://www.youtube.com/@GoogleDevelopers"
+              className="max-w-[420px]"
+              placeholder="输入 YouTube 频道链接"
               value={youtubeUrl}
               onChange={(e) => setYoutubeUrl(e.target.value)}
             />
-            <Button type="primary" size="large" loading={loading} onClick={handleAnalyze}>
-              一键分析
+            <Button type="primary" onClick={onAddChannel}>
+              添加关注
+            </Button>
+            <Button type="primary" loading={updating} onClick={onBatchUpdate}>
+              一键更新数据
             </Button>
           </div>
         </div>
-
-        <Spin spinning={loading}>
-          {result ? (
-            <>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <Card className="lg:col-span-2 !bg-slate-900/70 !border-slate-800">
-                  <div className="flex items-start gap-4">
-                    {result.channel.thumbnail_url ? (
-                      <img
-                        src={result.channel.thumbnail_url}
-                        alt="channel"
-                        className="w-20 h-20 rounded-full object-cover border border-slate-700"
-                      />
-                    ) : (
-                      <div className="w-20 h-20 rounded-full bg-slate-700" />
-                    )}
-                    <div className="flex-1">
-                      <Title level={4} style={{ color: "#f8fafc", margin: 0 }}>
-                        {result.channel.title}
-                      </Title>
-                      <div className="mt-2">
-                        <Tag color="blue">{result.channel.yt_channel_id}</Tag>
-                      </div>
-                      <Paragraph style={{ color: "#94a3b8", marginTop: 12 }}>
-                        {result.channel.description || "暂无简介"}
-                      </Paragraph>
-                    </div>
-                  </div>
-                </Card>
-                <Card className="!bg-slate-900/70 !border-slate-800">
-                  <div className="space-y-3">
-                    <Statistic title="订阅数" value={formatNumber(result.channel.subscriber_count)} />
-                    <Statistic title="总播放量" value={formatNumber(result.channel.total_views)} />
-                    <Statistic title="视频总数" value={formatNumber(result.channel.video_count)} />
-                    <Statistic title="近期平均播放量" value={formatNumber(result.recent_avg_views)} />
-                  </div>
-                </Card>
-              </div>
-
-              <Card
-                title={<span style={{ color: "#f8fafc" }}>近期视频（最近 10 条）</span>}
-                className="!bg-slate-900/70 !border-slate-800"
+        <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+          <Table
+            rowKey="pool_id"
+            loading={tableLoading}
+            dataSource={pool}
+            columns={columns}
+            pagination={{ pageSize: 8 }}
+          />
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-8 gap-2">
+            <Input
+              placeholder="搜索标题关键词"
+              value={filters.keyword}
+              onChange={(e) => setFilters((s) => ({ ...s, keyword: e.target.value }))}
+            />
+            <DatePicker.RangePicker
+              value={filters.dateRange as any}
+              onChange={(v) => setFilters((s) => ({ ...s, dateRange: v as any }))}
+            />
+            <InputNumber
+              className="w-full"
+              placeholder="最小时长(秒)"
+              value={filters.min_duration}
+              onChange={(v) => setFilters((s) => ({ ...s, min_duration: Number(v) || undefined }))}
+            />
+            <InputNumber
+              className="w-full"
+              placeholder="最大时长(秒)"
+              value={filters.max_duration}
+              onChange={(v) => setFilters((s) => ({ ...s, max_duration: Number(v) || undefined }))}
+            />
+            <Select
+              allowClear
+              placeholder="清晰度"
+              value={filters.definition}
+              onChange={(v) => setFilters((s) => ({ ...s, definition: v }))}
+              options={[
+                { label: "HD", value: "hd" },
+                { label: "SD", value: "sd" },
+              ]}
+            />
+            <Select
+              allowClear
+              placeholder="隐私状态"
+              value={filters.privacy_status}
+              onChange={(v) => setFilters((s) => ({ ...s, privacy_status: v }))}
+              options={[
+                { label: "公开", value: "public" },
+                { label: "不公开", value: "unlisted" },
+                { label: "私密", value: "private" },
+              ]}
+            />
+            <Select
+              value={filters.sort_by}
+              onChange={(v) => setFilters((s) => ({ ...s, sort_by: v }))}
+              options={[
+                { label: "发布时间倒序", value: "publish_time_desc" },
+                { label: "发布时间正序", value: "publish_time_asc" },
+                { label: "播放量倒序", value: "view_count_desc" },
+              ]}
+            />
+            <div className="flex gap-2">
+              <Button type="primary" onClick={() => loadVideos()}>
+                筛选
+              </Button>
+              <Button
+                onClick={() => {
+                  const reset = {
+                    keyword: "",
+                    dateRange: null as [dayjs.Dayjs, dayjs.Dayjs] | null,
+                    min_duration: undefined,
+                    max_duration: undefined,
+                    definition: undefined,
+                    privacy_status: undefined,
+                    sort_by: "publish_time_desc",
+                  };
+                  setFilters(reset);
+                  void loadVideos(reset);
+                }}
               >
-                {result.videos.length === 0 ? (
-                  <Empty description="暂无近期视频数据" />
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {result.videos.map((video) => (
-                      <Card key={video.id} size="small" className="!bg-slate-950/70 !border-slate-800">
-                        {video.thumbnail_url ? (
-                          <img
-                            src={video.thumbnail_url}
-                            alt={video.title}
-                            className="w-full h-40 object-cover rounded-lg mb-3"
-                          />
-                        ) : (
-                          <div className="w-full h-40 bg-slate-800 rounded-lg mb-3" />
-                        )}
-                        <Title level={5} style={{ color: "#f8fafc", marginBottom: 8 }}>
-                          {video.title}
-                        </Title>
-                        <div className="text-slate-300 text-sm space-y-1">
-                          <div>发布时间：{video.published_at ? new Date(video.published_at).toLocaleString() : "未知"}</div>
-                          <div>播放量：{formatNumber(video.view_count)}</div>
-                          <div>点赞量：{formatNumber(video.like_count)}</div>
-                          <div>评论量：{formatNumber(video.comment_count)}</div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </Card>
-            </>
-          ) : (
-            <Card className="!bg-slate-900/70 !border-slate-800">
-              <Empty description="输入链接后点击一键分析" />
-            </Card>
-          )}
-        </Spin>
-
-        <Card
-          title={<span style={{ color: "#f8fafc" }}>我的监控池频道</span>}
-          className="!bg-slate-900/70 !border-slate-800"
-        >
-          {pool.length === 0 ? (
-            <Empty description="当前监控池为空" />
-          ) : (
-            <div className="flex flex-wrap gap-3">
-              {pool.map((item) => (
-                <Tag key={item.pool_id} color="geekblue">
-                  {item.channel.title} / {item.group_name}
-                </Tag>
-              ))}
+                重置
+              </Button>
             </div>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {videoLoading ? (
+            <div className="text-slate-500 text-sm">加载中...</div>
+          ) : (
+            videos.map((video) => (
+              <div key={video.id} className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm flex gap-4">
+                <div className="relative w-64 shrink-0">
+                  <img src={video.thumbnail_url || ""} className="w-full h-36 object-cover rounded" />
+                  <div className="absolute right-2 bottom-2 text-xs px-2 py-0.5 rounded bg-black/60 text-white">{video.duration_str}</div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-slate-900 truncate">{video.title}</div>
+                  <div className="mt-2 flex gap-2">
+                    <Tag className="!border-slate-200 !bg-white !text-slate-700">{video.definition.toUpperCase()}</Tag>
+                    <Tag className="!border-slate-200 !bg-white !text-slate-700">{video.privacy_status}</Tag>
+                    <Tag className="!border-slate-200 !bg-white !text-slate-700">{video.category_id || "N/A"}</Tag>
+                  </div>
+                  <div className="text-slate-500 text-sm mt-3">
+                    发布于 {video.published_at ? dayjs(video.published_at).format("YYYY-MM-DD HH:mm") : "-"} 数据更新：
+                    {video.published_at ? dayjs(video.published_at).fromNow() : "-"}
+                  </div>
+                </div>
+                <div className="w-56 border border-slate-200 rounded-md p-2 text-sm">
+                  <div className="text-blue-600">播放量：{formatNumber(video.view_count)}</div>
+                  <div className="text-emerald-600">点赞数：{formatNumber(video.like_count)}</div>
+                  <div className="text-orange-500">评论数：{formatNumber(video.comment_count)}</div>
+                </div>
+                <div className="text-slate-500">⋯</div>
+              </div>
+            ))
           )}
-        </Card>
+        </div>
       </div>
     </div>
   );

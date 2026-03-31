@@ -36,6 +36,11 @@ export type YouTubeAnalyzeResponse = {
     title: string;
     thumbnail_url: string | null;
     published_at: string | null;
+    duration_sec: number;
+    duration_str: string;
+    definition: string;
+    privacy_status: string;
+    category_id: string | null;
     view_count: number;
     like_count: number;
     comment_count: number;
@@ -57,11 +62,55 @@ export async function listYouTubeChannelsApi() {
   }>;
 }
 
+export async function deleteYouTubeChannelApi(poolId: number) {
+  const res = await apiClient.delete(`/api/youtube/channels/${poolId}`);
+  return res.data as { success: boolean };
+}
+
 export async function compareCompetitorsApi(params: { channel_ids: number[]; days?: number }) {
   const searchParams = new URLSearchParams();
   params.channel_ids.forEach((id) => searchParams.append("channel_ids", String(id)));
   searchParams.append("days", String(params.days ?? 30));
   const res = await apiClient.get(`/api/youtube/competitors/compare?${searchParams.toString()}`);
   return res.data as Array<Record<string, string | number>>;
+}
+
+export async function getYouTubeQuotaDashboardApi() {
+  const res = await apiClient.get("/api/youtube/quota-dashboard");
+  return res.data as {
+    today_total: number;
+    today_used: number;
+    today_remaining: number;
+    history: Array<{ date: string; points_used: number }>;
+  };
+}
+
+export async function batchUpdateChannelsApi() {
+  const res = await apiClient.post("/api/youtube/channels/batch-update");
+  return res.data as {
+    estimated_points: number;
+    updated_channels: number;
+    updated_videos: number;
+  };
+}
+
+export async function listYouTubeVideosApi(params: {
+  keyword?: string;
+  start_date?: string;
+  end_date?: string;
+  min_duration?: number;
+  max_duration?: number;
+  definition?: string;
+  privacy_status?: string;
+  sort_by?: string;
+}) {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && `${v}` !== "") {
+      searchParams.append(k, String(v));
+    }
+  });
+  const res = await apiClient.get(`/api/youtube/videos?${searchParams.toString()}`);
+  return res.data as YouTubeAnalyzeResponse["videos"];
 }
 

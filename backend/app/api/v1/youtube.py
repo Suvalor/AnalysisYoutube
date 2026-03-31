@@ -5,15 +5,20 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.crud.youtube import (
+    delete_user_competitor_channel,
     ensure_competitor_pool,
     get_channel_histories_for_compare,
     list_user_competitor_channels,
+    list_distinct_monitored_channels,
+    query_videos,
     upsert_channel,
     upsert_channel_history,
     upsert_videos,
 )
+from app.crud.quota import get_quota_by_date, list_quota_recent_days
 from app.models.youtube import YouTubeChannel, YouTubeVideo
 from app.schemas.youtube import (
+    QuotaDashboardResponse,
     UserCompetitorChannelItem,
     YouTubeAnalyzeRequest,
     YouTubeAnalyzeResponse,
@@ -27,6 +32,7 @@ from app.services.youtube_service import (
     parse_datetime,
     parse_youtube_identifier,
 )
+from app.services.quota_service import record_api_quota_usage
 
 
 router = APIRouter()
@@ -43,6 +49,7 @@ async def analyze_youtube_channel(
 ) -> YouTubeAnalyzeResponse:
     identifier = parse_youtube_identifier(payload.youtube_url)
     item = await fetch_channel_info(identifier)
+    await record_api_quota_usage(db, "channels")
 
     snippet = item.get("snippet", {})
     statistics = item.get("statistics", {})
@@ -61,6 +68,8 @@ async def analyze_youtube_channel(
     )
 
     recent_videos_raw = await fetch_recent_videos(channel_id=channel_id, limit=10)
+    await record_api_quota_usage(db, "search")
+    await record_api_quota_usage(db, "videos")
     for video in recent_videos_raw:
         video.setdefault("_parsed_published_at", parse_datetime(video.get("snippet", {}).get("publishedAt")))
 
@@ -96,6 +105,56 @@ async def analyze_youtube_channel(
     )
 
 
+@router.get("/quota-dashboard", response_model=QuotaDashboardResponse)
+async def quota_dashboard(db: DBSessionDep, current_user: CurrentUserDep) -> QuotaDashboardResponse:
+    _ = current_user
+    today_total = 10000
+    today_row = await get_quota_by_date(db, date.today())
+    today_used = int(today_row.points_used if today_row else 0)
+    history_rows = await list_quota_recent_days(db, 7)
+    history = [{"date": r.record_date.isoformat(), "points_used": int(r.points_used)} for r in history_rows]
+    return QuotaDashboardResponse(
+        today_total=today_total,
+        today_used=today_used,
+        today_remaining=max(0, today_total - today_used),
+        history=history,
+    )
+
+
+@router.get("/videos", response_model=list[YouTubeVideoRead])
+async def list_videos(
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    keyword: str | None = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    min_duration: int | None = Query(None),
+    max_duration: int | None = Query(None),
+    definition: str | None = Query(None),
+    privacy_status: str | None = Query(None),
+    sort_by: str = Query("publish_time_desc"),
+) -> list[YouTubeVideoRead]:
+    start_dt = None
+    end_dt = None
+    if start_date:
+        start_dt = parse_datetime(f"{start_date}T00:00:00Z")
+    if end_date:
+        end_dt = parse_datetime(f"{end_date}T23:59:59Z")
+    rows = await query_videos(
+        db,
+        user_id=current_user.id,
+        keyword=keyword,
+        start_date=start_dt,
+        end_date=end_dt,
+        min_duration=min_duration,
+        max_duration=max_duration,
+        definition=definition,
+        privacy_status=privacy_status,
+        sort_by=sort_by,
+    )
+    return [YouTubeVideoRead.model_validate(x) for x in rows]
+
+
 @router.get(
     "/channels",
     response_model=list[UserCompetitorChannelItem],
@@ -117,6 +176,74 @@ async def list_channels(
             )
         )
     return results
+
+
+@router.delete("/channels/{pool_id}")
+async def delete_channel_from_pool(
+    pool_id: int,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> dict:
+    ok = await delete_user_competitor_channel(db, user_id=current_user.id, pool_id=pool_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    await db.commit()
+    return {"success": True}
+
+
+@router.post("/channels/batch-update")
+async def batch_update_channels(
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> dict:
+    _ = current_user
+    channels = await list_distinct_monitored_channels(db)
+    if not channels:
+        return {"estimated_points": 0, "updated_channels": 0, "updated_videos": 0}
+
+    # 粗略估算：每个频道 search(100) + videos(1) + channels(1)
+    estimated_points = len(channels) * 102
+
+    updated_channels = 0
+    updated_videos = 0
+    for c in channels:
+        item = await fetch_channel_info({"channel_id": c.yt_channel_id})
+        await record_api_quota_usage(db, "channels")
+        snippet = item.get("snippet", {})
+        statistics = item.get("statistics", {})
+        channel = await upsert_channel(
+            session=db,
+            yt_channel_id=item.get("id", c.yt_channel_id),
+            title=snippet.get("title", ""),
+            description=snippet.get("description", ""),
+            thumbnail_url=(snippet.get("thumbnails", {}).get("high", {}) or {}).get("url"),
+            subscriber_count=int(statistics.get("subscriberCount", 0)),
+            total_views=int(statistics.get("viewCount", 0)),
+            video_count=int(statistics.get("videoCount", 0)),
+            published_at=parse_datetime(snippet.get("publishedAt")),
+        )
+        recent_videos = await fetch_recent_videos(channel.yt_channel_id, 10)
+        await record_api_quota_usage(db, "search")
+        await record_api_quota_usage(db, "videos")
+        for v in recent_videos:
+            v.setdefault("_parsed_published_at", parse_datetime(v.get("snippet", {}).get("publishedAt")))
+        saved = await upsert_videos(db, channel_id=channel.id, videos=recent_videos)
+        await upsert_channel_history(
+            session=db,
+            channel_id=channel.id,
+            record_date=date.today(),
+            subscriber_count=channel.subscriber_count,
+            total_views=channel.total_views,
+            video_count=channel.video_count,
+        )
+        updated_channels += 1
+        updated_videos += len(saved)
+    await db.commit()
+    return {
+        "estimated_points": estimated_points,
+        "updated_channels": updated_channels,
+        "updated_videos": updated_videos,
+    }
 
 
 @router.get(
