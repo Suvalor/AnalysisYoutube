@@ -36,3 +36,20 @@ async def create_user(
     await session.refresh(user)
     return user
 
+
+async def update_user_settings(
+    session: AsyncSession,
+    user: User,
+    *,
+    feishu_doc_url: str | None,
+) -> User:
+    """更新用户设置相关字段。"""
+    user.feishu_doc_url = feishu_doc_url
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise
+    await session.refresh(user)
+    return user
+

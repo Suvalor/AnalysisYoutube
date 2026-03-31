@@ -38,7 +38,7 @@ services:
       DATABASE_URL: mysql+asyncmy://creator:creator123@mysql:3306/creator_saas
       SECRET_KEY: change_this_to_a_strong_random_string
       ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
       BACKEND_CORS_ORIGINS: http://localhost:5173
       YOUTUBE_API_KEY: AIzaSyDvV1f8rkiO6VFHj33M5gU3h_dV_kAFKdM
       VOLCENGINE_API_KEY: cb1ae748-a74f-48ef-b057-debfed45e2c4

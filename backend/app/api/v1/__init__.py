@@ -7,6 +7,7 @@ from app.api.v1 import oss
 from app.api.v1 import prompt_library
 from app.api.v1 import script_library
 from app.api.v1 import style_library
+from app.api.v1 import users
 from app.api.v1 import video_projects
 from app.api.v1 import youtube
 
@@ -23,4 +24,5 @@ api_router_v1.include_router(script_library.router, prefix="/libraries/scripts",
 api_router_v1.include_router(ai.router, prefix="/ai", tags=["ai"])
 api_router_v1.include_router(video_projects.router, prefix="/video-projects", tags=["video-projects"])
 api_router_v1.include_router(oss.router, prefix="/oss", tags=["oss"])
+api_router_v1.include_router(users.router, prefix="/users", tags=["users"])
 
