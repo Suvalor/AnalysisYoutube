@@ -22,6 +22,7 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1")
+    feishu_doc_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     competitor_pools: Mapped[list["UserCompetitorPool"]] = relationship(
         "UserCompetitorPool", back_populates="user", cascade="all, delete-orphan"
     )

@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     secret_key: str = Field("change_me", alias="SECRET_KEY")
     algorithm: str = Field("HS256", alias="ALGORITHM")
-    access_token_expire_minutes: int = Field(60, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
+    access_token_expire_minutes: int = Field(1440, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     youtube_api_key: str = Field("", alias="YOUTUBE_API_KEY")
     volcengine_api_key: str = Field("", alias="VOLCENGINE_API_KEY")
     volcengine_endpoint_id: str = Field("", alias="VOLCENGINE_ENDPOINT_ID")
