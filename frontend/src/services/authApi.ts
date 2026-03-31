@@ -100,9 +100,12 @@ export async function listYouTubeVideosApi(params: {
   end_date?: string;
   min_duration?: number;
   max_duration?: number;
+  channel_id?: number;
   definition?: string;
   privacy_status?: string;
   sort_by?: string;
+  page?: number;
+  page_size?: number;
 }) {
   const searchParams = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -111,6 +114,11 @@ export async function listYouTubeVideosApi(params: {
     }
   });
   const res = await apiClient.get(`/api/youtube/videos?${searchParams.toString()}`);
-  return res.data as YouTubeAnalyzeResponse["videos"];
+  return res.data as {
+    items: YouTubeAnalyzeResponse["videos"];
+    total: number;
+    page: number;
+    page_size: number;
+  };
 }
 

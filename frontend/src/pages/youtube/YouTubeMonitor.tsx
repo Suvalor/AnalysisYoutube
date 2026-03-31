@@ -1,4 +1,4 @@
-import { Button, DatePicker, Input, InputNumber, Modal, Select, Table, Tag, message } from "antd";
+import { Button, DatePicker, Input, InputNumber, Modal, Pagination, Select, Table, Tag, message } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { useEffect, useMemo, useState } from "react";
@@ -25,12 +25,16 @@ export default function YouTubeMonitor() {
   const [pool, setPool] = useState<Array<{ pool_id: number; group_name: string; channel: YouTubeAnalyzeResponse["channel"] }>>([]);
   const [videos, setVideos] = useState<YouTubeAnalyzeResponse["videos"]>([]);
   const [videoLoading, setVideoLoading] = useState(false);
+  const [videoTotal, setVideoTotal] = useState(0);
+  const [videoPage, setVideoPage] = useState(1);
+  const [videoPageSize, setVideoPageSize] = useState(20);
   const [quota, setQuota] = useState<{ today_remaining: number } | null>(null);
   const [filters, setFilters] = useState({
     keyword: "",
     dateRange: null as [dayjs.Dayjs, dayjs.Dayjs] | null,
     min_duration: undefined as number | undefined,
     max_duration: undefined as number | undefined,
+    channel_id: undefined as number | undefined,
     definition: undefined as string | undefined,
     privacy_status: undefined as string | undefined,
     sort_by: "publish_time_desc",
@@ -54,7 +58,7 @@ export default function YouTubeMonitor() {
     return d;
   };
 
-  const loadVideos = async (nextFilters = filters) => {
+  const loadVideos = async (nextFilters = filters, page = videoPage, pageSize = videoPageSize) => {
     setVideoLoading(true);
     try {
       const data = await listYouTubeVideosApi({
@@ -63,11 +67,17 @@ export default function YouTubeMonitor() {
         end_date: nextFilters.dateRange?.[1]?.format("YYYY-MM-DD"),
         min_duration: nextFilters.min_duration,
         max_duration: nextFilters.max_duration,
+        channel_id: nextFilters.channel_id,
         definition: nextFilters.definition,
         privacy_status: nextFilters.privacy_status,
         sort_by: nextFilters.sort_by,
+        page,
+        page_size: pageSize,
       });
-      setVideos(data);
+      setVideos(data.items);
+      setVideoTotal(data.total);
+      setVideoPage(data.page);
+      setVideoPageSize(data.page_size);
     } catch {
       message.error("加载视频列表失败");
     } finally {
@@ -143,7 +153,7 @@ export default function YouTubeMonitor() {
         key: "action",
         render: (_: unknown, row: (typeof pool)[number]) => (
           <div className="flex gap-2">
-            <Button size="small" onClick={() => loadVideos({ ...filters, keyword: row.channel.title })}>
+            <Button size="small" onClick={() => loadVideos({ ...filters, channel_id: row.channel.id }, 1, videoPageSize)}>
               查看分析
             </Button>
             <Button
@@ -218,6 +228,13 @@ export default function YouTubeMonitor() {
             />
             <Select
               allowClear
+              placeholder="按频道过滤"
+              value={filters.channel_id}
+              onChange={(v) => setFilters((s) => ({ ...s, channel_id: v }))}
+              options={pool.map((x) => ({ label: x.channel.title, value: x.channel.id }))}
+            />
+            <Select
+              allowClear
               placeholder="清晰度"
               value={filters.definition}
               onChange={(v) => setFilters((s) => ({ ...s, definition: v }))}
@@ -247,7 +264,13 @@ export default function YouTubeMonitor() {
               ]}
             />
             <div className="flex gap-2">
-              <Button type="primary" onClick={() => loadVideos()}>
+              <Button
+                type="primary"
+                onClick={() => {
+                  setVideoPage(1);
+                  void loadVideos(filters, 1, videoPageSize);
+                }}
+              >
                 筛选
               </Button>
               <Button
@@ -257,12 +280,14 @@ export default function YouTubeMonitor() {
                     dateRange: null as [dayjs.Dayjs, dayjs.Dayjs] | null,
                     min_duration: undefined,
                     max_duration: undefined,
+                    channel_id: undefined,
                     definition: undefined,
                     privacy_status: undefined,
                     sort_by: "publish_time_desc",
                   };
                   setFilters(reset);
-                  void loadVideos(reset);
+                  setVideoPage(1);
+                  void loadVideos(reset, 1, videoPageSize);
                 }}
               >
                 重置
@@ -301,6 +326,17 @@ export default function YouTubeMonitor() {
               </div>
             ))
           )}
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm flex justify-end">
+          <Pagination
+            current={videoPage}
+            pageSize={videoPageSize}
+            total={videoTotal}
+            showSizeChanger
+            onChange={(p, ps) => {
+              void loadVideos(filters, p, ps);
+            }}
+          />
         </div>
       </div>
     </div>
