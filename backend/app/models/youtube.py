@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import BIGINT, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import BIGINT, JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -20,6 +20,9 @@ class YouTubeChannel(Base):
     total_views: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
     video_count: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ai_tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    ai_audience_age: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -35,6 +38,9 @@ class YouTubeChannel(Base):
     )
     histories: Mapped[list["YouTubeChannelHistory"]] = relationship(
         "YouTubeChannelHistory", back_populates="channel", cascade="all, delete-orphan"
+    )
+    comments: Mapped[list["YouTubeComment"]] = relationship(
+        "YouTubeComment", back_populates="channel", cascade="all, delete-orphan"
     )
 
 
@@ -74,6 +80,7 @@ class YouTubeVideo(Base):
     definition: Mapped[str] = mapped_column(String(20), nullable=False, default="sd")
     privacy_status: Mapped[str] = mapped_column(String(20), nullable=False, default="public")
     category_id: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     view_count: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
     like_count: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
     comment_count: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
@@ -85,6 +92,37 @@ class YouTubeVideo(Base):
     )
 
     channel: Mapped["YouTubeChannel"] = relationship("YouTubeChannel", back_populates="videos")
+    comments: Mapped[list["YouTubeComment"]] = relationship(
+        "YouTubeComment", back_populates="video", cascade="all, delete-orphan"
+    )
+
+
+class YouTubeComment(Base):
+    """定向抓取的 YouTube 评论（commentThreads + searchTerms）。"""
+
+    __tablename__ = "youtube_comments"
+    __table_args__ = (UniqueConstraint("yt_comment_id", name="uq_youtube_comment_yt_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    yt_comment_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    video_id: Mapped[int] = mapped_column(
+        ForeignKey("youtube_videos.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    channel_id: Mapped[int] = mapped_column(
+        ForeignKey("youtube_channels.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    author_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    author_avatar: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    text_original: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    like_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    keyword_used: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    video: Mapped["YouTubeVideo"] = relationship("YouTubeVideo", back_populates="comments")
+    channel: Mapped["YouTubeChannel"] = relationship("YouTubeChannel", back_populates="comments")
 
 
 class YouTubeChannelHistory(Base):

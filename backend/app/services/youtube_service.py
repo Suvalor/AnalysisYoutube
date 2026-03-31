@@ -497,3 +497,75 @@ def seconds_to_duration_str(sec: int) -> str:
     if h > 0:
         return f"{h:02d}:{m:02d}:{s:02d}"
     return f"{m:02d}:{s:02d}"
+
+
+def parse_comment_thread_item(item: dict) -> dict | None:
+    """从 commentThreads.list 单条 item 解析为可入库字段。"""
+    tl = item.get("snippet", {}).get("topLevelComment", {})
+    if not tl:
+        return None
+    cid = tl.get("id")
+    sn = tl.get("snippet", {})
+    if not cid:
+        return None
+    text = sn.get("textDisplay") or sn.get("textOriginal") or ""
+    return {
+        "yt_comment_id": cid,
+        "author_name": sn.get("authorDisplayName", "") or "",
+        "author_avatar": sn.get("authorProfileImageUrl"),
+        "text_original": text,
+        "like_count": int(sn.get("likeCount", 0)),
+        "published_at_raw": sn.get("publishedAt"),
+    }
+
+
+async def fetch_comment_threads_with_search(
+    video_yt_id: str,
+    keyword: str,
+    *,
+    max_total: int = 100,
+) -> tuple[list[dict], int]:
+    """
+    调用 commentThreads.list（支持 searchTerms），最多收集 max_total 条。
+    返回 (解析后的评论行列表, YouTube API 调用次数)。
+    """
+    _require_api_key()
+    if not keyword.strip():
+        raise HTTPException(status_code=400, detail="keyword 不能为空")
+
+    collected: list[dict] = []
+    page_token: str | None = None
+    api_calls = 0
+
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+        while len(collected) < max_total:
+            batch = min(100, max_total - len(collected))
+            params: dict = {
+                "part": "snippet",
+                "videoId": video_yt_id,
+                "searchTerms": keyword.strip(),
+                "maxResults": batch,
+                "textFormat": "plainText",
+                "key": settings.youtube_api_key,
+            }
+            if page_token:
+                params["pageToken"] = page_token
+
+            resp = await client.get(f"{YOUTUBE_API_BASE}/commentThreads", params=params)
+            api_calls += 1
+            if resp.status_code != 200:
+                raise _http_error(f"YouTube commentThreads API 调用失败：{resp.text}")
+
+            data = resp.json()
+            for item in data.get("items", []):
+                row = parse_comment_thread_item(item)
+                if row:
+                    collected.append(row)
+                if len(collected) >= max_total:
+                    break
+
+            page_token = data.get("nextPageToken")
+            if not page_token or not data.get("items"):
+                break
+
+    return collected[:max_total], api_calls

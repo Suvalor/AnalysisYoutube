@@ -7,32 +7,41 @@ from app.api.deps import CurrentUserDep, DBSessionDep
 from app.crud.youtube import (
     bulk_upsert_channels_from_api_items,
     bulk_upsert_videos_from_api_items,
+    bulk_upsert_youtube_comments,
     delete_user_competitor_channel,
     ensure_competitor_pool,
+    get_channel_for_user,
     get_channel_histories_for_compare,
+    get_video_for_user,
     list_user_competitor_channels,
     list_distinct_monitored_channels,
     query_videos,
+    update_channel_ai_insight,
     upsert_channel,
     upsert_channel_history,
     upsert_videos,
 )
 from app.crud.quota import get_quota_by_date, list_quota_recent_days
-from app.models.youtube import YouTubeChannel, YouTubeVideo
+from app.models.youtube import YouTubeChannel, YouTubeComment, YouTubeVideo
 from app.schemas.youtube import (
+    CommentScrapeRequest,
+    CommentScrapeResponse,
     QuotaDashboardResponse,
     UserCompetitorChannelItem,
     YouTubeAnalyzeRequest,
     YouTubeAnalyzeResponse,
     YouTubeBatchAnalyzeRequest,
     YouTubeBatchAnalyzeResponse,
+    YouTubeChannelAIAnalyzeResponse,
     YouTubeChannelRead,
     YouTubeVideoPageResponse,
     YouTubeVideoRead,
 )
+from app.services.youtube_ai_service import analyze_channel_ai_insight, build_channel_ai_messages
 from app.services.youtube_service import (
     calc_recent_avg_views,
     fetch_channel_info,
+    fetch_comment_threads_with_search,
     fetch_recent_videos,
     parse_datetime,
     parse_youtube_identifier,
@@ -43,6 +52,22 @@ from app.services.quota_service import record_api_quota_usage, record_bulk_pipel
 
 
 router = APIRouter()
+
+
+def _video_to_read(x: YouTubeVideo) -> YouTubeVideoRead:
+    base = YouTubeVideoRead.model_validate(x)
+    return base.model_copy(update={"tags": x.tags or []})
+
+
+def _videos_to_read(rows: list[YouTubeVideo]) -> list[YouTubeVideoRead]:
+    items: list[YouTubeVideoRead] = []
+    for x in rows:
+        ch = getattr(x, "channel", None)
+        ch_title = ch.title if ch is not None else None
+        base = _video_to_read(x)
+        items.append(base.model_copy(update={"channel_title": ch_title}))
+    return items
+
 
 @router.post(
     "/analyze",
@@ -115,7 +140,7 @@ async def analyze_youtube_channel(
     return YouTubeAnalyzeResponse(
         channel=YouTubeChannelRead.model_validate(channel),
         recent_avg_views=calc_recent_avg_views(recent_videos_raw),
-        videos=[YouTubeVideoRead.model_validate(v) for v in videos],
+        videos=[_video_to_read(v) for v in videos],
     )
 
 
@@ -196,21 +221,31 @@ async def quota_dashboard(db: DBSessionDep, current_user: CurrentUserDep) -> Quo
     )
 
 
-@router.get("/videos", response_model=YouTubeVideoPageResponse)
-async def list_videos(
+async def _list_videos_impl(
     db: DBSessionDep,
     current_user: CurrentUserDep,
-    keyword: str | None = Query(None),
-    start_date: str | None = Query(None),
-    end_date: str | None = Query(None),
-    min_duration: int | None = Query(None),
-    max_duration: int | None = Query(None),
-    channel_id: int | None = Query(None),
-    definition: str | None = Query(None),
-    privacy_status: str | None = Query(None),
-    sort_by: str = Query("publish_time_desc"),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    *,
+    keyword: str | None,
+    start_date: str | None,
+    end_date: str | None,
+    min_duration: int | None,
+    max_duration: int | None,
+    channel_id: int | None,
+    definition: str | None,
+    privacy_status: str | None,
+    min_view_count: int | None,
+    max_view_count: int | None,
+    min_like_count: int | None,
+    max_like_count: int | None,
+    min_comment_count: int | None,
+    max_comment_count: int | None,
+    sort_by: str,
+    publish_time_sort: str | None,
+    view_count_sort: str | None,
+    like_count_sort: str | None,
+    comment_count_sort: str | None,
+    page: int,
+    page_size: int,
 ) -> YouTubeVideoPageResponse:
     start_dt = None
     end_dt = None
@@ -229,15 +264,262 @@ async def list_videos(
         channel_id=channel_id,
         definition=definition,
         privacy_status=privacy_status,
+        min_view_count=min_view_count,
+        max_view_count=max_view_count,
+        min_like_count=min_like_count,
+        max_like_count=max_like_count,
+        min_comment_count=min_comment_count,
+        max_comment_count=max_comment_count,
         sort_by=sort_by,
+        publish_time_sort=publish_time_sort,
+        view_count_sort=view_count_sort,
+        like_count_sort=like_count_sort,
+        comment_count_sort=comment_count_sort,
         page=page,
         page_size=page_size,
     )
     return YouTubeVideoPageResponse(
-        items=[YouTubeVideoRead.model_validate(x) for x in rows],
+        items=_videos_to_read(rows),
         total=total,
         page=page,
         page_size=page_size,
+    )
+
+
+@router.get(
+    "/videos/all",
+    response_model=YouTubeVideoPageResponse,
+    summary="跨频道全局视频列表（与 /videos 同参，语义明确）",
+)
+async def list_videos_all(
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    keyword: str | None = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    min_duration: int | None = Query(None),
+    max_duration: int | None = Query(None),
+    channel_id: int | None = Query(None),
+    definition: str | None = Query(None),
+    privacy_status: str | None = Query(None),
+    min_view_count: int | None = Query(None),
+    max_view_count: int | None = Query(None),
+    min_like_count: int | None = Query(None),
+    max_like_count: int | None = Query(None),
+    min_comment_count: int | None = Query(None),
+    max_comment_count: int | None = Query(None),
+    sort_by: str = Query("publish_time_desc"),
+    publish_time_sort: str | None = Query(None, description="asc/desc，与多列排序；未传则按 sort_by 或与其它列组合"),
+    view_count_sort: str | None = Query(None),
+    like_count_sort: str | None = Query(None),
+    comment_count_sort: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+) -> YouTubeVideoPageResponse:
+    return await _list_videos_impl(
+        db,
+        current_user,
+        keyword=keyword,
+        start_date=start_date,
+        end_date=end_date,
+        min_duration=min_duration,
+        max_duration=max_duration,
+        channel_id=channel_id,
+        definition=definition,
+        privacy_status=privacy_status,
+        min_view_count=min_view_count,
+        max_view_count=max_view_count,
+        min_like_count=min_like_count,
+        max_like_count=max_like_count,
+        min_comment_count=min_comment_count,
+        max_comment_count=max_comment_count,
+        sort_by=sort_by,
+        publish_time_sort=publish_time_sort,
+        view_count_sort=view_count_sort,
+        like_count_sort=like_count_sort,
+        comment_count_sort=comment_count_sort,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/videos", response_model=YouTubeVideoPageResponse)
+async def list_videos(
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    keyword: str | None = Query(None),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    min_duration: int | None = Query(None),
+    max_duration: int | None = Query(None),
+    channel_id: int | None = Query(None),
+    definition: str | None = Query(None),
+    privacy_status: str | None = Query(None),
+    min_view_count: int | None = Query(None),
+    max_view_count: int | None = Query(None),
+    min_like_count: int | None = Query(None),
+    max_like_count: int | None = Query(None),
+    min_comment_count: int | None = Query(None),
+    max_comment_count: int | None = Query(None),
+    sort_by: str = Query("publish_time_desc"),
+    publish_time_sort: str | None = Query(None, description="asc/desc，与多列排序；未传则按 sort_by 或与其它列组合"),
+    view_count_sort: str | None = Query(None),
+    like_count_sort: str | None = Query(None),
+    comment_count_sort: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+) -> YouTubeVideoPageResponse:
+    return await _list_videos_impl(
+        db,
+        current_user,
+        keyword=keyword,
+        start_date=start_date,
+        end_date=end_date,
+        min_duration=min_duration,
+        max_duration=max_duration,
+        channel_id=channel_id,
+        definition=definition,
+        privacy_status=privacy_status,
+        min_view_count=min_view_count,
+        max_view_count=max_view_count,
+        min_like_count=min_like_count,
+        max_like_count=max_like_count,
+        min_comment_count=min_comment_count,
+        max_comment_count=max_comment_count,
+        sort_by=sort_by,
+        publish_time_sort=publish_time_sort,
+        view_count_sort=view_count_sort,
+        like_count_sort=like_count_sort,
+        comment_count_sort=comment_count_sort,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.post(
+    "/videos/{video_id}/comments/scrape",
+    response_model=CommentScrapeResponse,
+    summary="按关键字定向抓取评论（commentThreads + searchTerms）",
+)
+async def scrape_video_comments(
+    video_id: int,
+    payload: CommentScrapeRequest,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> CommentScrapeResponse:
+    video = await get_video_for_user(db, user_id=current_user.id, video_id=video_id)
+    if video is None:
+        raise HTTPException(status_code=404, detail="视频不存在或无权访问")
+
+    parsed, api_calls = await fetch_comment_threads_with_search(
+        video.yt_video_id,
+        payload.keyword,
+        max_total=100,
+    )
+    quota_used = await record_api_quota_usage(db, "commentThreads", times=api_calls)
+
+    rows: list[dict] = []
+    for row in parsed:
+        rows.append(
+            {
+                "yt_comment_id": row["yt_comment_id"],
+                "video_id": video.id,
+                "channel_id": video.channel_id,
+                "author_name": row["author_name"],
+                "author_avatar": row["author_avatar"],
+                "text_original": row["text_original"],
+                "like_count": row["like_count"],
+                "published_at": parse_datetime(row.get("published_at_raw")),
+                "keyword_used": payload.keyword.strip(),
+            }
+        )
+
+    await bulk_upsert_youtube_comments(db, rows=rows)
+    await db.commit()
+
+    return CommentScrapeResponse(scraped_count=len(rows), quota_used=quota_used)
+
+
+@router.get(
+    "/channels/detail/{channel_id}",
+    response_model=YouTubeChannelRead,
+    summary="获取单个监控频道详情（数据库 channel 主键）",
+)
+async def get_channel_detail(
+    channel_id: int,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> YouTubeChannelRead:
+    ch = await get_channel_for_user(db, user_id=current_user.id, channel_id=channel_id)
+    if ch is None:
+        raise HTTPException(status_code=404, detail="频道不存在或无权访问")
+    return YouTubeChannelRead.model_validate(ch)
+
+
+@router.post(
+    "/channels/{channel_id}/ai-analyze",
+    response_model=YouTubeChannelAIAnalyzeResponse,
+    summary="对频道执行 AI 深度洞察分析",
+)
+async def analyze_channel_ai(
+    channel_id: int,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> YouTubeChannelAIAnalyzeResponse:
+    channel = await get_channel_for_user(db, user_id=current_user.id, channel_id=channel_id)
+    if channel is None:
+        raise HTTPException(status_code=404, detail="频道不存在或无权访问")
+
+    top_videos_query = await db.execute(
+        select(YouTubeVideo)
+        .where(YouTubeVideo.channel_id == channel.id)
+        .order_by(YouTubeVideo.view_count.desc())
+        .limit(10)
+    )
+    top_videos = list(top_videos_query.scalars().all())
+    top_video_titles = [x.title for x in top_videos if x.title]
+
+    merged_tags: list[str] = []
+    seen_tags: set[str] = set()
+    for video in top_videos:
+        for tag in video.tags or []:
+            t = str(tag).strip()
+            if not t or t in seen_tags:
+                continue
+            seen_tags.add(t)
+            merged_tags.append(t)
+    merged_tags = merged_tags[:80]
+
+    comments_query = await db.execute(
+        select(YouTubeComment.text_original)
+        .where(YouTubeComment.channel_id == channel.id)
+        .order_by(YouTubeComment.like_count.desc(), YouTubeComment.created_at.desc())
+        .limit(20)
+    )
+    hot_comments = [str(x[0]).strip() for x in comments_query.all() if x and str(x[0]).strip()]
+
+    messages = build_channel_ai_messages(
+        channel_title=channel.title,
+        channel_description=channel.description,
+        top_video_titles=top_video_titles,
+        merged_tags=merged_tags,
+        hot_comments=hot_comments,
+    )
+    ai_result = await analyze_channel_ai_insight(messages)
+
+    await update_channel_ai_insight(
+        db,
+        channel=channel,
+        ai_tags=list(ai_result["tags"]) if isinstance(ai_result.get("tags"), list) else [],
+        ai_audience_age=str(ai_result["age_group"]),
+        ai_summary=str(ai_result["summary"]),
+    )
+    await db.commit()
+
+    return YouTubeChannelAIAnalyzeResponse(
+        tags=channel.ai_tags or [],
+        age_group=channel.ai_audience_age or "",
+        summary=channel.ai_summary or "",
     )
 
 
@@ -249,8 +531,12 @@ async def list_videos(
 async def list_channels(
     db: DBSessionDep,
     current_user: CurrentUserDep,
+    sort_by: str = Query(
+        "added_desc",
+        description="排序：subscriber_desc/asc, total_views_desc/asc, video_count_desc/asc, added_desc",
+    ),
 ) -> list[UserCompetitorChannelItem]:
-    rows = await list_user_competitor_channels(db, current_user.id)
+    rows = await list_user_competitor_channels(db, current_user.id, sort_by=sort_by)
     results: list[UserCompetitorChannelItem] = []
     for row in rows:
         results.append(

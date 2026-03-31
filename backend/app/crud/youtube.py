@@ -5,7 +5,13 @@ from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.youtube import YouTubeChannel, YouTubeChannelHistory, YouTubeVideo, UserCompetitorPool
+from app.models.youtube import (
+    YouTubeChannel,
+    YouTubeChannelHistory,
+    YouTubeComment,
+    YouTubeVideo,
+    UserCompetitorPool,
+)
 from app.services.youtube_service import parse_datetime
 
 
@@ -80,6 +86,7 @@ async def upsert_videos(
                 definition=content_details.get("definition", "sd"),
                 privacy_status=status.get("privacyStatus", "public"),
                 category_id=snippet.get("categoryId"),
+                tags=snippet.get("tags") or [],
                 view_count=int(statistics.get("viewCount", 0)),
                 like_count=int(statistics.get("likeCount", 0)),
                 comment_count=int(statistics.get("commentCount", 0)),
@@ -95,6 +102,7 @@ async def upsert_videos(
             video.definition = content_details.get("definition", "sd")
             video.privacy_status = status.get("privacyStatus", "public")
             video.category_id = snippet.get("categoryId")
+            video.tags = snippet.get("tags") or []
             video.view_count = int(statistics.get("viewCount", 0))
             video.like_count = int(statistics.get("likeCount", 0))
             video.comment_count = int(statistics.get("commentCount", 0))
@@ -191,6 +199,7 @@ async def bulk_upsert_videos_from_api_items(
                 "definition": content_details.get("definition", "sd"),
                 "privacy_status": status.get("privacyStatus", "public"),
                 "category_id": snippet.get("categoryId"),
+                "tags": snippet.get("tags") or [],
                 "view_count": int(statistics.get("viewCount", 0)),
                 "like_count": int(statistics.get("likeCount", 0)),
                 "comment_count": int(statistics.get("commentCount", 0)),
@@ -212,6 +221,7 @@ async def bulk_upsert_videos_from_api_items(
         definition=stmt.inserted.definition,
         privacy_status=stmt.inserted.privacy_status,
         category_id=stmt.inserted.category_id,
+        tags=stmt.inserted.tags,
         view_count=stmt.inserted.view_count,
         like_count=stmt.inserted.like_count,
         comment_count=stmt.inserted.comment_count,
@@ -244,15 +254,84 @@ async def ensure_competitor_pool(
     return row
 
 
-async def list_user_competitor_channels(session: AsyncSession, user_id: int) -> list[UserCompetitorPool]:
-    result = await session.execute(
+async def list_user_competitor_channels(
+    session: AsyncSession,
+    user_id: int,
+    *,
+    sort_by: str = "added_desc",
+) -> list[UserCompetitorPool]:
+    """监控池频道列表，支持按频道指标排序。"""
+    stmt = (
         select(UserCompetitorPool)
         .options(selectinload(UserCompetitorPool.channel))
         .where(UserCompetitorPool.user_id == user_id)
-        .join(UserCompetitorPool.channel)
-        .order_by(UserCompetitorPool.added_at.desc())
+        .join(YouTubeChannel, UserCompetitorPool.channel_id == YouTubeChannel.id)
     )
+    if sort_by == "subscriber_desc":
+        stmt = stmt.order_by(YouTubeChannel.subscriber_count.desc())
+    elif sort_by == "subscriber_asc":
+        stmt = stmt.order_by(YouTubeChannel.subscriber_count.asc())
+    elif sort_by == "total_views_desc":
+        stmt = stmt.order_by(YouTubeChannel.total_views.desc())
+    elif sort_by == "total_views_asc":
+        stmt = stmt.order_by(YouTubeChannel.total_views.asc())
+    elif sort_by == "video_count_desc":
+        stmt = stmt.order_by(YouTubeChannel.video_count.desc())
+    elif sort_by == "video_count_asc":
+        stmt = stmt.order_by(YouTubeChannel.video_count.asc())
+    else:
+        stmt = stmt.order_by(UserCompetitorPool.added_at.desc())
+
+    result = await session.execute(stmt)
     return list(result.scalars().unique().all())
+
+
+async def get_channel_for_user(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    channel_id: int,
+) -> YouTubeChannel | None:
+    """当前用户监控池内是否包含该频道。"""
+    stmt = (
+        select(YouTubeChannel)
+        .join(UserCompetitorPool, UserCompetitorPool.channel_id == YouTubeChannel.id)
+        .where(UserCompetitorPool.user_id == user_id, YouTubeChannel.id == channel_id)
+    )
+    r = await session.execute(stmt)
+    return r.scalar_one_or_none()
+
+
+async def update_channel_ai_insight(
+    session: AsyncSession,
+    *,
+    channel: YouTubeChannel,
+    ai_tags: list[str],
+    ai_audience_age: str,
+    ai_summary: str,
+) -> YouTubeChannel:
+    channel.ai_tags = ai_tags
+    channel.ai_audience_age = ai_audience_age
+    channel.ai_summary = ai_summary
+    await session.flush()
+    return channel
+
+
+async def get_video_for_user(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    video_id: int,
+) -> YouTubeVideo | None:
+    """当前用户监控池内可访问的视频。"""
+    stmt = (
+        select(YouTubeVideo)
+        .join(YouTubeChannel, YouTubeChannel.id == YouTubeVideo.channel_id)
+        .join(UserCompetitorPool, UserCompetitorPool.channel_id == YouTubeChannel.id)
+        .where(UserCompetitorPool.user_id == user_id, YouTubeVideo.id == video_id)
+    )
+    r = await session.execute(stmt)
+    return r.scalar_one_or_none()
 
 
 async def delete_user_competitor_channel(session: AsyncSession, *, user_id: int, pool_id: int) -> bool:
@@ -292,7 +371,17 @@ async def query_videos(
     channel_id: int | None = None,
     definition: str | None = None,
     privacy_status: str | None = None,
+    min_view_count: int | None = None,
+    max_view_count: int | None = None,
+    min_like_count: int | None = None,
+    max_like_count: int | None = None,
+    min_comment_count: int | None = None,
+    max_comment_count: int | None = None,
     sort_by: str = "publish_time_desc",
+    publish_time_sort: str | None = None,
+    view_count_sort: str | None = None,
+    like_count_sort: str | None = None,
+    comment_count_sort: str | None = None,
     page: int = 1,
     page_size: int = 20,
 ) -> tuple[list[YouTubeVideo], int]:
@@ -301,6 +390,7 @@ async def query_videos(
         .join(YouTubeChannel, YouTubeChannel.id == YouTubeVideo.channel_id)
         .join(UserCompetitorPool, UserCompetitorPool.channel_id == YouTubeChannel.id)
         .where(UserCompetitorPool.user_id == user_id)
+        .options(selectinload(YouTubeVideo.channel))
     )
 
     if keyword:
@@ -319,13 +409,53 @@ async def query_videos(
         stmt = stmt.where(YouTubeVideo.definition == definition)
     if privacy_status:
         stmt = stmt.where(YouTubeVideo.privacy_status == privacy_status)
+    if min_view_count is not None:
+        stmt = stmt.where(YouTubeVideo.view_count >= min_view_count)
+    if max_view_count is not None:
+        stmt = stmt.where(YouTubeVideo.view_count <= max_view_count)
+    if min_like_count is not None:
+        stmt = stmt.where(YouTubeVideo.like_count >= min_like_count)
+    if max_like_count is not None:
+        stmt = stmt.where(YouTubeVideo.like_count <= max_like_count)
+    if min_comment_count is not None:
+        stmt = stmt.where(YouTubeVideo.comment_count >= min_comment_count)
+    if max_comment_count is not None:
+        stmt = stmt.where(YouTubeVideo.comment_count <= max_comment_count)
 
-    if sort_by == "publish_time_asc":
+    def _order_clause(col, direction: str | None):
+        if direction == "asc":
+            return col.asc()
+        if direction == "desc":
+            return col.desc()
+        return None
+
+    multi_parts: list = []
+    for d, col in (
+        (publish_time_sort, YouTubeVideo.published_at),
+        (view_count_sort, YouTubeVideo.view_count),
+        (like_count_sort, YouTubeVideo.like_count),
+        (comment_count_sort, YouTubeVideo.comment_count),
+    ):
+        oc = _order_clause(col, d if d in ("asc", "desc") else None)
+        if oc is not None:
+            multi_parts.append(oc)
+
+    if multi_parts:
+        stmt = stmt.order_by(*multi_parts)
+    elif sort_by == "publish_time_asc":
         stmt = stmt.order_by(YouTubeVideo.published_at.asc())
     elif sort_by == "view_count_desc":
         stmt = stmt.order_by(YouTubeVideo.view_count.desc())
     elif sort_by == "view_count_asc":
         stmt = stmt.order_by(YouTubeVideo.view_count.asc())
+    elif sort_by == "like_count_desc":
+        stmt = stmt.order_by(YouTubeVideo.like_count.desc())
+    elif sort_by == "like_count_asc":
+        stmt = stmt.order_by(YouTubeVideo.like_count.asc())
+    elif sort_by == "comment_count_desc":
+        stmt = stmt.order_by(YouTubeVideo.comment_count.desc())
+    elif sort_by == "comment_count_asc":
+        stmt = stmt.order_by(YouTubeVideo.comment_count.asc())
     else:
         stmt = stmt.order_by(YouTubeVideo.published_at.desc())
 
@@ -334,6 +464,29 @@ async def query_videos(
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
     result = await session.execute(stmt)
     return list(result.scalars().unique().all()), total
+
+
+async def bulk_upsert_youtube_comments(
+    session: AsyncSession,
+    *,
+    rows: list[dict],
+) -> int:
+    """批量 UPSERT 评论，按 yt_comment_id 去重。"""
+    if not rows:
+        return 0
+
+    stmt = mysql_insert(YouTubeComment.__table__).values(rows)
+    stmt = stmt.on_duplicate_key_update(
+        author_name=stmt.inserted.author_name,
+        author_avatar=stmt.inserted.author_avatar,
+        text_original=stmt.inserted.text_original,
+        like_count=stmt.inserted.like_count,
+        published_at=stmt.inserted.published_at,
+        keyword_used=stmt.inserted.keyword_used,
+    )
+    await session.execute(stmt)
+    await session.flush()
+    return len(rows)
 
 
 async def upsert_channel_history(

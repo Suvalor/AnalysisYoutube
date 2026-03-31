@@ -7,8 +7,8 @@ export default function Dashboard() {
         <h2 className="text-2xl font-semibold mb-3">欢迎来到 Creator SaaS</h2>
         <p className="text-slate-300 mb-6">从左侧导航进入各模块：对标监控、AI 创作、知识库和视频看板。</p>
         <div className="flex flex-wrap gap-3">
-          <Link to="/youtube-monitor" className="px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400">
-            YouTube 对标监控
+          <Link to="/youtube/channels" className="px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400">
+            YouTube 频道管理
           </Link>
           <Link to="/ai-creator" className="px-4 py-2 rounded-lg bg-fuchsia-500 hover:bg-fuchsia-400">
             AI 剧本创作
