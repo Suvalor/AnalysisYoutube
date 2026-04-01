@@ -1,7 +1,7 @@
 import { Segmented } from "antd";
 import TextArea from "antd/es/input/TextArea";
 import { useMemo, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import MarkdownPreview from "@/components/MarkdownPreview";
 
 type Props = {
   value: string;
@@ -43,8 +43,8 @@ export default function MarkdownEditorToggle({
           placeholder={placeholder}
         />
       ) : (
-        <div className="min-h-[220px] rounded-lg border border-slate-200 bg-slate-50 p-4 prose prose-slate max-w-none">
-          <ReactMarkdown>{value || "_暂无内容_"}</ReactMarkdown>
+        <div className="min-h-[220px] rounded-lg border border-slate-200 bg-slate-50 p-4 max-w-none overflow-x-auto">
+          <MarkdownPreview>{value || "_暂无内容_"}</MarkdownPreview>
         </div>
       )}
     </div>

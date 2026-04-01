@@ -113,7 +113,11 @@ export default function ChannelDetail({ channelId }: Props) {
     ? dayjs().diff(dayjs(channel.updated_at), "hour")
     : null;
   const aiTags = channel?.ai_tags ?? [];
-  const hasAiInsight = aiTags.length > 0 || Boolean(channel?.ai_audience_age) || Boolean(channel?.ai_summary);
+  const hasAiInsight =
+    aiTags.length > 0 ||
+    Boolean(channel?.ai_expertise?.trim()) ||
+    Boolean(channel?.ai_audience_age) ||
+    Boolean(channel?.ai_summary);
 
   return (
     <div className="p-4 md:p-6 space-y-4">
@@ -250,6 +254,7 @@ export default function ChannelDetail({ channelId }: Props) {
                       ? {
                           ...prev,
                           ai_tags: ai.tags,
+                          ai_expertise: ai.expertise,
                           ai_audience_age: ai.age_group,
                           ai_summary: ai.summary,
                         }
@@ -267,7 +272,7 @@ export default function ChannelDetail({ channelId }: Props) {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-3">
             <div className="rounded-lg border border-slate-200 p-3">
               <div className="text-sm font-medium text-slate-700 mb-2">核心标签</div>
               <div className="flex flex-wrap gap-2">
@@ -285,6 +290,10 @@ export default function ChannelDetail({ channelId }: Props) {
                   <div className="text-slate-400 text-sm">暂无标签</div>
                 )}
               </div>
+            </div>
+            <div className="rounded-lg border border-amber-200 p-3 bg-amber-50/70">
+              <div className="text-sm font-medium text-slate-700 mb-2">擅长内容</div>
+              <div className="text-sm text-slate-800 leading-6">{channel?.ai_expertise?.trim() || "暂无"}</div>
             </div>
             <div className="rounded-lg border border-slate-200 p-3 bg-indigo-50/60">
               <div className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">

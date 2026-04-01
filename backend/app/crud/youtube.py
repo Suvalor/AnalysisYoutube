@@ -309,10 +309,13 @@ async def update_channel_ai_insight(
     ai_tags: list[str],
     ai_audience_age: str,
     ai_summary: str,
+    ai_expertise: str | None = None,
 ) -> YouTubeChannel:
     channel.ai_tags = ai_tags
     channel.ai_audience_age = ai_audience_age
     channel.ai_summary = ai_summary
+    if ai_expertise is not None:
+        channel.ai_expertise = ai_expertise
     await session.flush()
     return channel
 

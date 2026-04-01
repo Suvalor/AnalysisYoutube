@@ -23,7 +23,6 @@ from app.crud.youtube import (
     list_user_competitor_channels,
     list_distinct_monitored_channels,
     query_videos,
-    update_channel_ai_insight,
     upsert_channel,
     upsert_channel_history,
     upsert_videos,
@@ -52,7 +51,10 @@ from app.schemas.youtube_oauth import (
     YouTubePublishResponse,
 )
 from app.services.field_encryption import encrypt_plaintext, try_decrypt
-from app.services.youtube_ai_service import analyze_channel_ai_insight, build_channel_ai_messages
+from app.services.youtube_channel_enrich import (
+    channel_needs_ai_tag_fill,
+    enrich_youtube_channel_ai,
+)
 from app.services.youtube_service import (
     calc_recent_avg_views,
     fetch_channel_info,
@@ -145,6 +147,10 @@ async def analyze_youtube_channel(
     await db.commit()
     await db.refresh(channel)
 
+    if await enrich_youtube_channel_ai(db, channel):
+        await db.commit()
+        await db.refresh(channel)
+
     videos_query = await db.execute(
         select(YouTubeVideo)
         .where(YouTubeVideo.channel_id == channel.id)
@@ -211,6 +217,14 @@ async def analyze_youtube_batch(
         )
 
     await db.commit()
+
+    for _yt_id, db_id in yt_to_db.items():
+        row = await db.execute(select(YouTubeChannel).where(YouTubeChannel.id == db_id))
+        ch = row.scalar_one_or_none()
+        if ch is None:
+            continue
+        if await enrich_youtube_channel_ai(db, ch):
+            await db.commit()
 
     return YouTubeBatchAnalyzeResponse(
         channels_count=len(yt_to_db),
@@ -485,54 +499,14 @@ async def analyze_channel_ai(
     if channel is None:
         raise HTTPException(status_code=404, detail="频道不存在或无权访问")
 
-    top_videos_query = await db.execute(
-        select(YouTubeVideo)
-        .where(YouTubeVideo.channel_id == channel.id)
-        .order_by(YouTubeVideo.view_count.desc())
-        .limit(10)
-    )
-    top_videos = list(top_videos_query.scalars().all())
-    top_video_titles = [x.title for x in top_videos if x.title]
-
-    merged_tags: list[str] = []
-    seen_tags: set[str] = set()
-    for video in top_videos:
-        for tag in video.tags or []:
-            t = str(tag).strip()
-            if not t or t in seen_tags:
-                continue
-            seen_tags.add(t)
-            merged_tags.append(t)
-    merged_tags = merged_tags[:80]
-
-    comments_query = await db.execute(
-        select(YouTubeComment.text_original)
-        .where(YouTubeComment.channel_id == channel.id)
-        .order_by(YouTubeComment.like_count.desc(), YouTubeComment.created_at.desc())
-        .limit(20)
-    )
-    hot_comments = [str(x[0]).strip() for x in comments_query.all() if x and str(x[0]).strip()]
-
-    messages = build_channel_ai_messages(
-        channel_title=channel.title,
-        channel_description=channel.description,
-        top_video_titles=top_video_titles,
-        merged_tags=merged_tags,
-        hot_comments=hot_comments,
-    )
-    ai_result = await analyze_channel_ai_insight(messages)
-
-    await update_channel_ai_insight(
-        db,
-        channel=channel,
-        ai_tags=list(ai_result["tags"]) if isinstance(ai_result.get("tags"), list) else [],
-        ai_audience_age=str(ai_result["age_group"]),
-        ai_summary=str(ai_result["summary"]),
-    )
+    if not await enrich_youtube_channel_ai(db, channel):
+        raise HTTPException(status_code=502, detail="AI 分析失败，请检查火山引擎配置或稍后重试")
     await db.commit()
+    await db.refresh(channel)
 
     return YouTubeChannelAIAnalyzeResponse(
         tags=channel.ai_tags or [],
+        expertise=channel.ai_expertise or "",
         age_group=channel.ai_audience_age or "",
         summary=channel.ai_summary or "",
     )
@@ -621,11 +595,26 @@ async def batch_update_channels(
         )
 
     await db.commit()
+
+    monitored = await list_distinct_monitored_channels(db)
+    ai_enriched = 0
+    ai_failed = 0
+    for ch in monitored:
+        if not channel_needs_ai_tag_fill(ch):
+            continue
+        if await enrich_youtube_channel_ai(db, ch):
+            await db.commit()
+            ai_enriched += 1
+        else:
+            ai_failed += 1
+
     return {
         "estimated_points": estimated_points,
         "updated_channels": len(yt_to_db),
         "updated_videos": updated_videos,
         "quota_used": quota_used,
+        "ai_enriched": ai_enriched,
+        "ai_failed": ai_failed,
     }
 
 

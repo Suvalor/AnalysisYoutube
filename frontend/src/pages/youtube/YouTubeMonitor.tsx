@@ -131,16 +131,22 @@ export default function YouTubeMonitor() {
       cancelText: "取消",
       onOk: async () => {
         setUpdating(true);
+        message.loading({ content: "正在同步数据并补全缺失的 AI 标签…", key: "yt-mon-batch", duration: 0 });
         try {
           const res = await batchUpdateChannelsApi();
-          message.success(
-            `更新完成：频道 ${res.updated_channels}，视频 ${res.updated_videos}。本次消耗 API 额度 ${res.quota_used} 点。`
-          );
+          const aiPart =
+            res.ai_enriched != null || res.ai_failed != null
+              ? ` AI 补全 ${res.ai_enriched ?? 0} 个${(res.ai_failed ?? 0) > 0 ? `，失败 ${res.ai_failed}` : ""}。`
+              : "";
+          message.success({
+            content: `更新完成：频道 ${res.updated_channels}，视频 ${res.updated_videos}。消耗 ${res.quota_used} 点。${aiPart}`,
+            key: "yt-mon-batch",
+          });
           await loadPool();
           await loadVideos();
           await loadQuota();
         } catch (e: any) {
-          message.error(e?.response?.data?.detail ?? "更新失败");
+          message.error({ content: e?.response?.data?.detail ?? "更新失败", key: "yt-mon-batch" });
         } finally {
           setUpdating(false);
         }

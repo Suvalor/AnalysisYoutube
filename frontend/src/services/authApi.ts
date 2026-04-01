@@ -26,6 +26,7 @@ export type YouTubeAnalyzeResponse = {
     total_views: number;
     video_count: number;
     ai_tags: string[] | null;
+    ai_expertise: string | null;
     ai_audience_age: string | null;
     ai_summary: string | null;
     published_at: string | null;
@@ -90,6 +91,7 @@ export async function analyzeYouTubeChannelAiApi(channelId: number) {
   const res = await apiClient.post(`/api/youtube/channels/${channelId}/ai-analyze`);
   return res.data as {
     tags: string[];
+    expertise: string;
     age_group: string;
     summary: string;
   };
@@ -130,6 +132,8 @@ export async function batchUpdateChannelsApi() {
     updated_channels: number;
     updated_videos: number;
     quota_used: number;
+    ai_enriched?: number;
+    ai_failed?: number;
   };
 }
 

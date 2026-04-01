@@ -1,6 +1,6 @@
 import { Button, Radio } from "antd";
 import { useState } from "react";
-import ReactMarkdown from "react-markdown";
+import MarkdownPreview from "@/components/MarkdownPreview";
 
 type ScriptPreviewProps = {
   title?: string;
@@ -41,8 +41,8 @@ export default function ScriptPreview({
       <div className="content-area overflow-y-auto h-[430px]">
         {!content && <div className="text-slate-500">点击「开始生成」后，这里会实时展示剧本内容。</div>}
         {content && isPreviewMode ? (
-          <article className="prose prose-slate max-w-none">
-            <ReactMarkdown>{content}</ReactMarkdown>
+          <article className="max-w-none">
+            <MarkdownPreview>{content}</MarkdownPreview>
           </article>
         ) : null}
         {content && !isPreviewMode ? (
