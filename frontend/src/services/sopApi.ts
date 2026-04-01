@@ -157,7 +157,7 @@ export async function listSopMediaApi(shotId?: number) {
 }
 
 export async function streamSopAiSplitApi(
-  payload: { outline_markdown: string; model_id?: number; agent_id?: number },
+  payload: { outline_markdown: string; model_id?: string; agent_id?: number },
   onEvent: (event: any) => void,
   signal?: AbortSignal
 ) {

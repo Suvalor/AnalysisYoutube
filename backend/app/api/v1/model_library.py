@@ -27,6 +27,21 @@ def _validate_json_string(field_name: str, raw: str | None) -> None:
         ) from e
 
 
+def _normalize_supported_models_json(raw: object) -> str | None:
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        val = raw.strip()
+        _validate_json_string("supported_models_json", val)
+        return val or None
+    if isinstance(raw, list):
+        return json.dumps(raw, ensure_ascii=False)
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail="supported_models_json 必须是 JSON 字符串或列表",
+    )
+
+
 def _to_read(row: ModelLibrary) -> ModelRead:
     return ModelRead(
         id=row.id,
@@ -54,7 +69,6 @@ async def get_model(model_id: int, db: DBSessionDep, current_user: CurrentUserDe
 
 @router.post("", response_model=ModelRead)
 async def create_model(payload: ModelCreate, db: DBSessionDep, current_user: CurrentUserDep) -> ModelRead:
-    _validate_json_string("supported_models_json", payload.supported_models_json)
     row = await create_with_user(
         db,
         ModelLibrary,
@@ -63,7 +77,7 @@ async def create_model(payload: ModelCreate, db: DBSessionDep, current_user: Cur
             "name": payload.name.strip(),
             "api_base_url": payload.api_base_url.strip(),
             "api_key_encrypted": encrypt_plaintext(payload.api_key.strip()) if payload.api_key and payload.api_key.strip() else None,
-            "supported_models_json": payload.supported_models_json.strip() if payload.supported_models_json else None,
+            "supported_models_json": _normalize_supported_models_json(payload.supported_models_json),
         },
     )
     return _to_read(row)
@@ -85,10 +99,7 @@ async def update_model(
     if "api_base_url" in incoming and incoming["api_base_url"] is not None:
         patch["api_base_url"] = str(incoming["api_base_url"]).strip()
     if "supported_models_json" in incoming:
-        raw = incoming["supported_models_json"]
-        val = None if raw is None else str(raw).strip()
-        _validate_json_string("supported_models_json", val)
-        patch["supported_models_json"] = val or None
+        patch["supported_models_json"] = _normalize_supported_models_json(incoming["supported_models_json"])
     if "api_key" in incoming:
         raw_key = incoming["api_key"]
         if raw_key is not None and str(raw_key).strip():

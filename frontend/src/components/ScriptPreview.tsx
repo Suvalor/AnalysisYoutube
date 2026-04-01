@@ -30,7 +30,7 @@ export default function ScriptPreview({
             size="small"
           >
             <Radio.Button value={false}>Markdown 源码</Radio.Button>
-            <Radio.Button value={true}>富文本预览</Radio.Button>
+            <Radio.Button value={true}>Markdown 预览</Radio.Button>
           </Radio.Group>
           <Button type="primary" size="small" onClick={onSave} loading={saving} disabled={saveDisabled}>
             保存到剧本库

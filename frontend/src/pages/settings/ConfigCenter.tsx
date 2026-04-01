@@ -1,6 +1,8 @@
-import { Button, Form, Input, Modal, Popconfirm, Space, Spin, Table, Tabs, message } from "antd";
+import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
+import { Button, Form, Input, Modal, Popconfirm, Space, Spin, Table, Tabs, Tag, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   createModelApi,
   createPromptApi,
@@ -26,7 +28,7 @@ type ModelFormValues = {
   name: string;
   api_base_url: string;
   api_key?: string;
-  supported_models_json?: string;
+  supported_models?: Array<{ label: string; value: string }>;
 };
 
 type TextFormValues = {
@@ -35,6 +37,8 @@ type TextFormValues = {
 };
 
 export default function ConfigCenter() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<ActiveTabKey>("models");
   const [loading, setLoading] = useState(false);
 
@@ -53,6 +57,29 @@ export default function ConfigCenter() {
 
   const [modelForm] = Form.useForm<ModelFormValues>();
   const [textForm] = Form.useForm<TextFormValues>();
+
+  const parseSupportedModels = (raw: string | null | undefined): Array<{ label: string; value: string }> => {
+    if (!raw || !raw.trim()) return [];
+    try {
+      const data = JSON.parse(raw) as Array<string | { label?: string; value?: string }>;
+      if (!Array.isArray(data)) return [];
+      return data
+        .map((item) => {
+          if (typeof item === "string") {
+            const v = item.trim();
+            return v ? { label: v, value: v } : null;
+          }
+          if (!item || typeof item !== "object") return null;
+          const label = String(item.label ?? "").trim();
+          const value = String(item.value ?? "").trim();
+          if (!label && !value) return null;
+          return { label: label || value, value: value || label };
+        })
+        .filter((x): x is { label: string; value: string } => Boolean(x));
+    } catch {
+      return [];
+    }
+  };
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -76,10 +103,18 @@ export default function ConfigCenter() {
     void loadAll();
   }, [loadAll]);
 
+  useEffect(() => {
+    const queryTab = new URLSearchParams(location.search).get("tab");
+    if (queryTab === "models" || queryTab === "prompts" || queryTab === "styles") {
+      setActiveTab(queryTab);
+    }
+  }, [location.search]);
+
   const openCreateModel = () => {
     setModelMode("create");
     setEditingModel(null);
     modelForm.resetFields();
+    modelForm.setFieldsValue({ supported_models: [] });
     setModelOpen(true);
   };
 
@@ -89,7 +124,7 @@ export default function ConfigCenter() {
     modelForm.setFieldsValue({
       name: row.name,
       api_base_url: row.api_base_url,
-      supported_models_json: row.supported_models_json ?? "",
+      supported_models: parseSupportedModels(row.supported_models_json),
       api_key: "",
     });
     setModelOpen(true);
@@ -107,8 +142,21 @@ export default function ConfigCenter() {
       } = {
         name: values.name.trim(),
         api_base_url: values.api_base_url.trim(),
-        supported_models_json: values.supported_models_json?.trim() || null,
       };
+      const supportedModels = (values.supported_models ?? []).map((x) => ({
+        label: String(x?.label ?? "").trim(),
+        value: String(x?.value ?? "").trim(),
+      }));
+      const hasPartial = supportedModels.some((x) => (x.label && !x.value) || (!x.label && x.value));
+      if (hasPartial) {
+        message.warning("模型名称和模型 ID 需要成对填写");
+        setSaving(false);
+        return;
+      }
+      const normalizedModels = supportedModels
+        .filter((x) => x.label && x.value)
+        .map((x) => ({ label: x.label, value: x.value }));
+      payload.supported_models_json = normalizedModels.length ? JSON.stringify(normalizedModels) : null;
       if (values.api_key?.trim()) {
         payload.api_key = values.api_key.trim();
       }
@@ -185,11 +233,22 @@ export default function ConfigCenter() {
         render: (_, row) => (row.has_api_key ? "********" : "未设置"),
       },
       {
-        title: "支持模型 JSON",
+        title: "支持模型",
         dataIndex: "supported_models_json",
         key: "supported_models_json",
-        ellipsis: true,
-        render: (v: string | null) => v || "-",
+        render: (v: string | null) => {
+          const items = parseSupportedModels(v);
+          if (!items.length) return "-";
+          return (
+            <Space size={[6, 6]} wrap>
+              {items.map((item) => (
+                <Tag key={`${item.value}-${item.label}`}>
+                  {item.label}（{item.value}）
+                </Tag>
+              ))}
+            </Space>
+          );
+        },
       },
       {
         title: "操作",
@@ -227,7 +286,7 @@ export default function ConfigCenter() {
         key: "op",
         render: (_, row) => (
           <Space>
-            <Button size="small" onClick={() => openEditText(row.id, row.title, row.content)}>
+            <Button size="small" onClick={() => navigate(`/config/agent/edit/${row.id}`)}>
               编辑
             </Button>
             <Popconfirm
@@ -246,7 +305,7 @@ export default function ConfigCenter() {
         ),
       },
     ],
-    [loadAll]
+    [loadAll, navigate]
   );
 
   const styleColumns: ColumnsType<StyleItem> = useMemo(
@@ -286,7 +345,11 @@ export default function ConfigCenter() {
         <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
           <Tabs
             activeKey={activeTab}
-            onChange={(k) => setActiveTab(k as ActiveTabKey)}
+            onChange={(k) => {
+              const tab = k as ActiveTabKey;
+              setActiveTab(tab);
+              navigate(`/config-center?tab=${tab}`, { replace: true });
+            }}
             items={[
               {
                 key: "models",
@@ -360,8 +423,43 @@ export default function ConfigCenter() {
               autoComplete="new-password"
             />
           </Form.Item>
-          <Form.Item name="supported_models_json" label="支持的模型 JSON">
-            <Input.TextArea rows={6} />
+          <Form.Item label="支持的模型列表">
+            <Form.List name="supported_models">
+              {(fields, { add, remove }) => (
+                <div className="space-y-2">
+                  {fields.map(({ key, name, ...restField }) => (
+                    <Space key={key} align="baseline" className="w-full">
+                      <Form.Item
+                        {...restField}
+                        name={[name, "label"]}
+                        className="!mb-0"
+                        rules={[{ max: 128, message: "模型名称过长" }]}
+                      >
+                        <Input placeholder="模型名称（label）" className="w-48" />
+                      </Form.Item>
+                      <Form.Item
+                        {...restField}
+                        name={[name, "value"]}
+                        className="!mb-0"
+                        rules={[{ max: 128, message: "模型 ID 过长" }]}
+                      >
+                        <Input placeholder="模型 ID（value）" className="w-56" />
+                      </Form.Item>
+                      <Button
+                        type="text"
+                        danger
+                        icon={<MinusCircleOutlined />}
+                        onClick={() => remove(name)}
+                        aria-label="删除模型"
+                      />
+                    </Space>
+                  ))}
+                  <Button type="dashed" onClick={() => add({ label: "", value: "" })} block icon={<PlusOutlined />}>
+                    添加模型
+                  </Button>
+                </div>
+              )}
+            </Form.List>
           </Form.Item>
         </Form>
       </Modal>

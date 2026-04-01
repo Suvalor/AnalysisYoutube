@@ -24,7 +24,7 @@ export default function MarkdownEditorToggle({
   const options = useMemo(
     () => [
       { label: "Markdown 源码", value: "edit" },
-      { label: "富文本预览", value: "preview" },
+      { label: "Markdown 预览", value: "preview" },
     ],
     []
   );

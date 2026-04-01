@@ -14,8 +14,9 @@ import { Button, Card, Drawer, Input, Modal, Select, Spin, Steps, Table, Typogra
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getScriptApi, listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
+import { getScriptApi, listPromptsApi, type PromptItem } from "@/services/libraryApi";
 import { uploadAssetWithProcessApi } from "@/services/libraryApi";
+import { getScriptModelsApi, type ScriptModelOption } from "@/services/scriptsApi";
 import {
   createShotsFromSegmentsApi,
   createSopAssetApi,
@@ -83,9 +84,9 @@ export default function ScriptWorkflowSOP() {
   const [publishPrivacy, setPublishPrivacy] = useState<"private" | "public" | "unlisted">("private");
   const [savingOutline, setSavingOutline] = useState(false);
   const [savingSegments, setSavingSegments] = useState(false);
-  const [modelOptions, setModelOptions] = useState<ModelItem[]>([]);
+  const [modelOptions, setModelOptions] = useState<ScriptModelOption[]>([]);
   const [agentOptions, setAgentOptions] = useState<PromptItem[]>([]);
-  const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const shotSaveTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const latestShotsRef = useRef<SopShot[]>([]);
@@ -130,11 +131,11 @@ export default function ScriptWorkflowSOP() {
     let mounted = true;
     (async () => {
       try {
-        const [models, agents] = await Promise.all([listModelsApi(), listPromptsApi()]);
+        const [models, agents] = await Promise.all([getScriptModelsApi(), listPromptsApi()]);
         if (!mounted) return;
         setModelOptions(models);
         setAgentOptions(agents);
-        if (models.length > 0) setSelectedModelId((prev) => prev ?? models[0].id);
+        if (models.length > 0) setSelectedModelId((prev) => prev ?? models[0].value);
         if (agents.length > 0) setSelectedAgentId((prev) => prev ?? agents[0].id);
       } catch (e: any) {
         if (!mounted) return;
@@ -663,7 +664,7 @@ export default function ScriptWorkflowSOP() {
               placeholder="选择模型"
               value={selectedModelId ?? undefined}
               onChange={(v) => setSelectedModelId(v)}
-              options={modelOptions.map((m) => ({ value: m.id, label: m.name }))}
+              options={modelOptions.map((m) => ({ value: m.value, label: m.label }))}
               className="w-48"
             />
             <Select
