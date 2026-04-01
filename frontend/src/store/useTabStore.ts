@@ -16,7 +16,8 @@ export type TabType =
   | "feishu-workspace"
   | "ai-model-settings"
   | "config-center"
-  | "sop-workflow";
+  | "sop-workflow"
+  | "agent-edit";
 
 export type TabItem = {
   id: string;

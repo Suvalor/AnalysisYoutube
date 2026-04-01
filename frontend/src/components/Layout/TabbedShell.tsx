@@ -27,6 +27,7 @@ import ChannelDetail from "@/pages/youtube/ChannelDetail";
 import FeishuWorkspace from "@/pages/feishu/FeishuWorkspace";
 import AiModelSettings from "@/pages/settings/AiModelSettings";
 import ConfigCenter from "@/pages/settings/ConfigCenter";
+import AgentEditorPage from "@/pages/settings/AgentEditorPage";
 import ScriptWorkflowSOP from "@/pages/sop/ScriptWorkflowSOP";
 
 type NavDef = {
@@ -79,6 +80,8 @@ function renderTabPanel(tab: TabItem) {
       return <AiModelSettings />;
     case "config-center":
       return <ConfigCenter />;
+    case "agent-edit":
+      return <AgentEditorPage />;
     default:
       return null;
   }
@@ -117,6 +120,16 @@ export default function TabbedShell() {
         path: path,
         type: "channel-detail",
         channelId: cid,
+      });
+    }
+    const editPromptMatch = path.match(/^\/config\/agent\/edit\/(\d+)$/);
+    if (editPromptMatch) {
+      const pid = Number(editPromptMatch[1]);
+      openTab({
+        id: `agent-edit-${pid}`,
+        title: `编辑智能体 #${pid}`,
+        path,
+        type: "agent-edit",
       });
     }
   }, [location.pathname, openTab]);

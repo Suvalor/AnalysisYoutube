@@ -56,14 +56,14 @@ class ModelCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     api_base_url: str = Field(..., min_length=1, max_length=512)
     api_key: str | None = Field(None, min_length=1, max_length=2048)
-    supported_models_json: str | None = None
+    supported_models_json: str | list[str | dict[str, str]] | None = None
 
 
 class ModelUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
     api_base_url: str | None = Field(None, min_length=1, max_length=512)
     api_key: str | None = Field(None, min_length=1, max_length=2048)
-    supported_models_json: str | None = None
+    supported_models_json: str | list[str | dict[str, str]] | None = None
 
 
 class ModelRead(BaseModel):

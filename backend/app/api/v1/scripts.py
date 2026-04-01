@@ -1,4 +1,5 @@
 import json
+from collections import OrderedDict
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, HTTPException, status
@@ -8,8 +9,12 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUserDep
+from app.api.deps import DBSessionDep
 from app.core.config import settings
+from app.crud.library import list_by_user
+from app.models.library import ModelLibrary
 from app.services.script_user_ai import (
+    DEFAULT_MODEL_OPTIONS,
     parse_models_from_user_json,
     resolve_prompt_and_style,
     user_custom_openai_credentials,
@@ -43,15 +48,50 @@ def _resolve_model_name(model_alias: str) -> str:
     return alias_map.get(model_alias, model_alias)
 
 
+def _parse_models_from_library_rows(rows: list[ModelLibrary]) -> list[dict[str, str]]:
+    out: list[dict[str, str]] = []
+    for row in rows:
+        raw = (row.supported_models_json or "").strip()
+        if not raw:
+            continue
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(data, list):
+            continue
+        for item in data:
+            if isinstance(item, str) and item.strip():
+                value = item.strip()
+                out.append({"value": value, "label": f"{row.name} / {value}"})
+            elif isinstance(item, dict):
+                value = str(item.get("value") or "").strip()
+                if not value:
+                    continue
+                label = str(item.get("label") or value).strip()
+                out.append({"value": value, "label": f"{row.name} / {label}"})
+    # 以 value 去重，保留首次出现顺序
+    dedup = OrderedDict()
+    for item in out:
+        dedup[item["value"]] = item
+    return list(dedup.values())
+
+
 @router.get(
     "/models",
     summary="当前用户可用的剧本生成模型列表",
 )
 async def list_script_models(
+    db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> dict:
     """从用户设置的 ai_models_json 解析；未配置时返回内置默认项。"""
     models = parse_models_from_user_json(current_user.ai_models_json)
+    if models == DEFAULT_MODEL_OPTIONS:
+        rows = await list_by_user(db, ModelLibrary, current_user.id)
+        lib_models = _parse_models_from_library_rows(rows)
+        if lib_models:
+            models = lib_models
     return {"models": models}
 
 

@@ -77,6 +77,11 @@ export async function updatePromptApi(promptId: number, payload: { title?: strin
   return res.data as PromptItem;
 }
 
+export async function getPromptApi(promptId: number) {
+  const res = await apiClient.get(`/api/libraries/prompts/${promptId}`);
+  return res.data as PromptItem;
+}
+
 export async function deletePromptApi(promptId: number) {
   const res = await apiClient.delete(`/api/libraries/prompts/${promptId}`);
   return res.data as { message: string };
@@ -145,13 +150,23 @@ export async function createScriptApi(payload: {
   return res.data as ScriptItem;
 }
 
-export async function listScriptsApi() {
-  const res = await apiClient.get("/api/libraries/scripts");
+export async function listScriptsApi(includeDeleted = false) {
+  const res = await apiClient.get("/api/libraries/scripts", { params: { include_deleted: includeDeleted } });
   return res.data as ScriptItem[];
 }
 
 export async function getScriptApi(scriptId: number) {
   const res = await apiClient.get(`/api/libraries/scripts/${scriptId}`);
+  return res.data as ScriptItem;
+}
+
+export async function deleteScriptApi(scriptId: number) {
+  const res = await apiClient.delete(`/api/libraries/scripts/${scriptId}`);
+  return res.data as { message: string };
+}
+
+export async function restoreScriptApi(scriptId: number) {
+  const res = await apiClient.post(`/api/libraries/scripts/${scriptId}/restore`);
   return res.data as ScriptItem;
 }
 
