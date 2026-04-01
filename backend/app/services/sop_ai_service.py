@@ -26,12 +26,14 @@ async def split_outline_markdown_with_ai(
     user: User,
     outline_markdown: str,
     model: str | None = None,
+    agent_prompt: str | None = None,
 ) -> str:
     parts: list[str] = []
     async for chunk in split_outline_markdown_with_ai_stream(
         user=user,
         outline_markdown=outline_markdown,
         model=model,
+        agent_prompt=agent_prompt,
     ):
         parts.append(chunk)
     return "".join(parts).strip()
@@ -42,6 +44,7 @@ async def split_outline_markdown_with_ai_stream(
     user: User,
     outline_markdown: str,
     model: str | None = None,
+    agent_prompt: str | None = None,
 ) -> AsyncGenerator[str, None]:
     fast_result = _fast_split_markdown(outline_markdown)
     if fast_result:
@@ -73,6 +76,8 @@ async def split_outline_markdown_with_ai_stream(
         "2) 每段保持可拍摄性与连续性；\n"
         "3) 不要输出 JSON，不要输出代码块标记。"
     )
+    if agent_prompt and agent_prompt.strip():
+        system_prompt = f"{system_prompt}\n\n【智能体补充规则】\n{agent_prompt.strip()}"
     user_prompt = f"请拆解以下剧本大纲：\n\n{outline_markdown}"
 
     http_client = httpx.AsyncClient(timeout=180.0, trust_env=False)

@@ -153,7 +153,8 @@ class SopMediaRead(BaseModel):
 
 class SopAiSplitRequest(BaseModel):
     outline_markdown: str = Field(..., min_length=1)
-    model: str | None = Field(None, min_length=1, max_length=128)
+    model_id: int | None = None
+    agent_id: int | None = None
 
 
 class SopAiSplitResponse(BaseModel):

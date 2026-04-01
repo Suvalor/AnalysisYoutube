@@ -10,11 +10,11 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Button, Card, Drawer, Input, InputNumber, Modal, Select, Spin, Steps, Table, Typography, Upload, message } from "antd";
+import { Button, Card, Drawer, Input, Modal, Select, Spin, Steps, Table, Typography, Upload, message } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getScriptApi } from "@/services/libraryApi";
+import { getScriptApi, listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
 import { uploadAssetWithProcessApi } from "@/services/libraryApi";
 import {
   createShotsFromSegmentsApi,
@@ -53,16 +53,6 @@ type SourceScript = {
   content: string;
 };
 
-const SHOT_TYPE_OPTIONS = [
-  { value: "远景", label: "远景" },
-  { value: "全景", label: "全景" },
-  { value: "中景", label: "中景" },
-  { value: "近景", label: "近景" },
-  { value: "特写", label: "特写" },
-  { value: "俯拍", label: "俯拍" },
-  { value: "仰拍", label: "仰拍" },
-];
-
 export default function ScriptWorkflowSOP() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -93,6 +83,10 @@ export default function ScriptWorkflowSOP() {
   const [publishPrivacy, setPublishPrivacy] = useState<"private" | "public" | "unlisted">("private");
   const [savingOutline, setSavingOutline] = useState(false);
   const [savingSegments, setSavingSegments] = useState(false);
+  const [modelOptions, setModelOptions] = useState<ModelItem[]>([]);
+  const [agentOptions, setAgentOptions] = useState<PromptItem[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
+  const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const shotSaveTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const latestShotsRef = useRef<SopShot[]>([]);
   const currentSplitTaskRef = useRef<string | null>(null);
@@ -125,6 +119,26 @@ export default function ScriptWorkflowSOP() {
         message.error(e?.response?.data?.detail ?? e?.message ?? "加载剧本失败");
       } finally {
         if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const [models, agents] = await Promise.all([listModelsApi(), listPromptsApi()]);
+        if (!mounted) return;
+        setModelOptions(models);
+        setAgentOptions(agents);
+        if (models.length > 0) setSelectedModelId((prev) => prev ?? models[0].id);
+        if (agents.length > 0) setSelectedAgentId((prev) => prev ?? agents[0].id);
+      } catch (e: any) {
+        if (!mounted) return;
+        message.warning(e?.response?.data?.detail ?? e?.message ?? "加载模型/智能体配置失败");
       }
     })();
     return () => {
@@ -204,7 +218,11 @@ export default function ScriptWorkflowSOP() {
           splitAbortRef.current?.abort();
           splitAbortRef.current = new AbortController();
           await streamSopAiSplitApi(
-            { outline_markdown: outlineMarkdown },
+            {
+              outline_markdown: outlineMarkdown,
+              model_id: selectedModelId ?? undefined,
+              agent_id: selectedAgentId ?? undefined,
+            },
             (event) => {
               if (currentSplitTaskRef.current !== reqId) return;
               const t = String(event?.type || "");
@@ -290,8 +308,13 @@ export default function ScriptWorkflowSOP() {
         }
       }
       const latest = await listSopSegmentsApi(sid);
-      setSegments(latest.sort((a, b) => a.segment_no - b.segment_no));
-      setSelectedSegmentId((prev) => prev ?? latest[0]?.id ?? null);
+      const sorted = latest.sort((a, b) => a.segment_no - b.segment_no);
+      setSegments(sorted);
+      setSelectedSegmentId((prev) => prev ?? sorted[0]?.id ?? null);
+      const hydrated = sorted
+        .map((s) => `## 片段 ${s.segment_no}：${s.title}\n${s.content}`)
+        .join("\n\n");
+      setAiSegmentsMarkdown(hydrated);
       message.success("片段已保存到 segments");
     } catch (e: any) {
       message.error(e?.response?.data?.detail ?? e?.message ?? "保存片段失败");
@@ -338,11 +361,7 @@ export default function ScriptWorkflowSOP() {
     setSavingShotIds((prev) => ({ ...prev, [shot.id]: true }));
     try {
       const updated = await updateSopShotApi(shot.id, {
-        shot_no: shot.shot_no,
-        shot_type: shot.shot_type,
         visual_prompt: shot.visual_prompt,
-        dialogue: shot.dialogue,
-        duration_seconds: shot.duration_seconds,
       });
       setShots((prev) => prev.map((s) => (s.id === shot.id ? updated : s)));
     } catch (e: any) {
@@ -380,6 +399,10 @@ export default function ScriptWorkflowSOP() {
         const sorted = latest.sort((a, b) => a.segment_no - b.segment_no);
         setSegments(sorted);
         setSelectedSegmentId((prev) => prev ?? sorted[0]?.id ?? null);
+        const hydrated = sorted
+          .map((s) => `## 片段 ${s.segment_no}：${s.title}\n${s.content}`)
+          .join("\n\n");
+        if (hydrated.trim()) setAiSegmentsMarkdown(hydrated);
       } catch {
         if (!mounted) return;
         setSopScriptId(null);
@@ -635,6 +658,22 @@ export default function ScriptWorkflowSOP() {
             步骤 2：剧情拆解
           </Title>
           <div className="mb-3 flex gap-2">
+            <Select
+              size="middle"
+              placeholder="选择模型"
+              value={selectedModelId ?? undefined}
+              onChange={(v) => setSelectedModelId(v)}
+              options={modelOptions.map((m) => ({ value: m.id, label: m.name }))}
+              className="w-48"
+            />
+            <Select
+              size="middle"
+              placeholder="选择智能体/提示词"
+              value={selectedAgentId ?? undefined}
+              onChange={(v) => setSelectedAgentId(v)}
+              options={agentOptions.map((a) => ({ value: a.id, label: a.title }))}
+              className="w-56"
+            />
             <Button type="primary" onClick={handleAiSplitSegments} loading={splitting}>
               AI 智能拆解分镜
             </Button>
@@ -862,59 +901,20 @@ function ShotEditableCard({
   return (
     <div className="border border-slate-200 rounded-lg bg-white p-3">
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-3">
-        <div className="xl:col-span-3 space-y-2">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-            <div>
-              <div className="text-xs text-slate-500 mb-1">镜头号</div>
-              <InputNumber
-                min={1}
-                className="w-full"
-                value={shot.shot_no}
-                onChange={(v) => onChange(shot.id, { shot_no: Number(v || 1) })}
-              />
+        <div className="xl:col-span-3 flex flex-col min-h-[260px]">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-sm font-semibold text-slate-700">
+              镜头 #{String(shot.shot_no).padStart(2, "0")}
             </div>
-            <div className="md:col-span-2">
-              <div className="text-xs text-slate-500 mb-1">景别/视角</div>
-              <Select
-                value={shot.shot_type || undefined}
-                options={SHOT_TYPE_OPTIONS}
-                placeholder="选择景别/视角"
-                onChange={(v) => onChange(shot.id, { shot_type: v })}
-              />
-            </div>
+            {saving && <span className="text-xs text-slate-500">保存中...</span>}
           </div>
-
-          <div>
-            <div className="text-xs text-slate-500 mb-1">画面提示词</div>
-            <MarkdownEditorToggle
-              value={shot.visual_prompt || ""}
-              onChange={(v) => onChange(shot.id, { visual_prompt: v })}
-              minRows={4}
-              placeholder="输入画面提示词（支持 Markdown）"
-            />
-          </div>
-
-          <div>
-            <div className="text-xs text-slate-500 mb-1">台词</div>
-            <MarkdownEditorToggle
-              value={shot.dialogue || ""}
-              onChange={(v) => onChange(shot.id, { dialogue: v })}
-              minRows={3}
-              placeholder="输入台词（支持 Markdown）"
-            />
-          </div>
-
-          <div>
-            <div className="text-xs text-slate-500 mb-1">参考时长（秒）</div>
-            <InputNumber
-              min={0}
-              step={0.5}
-              className="w-40"
-              value={shot.duration_seconds ?? undefined}
-              onChange={(v) => onChange(shot.id, { duration_seconds: v == null ? null : Number(v) })}
-            />
-            {saving && <span className="ml-3 text-xs text-slate-500">保存中...</span>}
-          </div>
+          <MarkdownEditorToggle
+            className="flex-1"
+            value={shot.visual_prompt || ""}
+            onChange={(v) => onChange(shot.id, { visual_prompt: v })}
+            minRows={12}
+            placeholder="输入画面提示词（支持 Markdown）"
+          />
         </div>
 
         <div
