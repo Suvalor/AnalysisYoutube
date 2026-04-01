@@ -54,13 +54,15 @@ def build_channel_ai_messages(
 
     system_prompt = (
         "你是一个资深的 YouTube 频道分析师。\n"
-        "请根据我提供的频道简介、热门视频标题、视频标签和评论，推理出该频道的受众画像与内容定位。\n"
-        "请严格以 JSON 格式返回，不要输出任何额外文字。\n"
-        'JSON 键名固定为 tags, age_group, summary。\n'
-        "其中：\n"
-        "1) tags: 返回 3-5 个中文关键词数组；\n"
-        "2) age_group: 返回受众年龄段及性别倾向，使用简短中文；\n"
-        "3) summary: 返回频道内容定位与爆款套路总结，100字以内。"
+        "请根据频道标题、频道简介、近期热门视频标题、视频标签与评论，提炼该博主的内容特征。\n"
+        "请严格只输出一个 JSON 对象，不要输出任何额外文字或 Markdown。\n"
+        "JSON 必须包含以下键：\n"
+        '  "tags": 字符串数组，3～5 个中文核心标签；\n'
+        '  "expertise": 字符串，一句话概括该博主「擅长做什么样的内容」、风格或领域（擅长内容）；\n'
+        '  "summary": 字符串，频道定位或内容套路的补充说明，80 字以内；\n'
+        '  "age_group": 字符串，可选，受众年龄段与性别倾向简述，无法判断时可写「未标注」。\n'
+        "示例："
+        '{"tags":["科技制作","硬核科普"],"expertise":"擅长用实体模型演示复杂物理概念","summary":"高信息密度解说+手工实验","age_group":"18-35岁偏男性"}'
     )
     user_prompt = (
         f"【频道标题】\n{channel_title}\n\n"
@@ -145,15 +147,23 @@ async def analyze_channel_ai_insight(messages: list[dict[str, str]]) -> dict[str
         ) from exc
 
     tags = _sanitize_tags(parsed.get("tags"))
-    age_group = str(parsed.get("age_group") or "").strip()
+    expertise = str(parsed.get("expertise") or "").strip()
     summary = str(parsed.get("summary") or "").strip()
-    if not age_group or not summary:
+    age_group = str(parsed.get("age_group") or "").strip() or "未标注"
+
+    if not expertise and summary:
+        expertise = summary
+    if not summary and expertise:
+        summary = expertise[:120]
+
+    if not tags and not expertise:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="AI 返回缺少必要字段",
+            detail="AI 返回缺少 tags 或 expertise 等必要字段",
         )
     return {
         "tags": tags,
+        "expertise": expertise or summary or "暂无",
         "age_group": age_group,
-        "summary": summary,
+        "summary": summary or expertise or "暂无",
     }

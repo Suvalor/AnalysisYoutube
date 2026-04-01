@@ -50,6 +50,7 @@ class YouTubeChannelRead(BaseModel):
     total_views: int
     video_count: int
     ai_tags: list[str] | None = None
+    ai_expertise: str | None = None
     ai_audience_age: str | None = None
     ai_summary: str | None = None
     published_at: datetime | None = None
@@ -97,6 +98,7 @@ class CommentScrapeResponse(BaseModel):
 
 class YouTubeChannelAIAnalyzeResponse(BaseModel):
     tags: list[str] = Field(default_factory=list, description="AI 推断的频道核心标签")
+    expertise: str = Field(default="", description="AI 总结的擅长内容")
     age_group: str = Field(..., description="AI 推断的受众年龄段与性别倾向")
     summary: str = Field(..., description="AI 推断的频道定位与爆款套路总结")
 

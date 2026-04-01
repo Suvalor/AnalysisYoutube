@@ -1,4 +1,4 @@
-import { Button, Input, Modal, Select, Spin, Table, message } from "antd";
+import { Button, Input, Modal, Popover, Select, Spin, Table, Tag, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -64,17 +64,22 @@ export default function ChannelList() {
       return;
     }
     setAnalyzing(true);
+    message.loading({ content: "正在拉取频道与视频数据，并进行 AI 标签分析，请稍候…", key: "yt-add", duration: 0 });
     try {
       const res = await analyzeYouTubeBatchApi({ urls: urls.trim() });
-      message.success(
-        `成功分析 ${res.channels_count} 个频道，共获取 ${res.videos_count} 个视频。本次消耗 API 额度 ${res.quota_used} 点。`
-      );
+      message.success({
+        content: `成功分析 ${res.channels_count} 个频道，共获取 ${res.videos_count} 个视频。本次消耗 API 额度 ${res.quota_used} 点。`,
+        key: "yt-add",
+      });
       setUrls("");
       await load();
       void getYouTubeQuotaDashboardApi();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: unknown } } };
-      message.error(typeof err.response?.data?.detail === "string" ? err.response.data.detail : "添加失败");
+      message.error({
+        content: typeof err.response?.data?.detail === "string" ? err.response.data.detail : "添加失败",
+        key: "yt-add",
+      });
     } finally {
       setAnalyzing(false);
     }
@@ -91,16 +96,26 @@ export default function ChannelList() {
       cancelText: "取消",
       onOk: async () => {
         setUpdating(true);
+        message.loading({
+          content: "正在同步 YouTube 数据，并对缺少标签的频道执行 AI 补全，请稍候…",
+          key: "yt-batch",
+          duration: 0,
+        });
         try {
           const res = await batchUpdateChannelsApi();
-          message.success(
-            `更新完成：频道 ${res.updated_channels}，视频 ${res.updated_videos}。本次消耗 API 额度 ${res.quota_used} 点。`
-          );
+          const aiPart =
+            res.ai_enriched != null || res.ai_failed != null
+              ? ` AI 补全成功 ${res.ai_enriched ?? 0} 个${(res.ai_failed ?? 0) > 0 ? `，失败 ${res.ai_failed} 个` : ""}。`
+              : "";
+          message.success({
+            content: `更新完成：频道 ${res.updated_channels}，视频 ${res.updated_videos}。消耗 API ${res.quota_used} 点。${aiPart}`,
+            key: "yt-batch",
+          });
           await load();
           void getYouTubeQuotaDashboardApi();
         } catch (e: unknown) {
           const err = e as { response?: { data?: { detail?: string } } };
-          message.error(err.response?.data?.detail ?? "更新失败");
+          message.error({ content: err.response?.data?.detail ?? "更新失败", key: "yt-batch" });
         } finally {
           setUpdating(false);
         }
@@ -115,9 +130,57 @@ export default function ChannelList() {
       render: (_, r) => (
         <div className="flex items-center gap-2">
           <img src={r.channel.thumbnail_url || ""} alt="" className="w-9 h-9 rounded-full border border-slate-200" />
-          <span className="font-medium text-slate-900">{r.channel.title}</span>
+          <div className="min-w-0">
+            <div className="font-medium text-slate-900 truncate">{r.channel.title}</div>
+            {r.channel.description?.trim() ? (
+              <Popover
+                title="频道简介"
+                content={
+                  <Typography.Paragraph className="!mb-0 max-w-sm whitespace-pre-wrap text-slate-700 text-xs">
+                    {r.channel.description}
+                  </Typography.Paragraph>
+                }
+                trigger="click"
+              >
+                <button
+                  type="button"
+                  className="text-xs text-blue-600 hover:text-blue-500 truncate max-w-[200px] block text-left"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  简介预览
+                </button>
+              </Popover>
+            ) : (
+              <span className="text-xs text-slate-400">暂无简介</span>
+            )}
+          </div>
         </div>
       ),
+    },
+    {
+      title: "标签 / 擅长",
+      key: "tags_expertise",
+      width: 260,
+      render: (_, r) => {
+        const tags = r.channel.ai_tags ?? [];
+        const exp = r.channel.ai_expertise?.trim();
+        return (
+          <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-wrap gap-1">
+              {tags.length ? (
+                tags.map((tag, idx) => (
+                  <Tag key={`${tag}-${idx}`} color={["blue", "geekblue", "cyan", "purple", "magenta"][idx % 5]} className="!m-0">
+                    {tag}
+                  </Tag>
+                ))
+              ) : (
+                <span className="text-xs text-slate-400">待 AI 分析</span>
+              )}
+            </div>
+            {exp ? <div className="text-xs text-slate-600 line-clamp-2 leading-snug">{exp}</div> : null}
+          </div>
+        );
+      },
     },
     {
       title: "订阅数",

@@ -21,6 +21,7 @@ class YouTubeChannel(Base):
     video_count: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ai_tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    ai_expertise: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_audience_age: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
