@@ -8,24 +8,37 @@ type AgentFormValues = {
   content: string;
 };
 
-export default function AgentEditorPage() {
+type AgentEditorPageProps = {
+  promptId?: number;
+};
+
+export default function AgentEditorPage({ promptId: promptIdFromTab }: AgentEditorPageProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [form] = Form.useForm<AgentFormValues>();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const initialRef = useRef<AgentFormValues | null>(null);
+  const [invalidId, setInvalidId] = useState(false);
 
-  const promptId = useMemo(() => Number(id || 0), [id]);
+  const promptId = useMemo(() => {
+    if (typeof promptIdFromTab === "number" && Number.isFinite(promptIdFromTab) && promptIdFromTab > 0) {
+      return promptIdFromTab;
+    }
+    const raw = (id || "").trim();
+    if (!raw) return 0;
+    const num = Number(raw);
+    return Number.isFinite(num) && num > 0 ? num : 0;
+  }, [id, promptIdFromTab]);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       if (!promptId) {
-        message.error("智能体 ID 无效");
-        navigate("/config-center?tab=prompts", { replace: true });
+        setInvalidId(true);
         return;
       }
+      setInvalidId(false);
       setLoading(true);
       try {
         const row = await getPromptApi(promptId);
@@ -111,7 +124,15 @@ export default function AgentEditorPage() {
           </div>
         </div>
 
-        <Form form={form} layout="vertical" disabled={loading}>
+        {invalidId ? (
+          <div className="py-10 text-center">
+            <p className="text-slate-600 mb-4">当前智能体 ID 无效，请返回智能体列表重新选择。</p>
+            <Button type="primary" onClick={goBack}>
+              返回智能体管理
+            </Button>
+          </div>
+        ) : (
+          <Form form={form} layout="vertical" disabled={loading}>
           <Form.Item name="title" label="名称" rules={[{ required: true, message: "请输入名称" }]}>
             <Input placeholder="例如：短视频脚本智能体" />
           </Form.Item>
@@ -125,11 +146,12 @@ export default function AgentEditorPage() {
               autoSize={{ minRows: 20, maxRows: 36 }}
             />
           </Form.Item>
-        </Form>
+          </Form>
+        )}
 
         <div className="mt-4 flex gap-2">
           <Button onClick={handleBack}>返回</Button>
-          <Button type="primary" loading={saving} onClick={handleSave}>
+          <Button type="primary" loading={saving} onClick={handleSave} disabled={invalidId}>
             保存
           </Button>
         </div>

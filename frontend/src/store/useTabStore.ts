@@ -26,6 +26,8 @@ export type TabItem = {
   type: TabType;
   /** 仅 type 为 channel-detail 时使用 */
   channelId?: number;
+  /** 仅 type 为 agent-edit 时使用 */
+  promptId?: number;
 };
 
 type TabState = {
@@ -42,6 +44,37 @@ export const useTabStore = create<TabState>((set, get) => ({
 
   openTab: (tab) => {
     const { tabs } = get();
+
+    // 同一智能体编辑页只保留一个标签：按 promptId / 路径合并，避免重复打开
+    if (tab.type === "agent-edit" && typeof tab.promptId === "number" && Number.isFinite(tab.promptId)) {
+      const pid = tab.promptId;
+      const dupIdx = tabs.findIndex((t) => {
+        if (t.type !== "agent-edit") return false;
+        if (t.promptId === pid) return true;
+        const m = t.path.match(/^\/config\/agent\/edit\/(\d+)$/);
+        return m != null && Number(m[1]) === pid;
+      });
+      if (dupIdx >= 0) {
+        const existing = tabs[dupIdx];
+        const mergedId = existing.id;
+        const nextTabs = tabs.map((t, i) =>
+          i === dupIdx
+            ? {
+                ...t,
+                ...tab,
+                id: mergedId,
+                type: "agent-edit" as const,
+                promptId: pid,
+                path: tab.path,
+                title: tab.title,
+              }
+            : t
+        );
+        set({ tabs: nextTabs, activeTabId: mergedId });
+        return;
+      }
+    }
+
     const idx = tabs.findIndex((t) => t.id === tab.id);
     if (idx >= 0) {
       set({ activeTabId: tab.id });
