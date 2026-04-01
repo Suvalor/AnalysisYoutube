@@ -1,25 +1,17 @@
 import { Button, Card, Input, Select, Typography, message } from "antd";
 import { useEffect, useMemo, useState } from "react";
-import { createScriptApi } from "@/services/libraryApi";
-import { getScriptModelsApi, type ScriptModelOption } from "@/services/scriptsApi";
-import { getUserSettingsApi } from "@/services/userApi";
+import {
+  createScriptApi,
+  listModelsApi,
+  listPromptsApi,
+  listStylesApi,
+  type ModelItem,
+  type PromptItem,
+  type StyleItem,
+} from "@/services/libraryApi";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
-
-const DEFAULT_PROMPT_OPTIONS = [
-  { value: "short-video", label: "短视频脚本（带分镜）" },
-  { value: "talking-head", label: "口播稿（单人出镜，信息密集）" },
-  { value: "live-sale", label: "直播话术（转化导向）" },
-  { value: "drama-multi-role", label: "剧情脚本（多角色对话）" },
-];
-
-const DEFAULT_STYLE_OPTIONS = [
-  { value: "humor", label: "幽默搞笑" },
-  { value: "professional", label: "专业权威" },
-  { value: "storytelling", label: "故事叙事" },
-  { value: "emotional", label: "情绪共鸣" },
-];
 
 type StreamMsg = {
   type: "delta" | "done" | "error";
@@ -27,44 +19,38 @@ type StreamMsg = {
   message?: string;
 };
 
-function parseUiOptionsFromSettings(raw: string | null | undefined) {
-  if (!raw?.trim()) {
-    return {
-      prompts: DEFAULT_PROMPT_OPTIONS,
-      styles: DEFAULT_STYLE_OPTIONS,
-    };
+type ModelOption = { value: string; label: string };
+
+function toModelOptions(rows: ModelItem[]): ModelOption[] {
+  const out: ModelOption[] = [];
+  for (const row of rows) {
+    const raw = row.supported_models_json?.trim();
+    if (!raw) continue;
+    try {
+      const arr = JSON.parse(raw) as Array<string | { value?: string; label?: string }>;
+      if (!Array.isArray(arr)) continue;
+      for (const item of arr) {
+        if (typeof item === "string" && item.trim()) {
+          out.push({ value: item.trim(), label: `${row.name} / ${item.trim()}` });
+        } else if (item && typeof item === "object" && item.value?.trim()) {
+          out.push({ value: item.value.trim(), label: `${row.name} / ${item.label?.trim() || item.value.trim()}` });
+        }
+      }
+    } catch {
+      continue;
+    }
   }
-  try {
-    const o = JSON.parse(raw) as {
-      prompts?: { value?: string; label?: string }[];
-      styles?: { value?: string; label?: string }[];
-    };
-    const prompts = (o.prompts ?? [])
-      .filter((x) => x?.value && x?.label)
-      .map((x) => ({ value: String(x.value), label: String(x.label) }));
-    const styles = (o.styles ?? [])
-      .filter((x) => x?.value && x?.label)
-      .map((x) => ({ value: String(x.value), label: String(x.label) }));
-    return {
-      prompts: prompts.length ? prompts : DEFAULT_PROMPT_OPTIONS,
-      styles: styles.length ? styles : DEFAULT_STYLE_OPTIONS,
-    };
-  } catch {
-    return {
-      prompts: DEFAULT_PROMPT_OPTIONS,
-      styles: DEFAULT_STYLE_OPTIONS,
-    };
-  }
+  return out;
 }
 
 export default function AICreator() {
-  const [modelOptions, setModelOptions] = useState<ScriptModelOption[]>([]);
-  const [promptOptions, setPromptOptions] = useState(DEFAULT_PROMPT_OPTIONS);
-  const [styleOptions, setStyleOptions] = useState(DEFAULT_STYLE_OPTIONS);
+  const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
+  const [promptRows, setPromptRows] = useState<PromptItem[]>([]);
+  const [styleRows, setStyleRows] = useState<StyleItem[]>([]);
 
   const [selectedModel, setSelectedModel] = useState<string>("");
-  const [selectedPrompt, setSelectedPrompt] = useState<string>(DEFAULT_PROMPT_OPTIONS[0]!.value);
-  const [selectedStyle, setSelectedStyle] = useState<string>(DEFAULT_STYLE_OPTIONS[0]!.value);
+  const [selectedPrompt, setSelectedPrompt] = useState<number | null>(null);
+  const [selectedStyle, setSelectedStyle] = useState<number | null>(null);
   const [coreIdea, setCoreIdea] = useState("");
   const [generating, setGenerating] = useState(false);
   const [generatedText, setGeneratedText] = useState("");
@@ -74,26 +60,22 @@ export default function AICreator() {
     let mounted = true;
     (async () => {
       try {
-        const [models, settings] = await Promise.all([getScriptModelsApi(), getUserSettingsApi()]);
+        const [models, prompts, styles] = await Promise.all([listModelsApi(), listPromptsApi(), listStylesApi()]);
         if (!mounted) return;
-        const ui = parseUiOptionsFromSettings(settings.ai_prompt_config_json);
-        setPromptOptions(ui.prompts);
-        setStyleOptions(ui.styles);
-        setModelOptions(models);
-        const firstModel = models[0]?.value ?? "";
+        const modelOps = toModelOptions(models);
+        setModelOptions(modelOps);
+        setPromptRows(prompts);
+        setStyleRows(styles);
+        const firstModel = modelOps[0]?.value ?? "";
         setSelectedModel((prev) => {
-          if (prev && models.some((m) => m.value === prev)) return prev;
+          if (prev && modelOps.some((m) => m.value === prev)) return prev;
           return firstModel;
         });
-        setSelectedPrompt((prev) =>
-          ui.prompts.some((p) => p.value === prev) ? prev : ui.prompts[0]!.value
-        );
-        setSelectedStyle((prev) =>
-          ui.styles.some((s) => s.value === prev) ? prev : ui.styles[0]!.value
-        );
+        setSelectedPrompt((prev) => (prev && prompts.some((p) => p.id === prev) ? prev : (prompts[0]?.id ?? null)));
+        setSelectedStyle((prev) => (prev && styles.some((s) => s.id === prev) ? prev : (styles[0]?.id ?? null)));
       } catch (e: any) {
         if (!mounted) return;
-        message.error(e?.response?.data?.detail ?? e?.message ?? "加载模型或设置失败");
+        message.error(e?.response?.data?.detail ?? e?.message ?? "加载配置失败");
         setModelOptions([]);
       } finally {
         if (mounted) setOptionsLoading(false);
@@ -108,8 +90,8 @@ export default function AICreator() {
     () =>
       Boolean(
         selectedModel &&
-          selectedPrompt &&
-          selectedStyle &&
+          selectedPrompt !== null &&
+          selectedStyle !== null &&
           coreIdea.trim().length > 0 &&
           !generating &&
           !optionsLoading
@@ -123,6 +105,12 @@ export default function AICreator() {
       return;
     }
     if (!canGenerate) return;
+    const promptRow = promptRows.find((x) => x.id === selectedPrompt);
+    const styleRow = styleRows.find((x) => x.id === selectedStyle);
+    if (!promptRow || !styleRow) {
+      message.warning("请先在配置中心维护可用的智能体和风格");
+      return;
+    }
     setGenerating(true);
     setGeneratedText("");
     try {
@@ -135,8 +123,8 @@ export default function AICreator() {
         },
         body: JSON.stringify({
           model: selectedModel,
-          prompt_template: selectedPrompt,
-          style: selectedStyle,
+          prompt_template: promptRow.content,
+          style: styleRow.content,
           core_idea: coreIdea.trim(),
         }),
       });
@@ -201,11 +189,10 @@ export default function AICreator() {
     }
   };
 
-  const cardClass =
-    "border border-slate-200 shadow-sm bg-white rounded-lg [&_.ant-card-body]:bg-white";
+  const cardClass = "border border-slate-200 shadow-none bg-white rounded-lg [&_.ant-card-body]:bg-white";
 
   return (
-    <div className="min-h-full bg-[#F8F9FA] p-4 md:p-8 text-slate-900">
+    <div className="min-h-full bg-white p-4 md:p-8 text-slate-900">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className={`lg:col-span-1 ${cardClass}`}>
           <Title level={4} className="!mb-4 !text-slate-900">
@@ -227,20 +214,22 @@ export default function AICreator() {
               <Text className="text-slate-600">选择提示词</Text>
               <Select
                 className="w-full mt-1"
-                value={selectedPrompt}
-                onChange={(v) => setSelectedPrompt(v)}
-                options={promptOptions}
+                value={selectedPrompt ?? undefined}
+                onChange={(v: number) => setSelectedPrompt(v)}
+                options={promptRows.map((x) => ({ value: x.id, label: x.title }))}
                 loading={optionsLoading}
+                placeholder="请选择智能体"
               />
             </div>
             <div>
               <Text className="text-slate-600">选择风格</Text>
               <Select
                 className="w-full mt-1"
-                value={selectedStyle}
-                onChange={(v) => setSelectedStyle(v)}
-                options={styleOptions}
+                value={selectedStyle ?? undefined}
+                onChange={(v: number) => setSelectedStyle(v)}
+                options={styleRows.map((x) => ({ value: x.id, label: x.title }))}
                 loading={optionsLoading}
+                placeholder="请选择风格"
               />
             </div>
             <div>
@@ -268,7 +257,7 @@ export default function AICreator() {
               保存到剧本库
             </Button>
           </div>
-          <div className="min-h-[520px] rounded-lg border border-slate-200 bg-slate-50 p-4 whitespace-pre-wrap leading-7 text-slate-800">
+          <div className="min-h-[520px] rounded-lg border border-slate-200 bg-white p-4 whitespace-pre-wrap leading-7 text-slate-800">
             {generatedText || "点击「开始生成」后，这里会以打字机效果实时展示内容。"}
           </div>
         </Card>

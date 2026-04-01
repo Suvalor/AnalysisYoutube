@@ -26,6 +26,7 @@ import GlobalVideoList from "@/pages/youtube/GlobalVideoList";
 import ChannelDetail from "@/pages/youtube/ChannelDetail";
 import FeishuWorkspace from "@/pages/feishu/FeishuWorkspace";
 import AiModelSettings from "@/pages/settings/AiModelSettings";
+import ConfigCenter from "@/pages/settings/ConfigCenter";
 
 type NavDef = {
   path: string;
@@ -40,7 +41,7 @@ const navDefs: NavDef[] = [
   { path: "/youtube/channels", label: "频道管理", icon: Youtube, type: "channel-list", tabId: "channel-list" },
   { path: "/youtube/videos", label: "全局视频", icon: Youtube, type: "global-videos", tabId: "global-videos" },
   { path: "/ai-creator", label: "AI 剧本创作", icon: WandSparkles, type: "ai-creator", tabId: "ai-creator" },
-  { path: "/ai-model-settings", label: "模型配置", icon: Settings, type: "ai-model-settings", tabId: "ai-model-settings" },
+  { path: "/config-center", label: "配置中心", icon: Settings, type: "config-center", tabId: "config-center" },
   { path: "/knowledge-base", label: "知识库管理", icon: Library, type: "knowledge-base", tabId: "knowledge-base" },
   { path: "/assets", label: "素材库", icon: Image, type: "assets", tabId: "assets" },
   { path: "/video-board", label: "视频看板", icon: Kanban, type: "video-board", tabId: "video-board" },
@@ -72,6 +73,8 @@ function renderTabPanel(tab: TabItem) {
       return <FeishuWorkspace />;
     case "ai-model-settings":
       return <AiModelSettings />;
+    case "config-center":
+      return <ConfigCenter />;
     default:
       return null;
   }

@@ -4,10 +4,10 @@ from fastapi import HTTPException, status
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.library import AssetLibrary, PromptLibrary, ScriptLibrary, StyleLibrary
+from app.models.library import AssetLibrary, ModelLibrary, PromptLibrary, ScriptLibrary, StyleLibrary
 
 
-ModelT = TypeVar("ModelT", PromptLibrary, StyleLibrary, AssetLibrary, ScriptLibrary)
+ModelT = TypeVar("ModelT", PromptLibrary, StyleLibrary, ModelLibrary, AssetLibrary, ScriptLibrary)
 
 
 async def list_by_user(session: AsyncSession, model: type[ModelT], user_id: int) -> list[ModelT]:
