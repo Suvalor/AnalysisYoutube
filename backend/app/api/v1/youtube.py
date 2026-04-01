@@ -1,9 +1,16 @@
 from datetime import date, timedelta
+from datetime import datetime, timezone
+import mimetypes
+import secrets
+import tempfile
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, HTTPException, Query
+import httpx
 from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DBSessionDep
+from app.core.config import settings
 from app.crud.youtube import (
     bulk_upsert_channels_from_api_items,
     bulk_upsert_videos_from_api_items,
@@ -37,6 +44,14 @@ from app.schemas.youtube import (
     YouTubeVideoPageResponse,
     YouTubeVideoRead,
 )
+from app.schemas.youtube_oauth import (
+    YouTubeOAuthCallbackRequest,
+    YouTubeOAuthStatusResponse,
+    YouTubeOAuthUrlResponse,
+    YouTubePublishRequest,
+    YouTubePublishResponse,
+)
+from app.services.field_encryption import encrypt_plaintext, try_decrypt
 from app.services.youtube_ai_service import analyze_channel_ai_insight, build_channel_ai_messages
 from app.services.youtube_service import (
     calc_recent_avg_views,
@@ -658,4 +673,230 @@ async def competitors_compare(
         result_map[d][f"{key_base}_video_count"] = row.video_count
 
     return [result_map[k] for k in sorted(result_map.keys())]
+
+
+@router.get("/oauth/url", response_model=YouTubeOAuthUrlResponse, summary="生成 Google OAuth 授权地址")
+async def get_youtube_oauth_url(current_user: CurrentUserDep) -> YouTubeOAuthUrlResponse:
+    _ = current_user
+    if not settings.google_oauth_client_id:
+        raise HTTPException(status_code=500, detail="未配置 GOOGLE_OAUTH_CLIENT_ID")
+    redirect_uri = (settings.google_oauth_redirect_uri or "").strip()
+    if not redirect_uri:
+        raise HTTPException(status_code=500, detail="未配置 GOOGLE_OAUTH_REDIRECT_URI")
+
+    state = secrets.token_urlsafe(24)
+    params = {
+        "client_id": settings.google_oauth_client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "access_type": "offline",
+        "prompt": "consent",
+        "scope": "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly",
+        "state": state,
+        "include_granted_scopes": "true",
+    }
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    return YouTubeOAuthUrlResponse(auth_url=auth_url, state=state)
+
+
+@router.post("/oauth/callback", response_model=YouTubeOAuthStatusResponse, summary="OAuth 回调后兑换并加密保存 token")
+async def youtube_oauth_callback(
+    payload: YouTubeOAuthCallbackRequest,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> YouTubeOAuthStatusResponse:
+    if not settings.google_oauth_client_id or not settings.google_oauth_client_secret:
+        raise HTTPException(status_code=500, detail="Google OAuth 配置不完整")
+    redirect_uri = (payload.redirect_uri or settings.google_oauth_redirect_uri or "").strip()
+    if not redirect_uri:
+        raise HTTPException(status_code=500, detail="缺少 redirect_uri")
+
+    async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
+        token_resp = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": payload.code,
+                "client_id": settings.google_oauth_client_id,
+                "client_secret": settings.google_oauth_client_secret,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            },
+        )
+        if token_resp.status_code >= 400:
+            raise HTTPException(status_code=400, detail=f"OAuth token 兑换失败: {token_resp.text}")
+        token_data = token_resp.json()
+        access_token = str(token_data.get("access_token") or "").strip()
+        refresh_token = str(token_data.get("refresh_token") or "").strip()
+        if not access_token:
+            raise HTTPException(status_code=400, detail="未获取到 access_token")
+
+        expires_in = int(token_data.get("expires_in") or 0)
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in) if expires_in > 0 else None
+
+        channel_id: str | None = None
+        ch_resp = await client.get(
+            "https://www.googleapis.com/youtube/v3/channels",
+            params={"part": "id", "mine": "true"},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if ch_resp.status_code < 400:
+            items = (ch_resp.json() or {}).get("items") or []
+            if items and isinstance(items, list):
+                channel_id = str((items[0] or {}).get("id") or "").strip() or None
+
+    current_user.youtube_access_token_encrypted = encrypt_plaintext(access_token)
+    if refresh_token:
+        current_user.youtube_refresh_token_encrypted = encrypt_plaintext(refresh_token)
+    current_user.youtube_token_expires_at = expires_at
+    current_user.youtube_channel_id = channel_id
+    await db.commit()
+    await db.refresh(current_user)
+
+    return YouTubeOAuthStatusResponse(
+        connected=bool(current_user.youtube_access_token_encrypted),
+        channel_id=current_user.youtube_channel_id,
+        expires_at=current_user.youtube_token_expires_at,
+    )
+
+
+@router.get("/oauth/status", response_model=YouTubeOAuthStatusResponse, summary="YouTube OAuth 连接状态")
+async def youtube_oauth_status(current_user: CurrentUserDep) -> YouTubeOAuthStatusResponse:
+    return YouTubeOAuthStatusResponse(
+        connected=bool(current_user.youtube_access_token_encrypted),
+        channel_id=current_user.youtube_channel_id,
+        expires_at=current_user.youtube_token_expires_at,
+    )
+
+
+@router.post("/publish", response_model=YouTubePublishResponse, summary="发布视频到 YouTube")
+async def youtube_publish(
+    payload: YouTubePublishRequest,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> YouTubePublishResponse:
+    if not payload.media_url.strip():
+        raise HTTPException(status_code=422, detail="media_url 不能为空")
+    access_token = await _get_valid_youtube_access_token(db, current_user)
+    if not access_token:
+        raise HTTPException(status_code=400, detail="请先完成 YouTube OAuth 授权")
+
+    async with httpx.AsyncClient(timeout=120.0, trust_env=False, follow_redirects=True) as client:
+        media_resp = await client.get(payload.media_url)
+        if media_resp.status_code >= 400:
+            raise HTTPException(status_code=400, detail=f"媒体下载失败: {media_resp.status_code}")
+
+        content_type = (
+            str(media_resp.headers.get("content-type") or "").split(";")[0].strip()
+            or mimetypes.guess_type(payload.media_url)[0]
+            or "video/mp4"
+        )
+
+        with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
+            written = 0
+            async for chunk in media_resp.aiter_bytes(chunk_size=1024 * 1024):
+                if not chunk:
+                    continue
+                tmp_file.write(chunk)
+                written += len(chunk)
+            if written <= 0:
+                raise HTTPException(status_code=400, detail="媒体内容为空，无法发布")
+            tmp_file.flush()
+
+            init_resp = await client.post(
+                "https://www.googleapis.com/upload/youtube/v3/videos",
+                params={"uploadType": "resumable", "part": "snippet,status"},
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json; charset=UTF-8",
+                    "X-Upload-Content-Length": str(written),
+                    "X-Upload-Content-Type": content_type,
+                },
+                json={
+                    "snippet": {
+                        "title": payload.title,
+                        "description": payload.description,
+                    },
+                    "status": {
+                        "privacyStatus": payload.privacy_status,
+                    },
+                },
+            )
+            if init_resp.status_code >= 400:
+                raise HTTPException(status_code=400, detail=f"创建上传会话失败: {init_resp.text}")
+            upload_url = str(init_resp.headers.get("Location") or "").strip()
+            if not upload_url:
+                raise HTTPException(status_code=400, detail="未获取到 YouTube 上传会话地址")
+
+            chunk_size = 8 * 1024 * 1024
+            start = 0
+            video_id: str | None = None
+            tmp_file.seek(0)
+            while start < written:
+                data_chunk = tmp_file.read(min(chunk_size, written - start))
+                if not data_chunk:
+                    break
+                end = start + len(data_chunk) - 1
+                upload_resp = await client.put(
+                    upload_url,
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Content-Type": content_type,
+                        "Content-Length": str(len(data_chunk)),
+                        "Content-Range": f"bytes {start}-{end}/{written}",
+                    },
+                    content=data_chunk,
+                )
+                # 308 表示分块续传中，最终分片会返回 200/201。
+                if upload_resp.status_code == 308:
+                    start = end + 1
+                    continue
+                if upload_resp.status_code >= 400:
+                    raise HTTPException(status_code=400, detail=f"上传视频失败: {upload_resp.text}")
+                data = upload_resp.json() if upload_resp.text else {}
+                video_id = str(data.get("id") or "").strip() or None
+                start = end + 1
+
+            if not video_id:
+                raise HTTPException(status_code=400, detail="上传完成但未返回 video_id")
+
+    return YouTubePublishResponse(status="published", video_id=video_id, message="已成功发布到 YouTube")
+
+
+async def _get_valid_youtube_access_token(db: DBSessionDep, current_user: CurrentUserDep) -> str | None:
+    access_token = try_decrypt(current_user.youtube_access_token_encrypted)
+    now = datetime.now(timezone.utc)
+    expires_at = current_user.youtube_token_expires_at
+    if access_token and (expires_at is None or expires_at > now + timedelta(seconds=60)):
+        return access_token
+
+    refresh_token = try_decrypt(current_user.youtube_refresh_token_encrypted)
+    if not refresh_token:
+        return access_token
+    if not settings.google_oauth_client_id or not settings.google_oauth_client_secret:
+        raise HTTPException(status_code=500, detail="Google OAuth 配置不完整，无法刷新 token")
+
+    async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
+        resp = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": settings.google_oauth_client_id,
+                "client_secret": settings.google_oauth_client_secret,
+                "refresh_token": refresh_token,
+                "grant_type": "refresh_token",
+            },
+        )
+        if resp.status_code >= 400:
+            raise HTTPException(status_code=400, detail=f"刷新 access_token 失败: {resp.text}")
+        token_data = resp.json()
+        new_access = str(token_data.get("access_token") or "").strip()
+        if not new_access:
+            raise HTTPException(status_code=400, detail="刷新 token 成功但未返回 access_token")
+        expires_in = int(token_data.get("expires_in") or 0)
+
+    current_user.youtube_access_token_encrypted = encrypt_plaintext(new_access)
+    if expires_in > 0:
+        current_user.youtube_token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+    await db.commit()
+    await db.refresh(current_user)
+    return new_access
 

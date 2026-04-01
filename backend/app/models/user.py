@@ -27,6 +27,10 @@ class User(Base):
     ai_models_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_prompt_config_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    youtube_access_token_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    youtube_refresh_token_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    youtube_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    youtube_channel_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     competitor_pools: Mapped[list["UserCompetitorPool"]] = relationship(
         "UserCompetitorPool", back_populates="user", cascade="all, delete-orphan"
     )

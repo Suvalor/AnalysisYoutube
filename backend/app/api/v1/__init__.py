@@ -10,6 +10,7 @@ from app.api.v1 import oss
 from app.api.v1 import prompt_library
 from app.api.v1 import scripts
 from app.api.v1 import script_library
+from app.api.v1 import sop
 from app.api.v1 import style_library
 from app.api.v1 import users
 from app.api.v1 import video_projects
@@ -28,6 +29,7 @@ api_router_v1.include_router(asset_library.router, prefix="/assets", tags=["asse
 api_router_v1.include_router(script_library.router, prefix="/libraries/scripts", tags=["script-library"])
 api_router_v1.include_router(ai.router, prefix="/ai", tags=["ai"])
 api_router_v1.include_router(scripts.router, prefix="/v1/scripts", tags=["scripts"])
+api_router_v1.include_router(sop.router, prefix="/sop", tags=["sop"])
 api_router_v1.include_router(jimeng.router, prefix="/v1/jimeng", tags=["jimeng"])
 api_router_v1.include_router(materials.router, prefix="/v1/materials", tags=["materials"])
 api_router_v1.include_router(video_projects.router, prefix="/video-projects", tags=["video-projects"])

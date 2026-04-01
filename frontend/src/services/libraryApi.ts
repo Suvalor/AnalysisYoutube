@@ -145,6 +145,16 @@ export async function createScriptApi(payload: {
   return res.data as ScriptItem;
 }
 
+export async function listScriptsApi() {
+  const res = await apiClient.get("/api/libraries/scripts");
+  return res.data as ScriptItem[];
+}
+
+export async function getScriptApi(scriptId: number) {
+  const res = await apiClient.get(`/api/libraries/scripts/${scriptId}`);
+  return res.data as ScriptItem;
+}
+
 export async function listAssetsApi() {
   const res = await apiClient.get("/api/assets");
   return res.data as AssetItem[];

@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     jimeng_auth_token: str = Field("", alias="JIMENG_AUTH_TOKEN")
     jimeng_submit_path: str = Field("/v1/tasks", alias="JIMENG_SUBMIT_PATH")
     jimeng_status_path_template: str = Field("/v1/tasks/{task_id}", alias="JIMENG_STATUS_PATH_TEMPLATE")
+    google_oauth_client_id: str = Field("", alias="GOOGLE_OAUTH_CLIENT_ID")
+    google_oauth_client_secret: str = Field("", alias="GOOGLE_OAUTH_CLIENT_SECRET")
+    google_oauth_redirect_uri: str = Field("", alias="GOOGLE_OAUTH_REDIRECT_URI")
 
     # 支持单个 URL、逗号分隔字符串，或 JSON 数组字符串
     backend_cors_origins: str = Field(
