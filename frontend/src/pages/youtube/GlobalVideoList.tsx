@@ -2,9 +2,10 @@ import { Button, DatePicker, Input, InputNumber, Modal, Pagination, Select, Tag,
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { Eye, MessageCircle, ThumbsUp } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { listYouTubeChannelsApi, listYouTubeVideosAllApi, scrapeVideoCommentsApi, type VideoListItem } from "@/services/authApi";
 import { formatNumber } from "@/utils/format";
+import { buildYouTubeWatchUrl } from "@/utils/youtubeLinks";
 
 dayjs.extend(relativeTime);
 
@@ -256,14 +257,49 @@ export default function GlobalVideoList() {
         {loading ? (
           <div className="text-slate-500">加载中...</div>
         ) : (
-          videos.map((video) => (
+          videos.map((video) => {
+            const watchUrl = buildYouTubeWatchUrl(video.yt_video_id);
+            const openYouTube = (e: MouseEvent) => {
+              e.stopPropagation();
+              if (!watchUrl) {
+                message.warning("该视频缺少有效的 YouTube 视频 ID，无法跳转");
+                return;
+              }
+              window.open(watchUrl, "_blank", "noopener,noreferrer");
+            };
+            return (
             <div key={video.id} className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm flex flex-col md:flex-row gap-4">
               <div className="relative w-full md:w-64 shrink-0">
-                <img src={video.thumbnail_url || ""} alt="" className="w-full h-36 object-cover rounded" />
-                <div className="absolute right-2 bottom-2 text-xs px-2 py-0.5 rounded bg-black/60 text-white">{video.duration_str}</div>
+                {watchUrl ? (
+                  <button
+                    type="button"
+                    onClick={openYouTube}
+                    className="block w-full p-0 border-0 bg-transparent cursor-pointer rounded overflow-hidden group/thumb"
+                    aria-label="在 YouTube 打开视频"
+                  >
+                    <img
+                      src={video.thumbnail_url || ""}
+                      alt=""
+                      className="w-full h-36 object-cover rounded transition-opacity group-hover/thumb:opacity-90"
+                    />
+                  </button>
+                ) : (
+                  <img src={video.thumbnail_url || ""} alt="" className="w-full h-36 object-cover rounded opacity-90" />
+                )}
+                <div className="absolute right-2 bottom-2 text-xs px-2 py-0.5 rounded bg-black/60 text-white pointer-events-none">{video.duration_str}</div>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-semibold text-slate-900 truncate">{video.title}</div>
+                {watchUrl ? (
+                  <button
+                    type="button"
+                    onClick={openYouTube}
+                    className="font-semibold text-slate-900 truncate text-left w-full p-0 border-0 bg-transparent cursor-pointer hover:text-blue-700 transition-colors"
+                  >
+                    {video.title}
+                  </button>
+                ) : (
+                  <div className="font-semibold text-slate-900 truncate">{video.title}</div>
+                )}
                 {video.channel_title && <div className="text-xs text-slate-500 mt-0.5 truncate">频道：{video.channel_title}</div>}
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Tag className="!border-slate-200 !bg-white !text-slate-700">{video.definition.toUpperCase()}</Tag>
@@ -294,7 +330,8 @@ export default function GlobalVideoList() {
                 </Button>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
 

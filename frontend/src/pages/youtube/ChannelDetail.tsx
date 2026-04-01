@@ -1,4 +1,4 @@
-import { Button, DatePicker, Input, InputNumber, Pagination, Select, Tag, message } from "antd";
+import { Button, DatePicker, Input, InputNumber, Pagination, Select, Space, Tag, message } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import {
@@ -14,7 +14,7 @@ import {
   Users,
   Youtube,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   analyzeYouTubeChannelAiApi,
@@ -22,10 +22,40 @@ import {
   listYouTubeVideosApi,
   type VideoListItem,
 } from "@/services/authApi";
+import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
 import { formatNumber } from "@/utils/format";
 import { useTabStore } from "@/store/useTabStore";
 
 dayjs.extend(relativeTime);
+
+/** 解析模型库中的 supported_models_json，得到可选的 LLM 模型名列表 */
+function parseSupportedModels(json: string | null): string[] {
+  if (!json?.trim()) return [];
+  try {
+    const data = JSON.parse(json) as unknown;
+    if (!Array.isArray(data)) return [];
+    const out: string[] = [];
+    for (const item of data) {
+      if (typeof item === "string" && item.trim()) out.push(item.trim());
+      else if (item && typeof item === "object" && "value" in item) {
+        const v = String((item as { value?: string }).value ?? "").trim();
+        if (v) out.push(v);
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+function axiosDetail(err: unknown): string {
+  if (err && typeof err === "object" && "response" in err) {
+    const r = (err as { response?: { data?: { detail?: string } } }).response;
+    const d = r?.data?.detail;
+    if (typeof d === "string") return d;
+  }
+  return "";
+}
 
 type Props = { channelId: number };
 
@@ -41,6 +71,11 @@ export default function ChannelDetail({ channelId }: Props) {
   const [pageSize, setPageSize] = useState(20);
   const [loading, setLoading] = useState(true);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [libraryModels, setLibraryModels] = useState<ModelItem[]>([]);
+  const [promptAgents, setPromptAgents] = useState<PromptItem[]>([]);
+  const [selectedModelLibId, setSelectedModelLibId] = useState<number | undefined>(undefined);
+  const [llmModelName, setLlmModelName] = useState("");
+  const [selectedAgentId, setSelectedAgentId] = useState<number | undefined>(undefined);
   const [filters, setFilters] = useState({
     keyword: "",
     dateRange: null as [dayjs.Dayjs, dayjs.Dayjs] | null,
@@ -82,9 +117,15 @@ export default function ChannelDetail({ channelId }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const c = await getYouTubeChannelDetailApi(channelId);
+        const [c, models, prompts] = await Promise.all([
+          getYouTubeChannelDetailApi(channelId),
+          listModelsApi().catch(() => [] as ModelItem[]),
+          listPromptsApi().catch(() => [] as PromptItem[]),
+        ]);
         if (cancelled) return;
         setChannel(c);
+        setLibraryModels(models);
+        setPromptAgents(prompts);
         useTabStore.getState().openTab({
           id: `channel-detail-${channelId}`,
           title: c.title || "博主详情",
@@ -102,6 +143,91 @@ export default function ChannelDetail({ channelId }: Props) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
+
+  /** 详情接口若带有上次分析所用的模型与智能体，用于预填表单 */
+  useEffect(() => {
+    if (!channel) return;
+    if (channel.ai_source_model_library_id) {
+      setSelectedModelLibId(channel.ai_source_model_library_id);
+      setLlmModelName(channel.ai_source_llm_model_name?.trim() ?? "");
+      setSelectedAgentId(channel.ai_source_agent_id ?? undefined);
+    }
+  }, [
+    channel?.id,
+    channel?.ai_source_model_library_id,
+    channel?.ai_source_llm_model_name,
+    channel?.ai_source_agent_id,
+  ]);
+
+  /** 无历史溯源时，默认选中第一个已配置 Key 的模型库 */
+  useEffect(() => {
+    if (libraryModels.length === 0 || selectedModelLibId !== undefined) return;
+    if (channel?.ai_source_model_library_id) return;
+    const first = libraryModels.find((m) => m.has_api_key);
+    if (first) {
+      setSelectedModelLibId(first.id);
+      const opts = parseSupportedModels(first.supported_models_json);
+      if (opts.length) setLlmModelName(opts[0]!);
+    }
+  }, [libraryModels, channel?.ai_source_model_library_id, selectedModelLibId]);
+
+  const selectedLib = useMemo(
+    () => libraryModels.find((m) => m.id === selectedModelLibId),
+    [libraryModels, selectedModelLibId]
+  );
+  const llmNameOptions = useMemo(
+    () => parseSupportedModels(selectedLib?.supported_models_json ?? null),
+    [selectedLib?.supported_models_json]
+  );
+
+  /** 切换模型库时，若当前模型名不在新列表中则自动切到列表首项 */
+  useEffect(() => {
+    if (!selectedModelLibId) return;
+    if (llmNameOptions.length === 0) return;
+    if (!llmNameOptions.includes(llmModelName)) {
+      setLlmModelName(llmNameOptions[0]!);
+    }
+  }, [selectedModelLibId, llmNameOptions, llmModelName]);
+
+  const runAiDeepAnalysis = async () => {
+    if (selectedModelLibId === undefined) {
+      message.warning("请选择模型配置（来自配置中心-模型管理）");
+      return;
+    }
+    const name = llmModelName.trim();
+    if (!name) {
+      message.warning("请选择或填写要调用的 LLM 模型名称");
+      return;
+    }
+    setAiAnalyzing(true);
+    try {
+      const ai = await analyzeYouTubeChannelAiApi(channelId, {
+        model_library_id: selectedModelLibId,
+        llm_model_name: name,
+        agent_id: selectedAgentId ?? null,
+      });
+      setChannel((prev) =>
+        prev
+          ? {
+              ...prev,
+              ai_tags: ai.tags,
+              ai_expertise: ai.expertise,
+              ai_audience_age: ai.age_group,
+              ai_summary: ai.summary,
+              ai_analyzed_at: ai.analyzed_at ?? prev.ai_analyzed_at ?? null,
+              ai_source_model_library_id: ai.model_library_id ?? prev.ai_source_model_library_id ?? null,
+              ai_source_llm_model_name: ai.llm_model_name ?? prev.ai_source_llm_model_name ?? null,
+              ai_source_agent_id: ai.agent_id ?? prev.ai_source_agent_id ?? null,
+            }
+          : prev
+      );
+      message.success("AI 深度分析完成并已保存");
+    } catch (e) {
+      message.error(axiosDetail(e) || "AI 深度分析失败");
+    } finally {
+      setAiAnalyzing(false);
+    }
+  };
 
   const backToList = () => {
     openTab({ id: "channel-list", title: "频道管理", path: "/youtube/channels", type: "channel-list" });
@@ -238,41 +364,16 @@ export default function ChannelDetail({ channelId }: Props) {
           <Sparkles size={18} className="text-violet-500" />
           <div className="text-base font-semibold text-slate-900">AI 深度洞察 (AI Insight)</div>
         </div>
-        {!hasAiInsight ? (
-          <div className="rounded-lg border border-dashed border-violet-300 bg-violet-50 p-6 text-center">
-            <Button
-              type="primary"
-              size="large"
-              loading={aiAnalyzing}
-              className="!bg-violet-600 !border-violet-600 hover:!bg-violet-500 hover:!border-violet-500"
-              onClick={async () => {
-                setAiAnalyzing(true);
-                try {
-                  const ai = await analyzeYouTubeChannelAiApi(channelId);
-                  setChannel((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          ai_tags: ai.tags,
-                          ai_expertise: ai.expertise,
-                          ai_audience_age: ai.age_group,
-                          ai_summary: ai.summary,
-                        }
-                      : prev
-                  );
-                  message.success("AI 深度分析完成");
-                } catch {
-                  message.error("AI 深度分析失败");
-                } finally {
-                  setAiAnalyzing(false);
-                }
-              }}
-            >
-              ✨ 运行 AI 深度分析
-            </Button>
+        {channel?.ai_analyzed_at ? (
+          <div className="text-xs text-slate-500 mb-3">
+            最近分析时间：
+            {dayjs(channel.ai_analyzed_at).format("YYYY-MM-DD HH:mm")}
+            {channel.ai_source_llm_model_name ? ` · 模型：${channel.ai_source_llm_model_name}` : ""}
           </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-3">
+        ) : null}
+
+        {hasAiInsight ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
             <div className="rounded-lg border border-slate-200 p-3">
               <div className="text-sm font-medium text-slate-700 mb-2">核心标签</div>
               <div className="flex flex-wrap gap-2">
@@ -301,7 +402,7 @@ export default function ChannelDetail({ channelId }: Props) {
                 受众画像
               </div>
               <div className="text-slate-800 text-sm leading-6">
-                👥 受众推断：{channel?.ai_audience_age || "暂无推断结果"}
+                受众推断：{channel?.ai_audience_age || "暂无推断结果"}
               </div>
             </div>
             <div className="rounded-lg border border-slate-200 p-3 bg-slate-50">
@@ -309,7 +410,77 @@ export default function ChannelDetail({ channelId }: Props) {
               <div className="text-sm text-slate-700 leading-6">{channel?.ai_summary || "暂无分析总结"}</div>
             </div>
           </div>
-        )}
+        ) : null}
+
+        <div
+          className={
+            hasAiInsight
+              ? "rounded-lg border border-slate-200 bg-slate-50/80 p-4 space-y-3"
+              : "rounded-lg border border-dashed border-violet-300 bg-violet-50 p-6"
+          }
+        >
+          {!hasAiInsight ? (
+            <div className="text-sm text-slate-600 text-center mb-2">选择模型与智能体后运行分析（结果会写入数据库并与频道列表同步）</div>
+          ) : (
+            <div className="text-sm font-medium text-slate-700">重新分析</div>
+          )}
+          <Space wrap className="w-full" size="middle">
+            <Select
+              placeholder="选择模型配置 (LLM)"
+              allowClear={false}
+              className="min-w-[200px]"
+              value={selectedModelLibId}
+              onChange={(v) => {
+                setSelectedModelLibId(v);
+                const row = libraryModels.find((m) => m.id === v);
+                const opts = parseSupportedModels(row?.supported_models_json ?? null);
+                setLlmModelName(opts.length ? opts[0]! : "");
+              }}
+              options={libraryModels.map((m) => ({
+                value: m.id,
+                label: m.has_api_key ? m.name : `${m.name}（未配置 API Key）`,
+                disabled: !m.has_api_key,
+              }))}
+            />
+            {llmNameOptions.length > 0 ? (
+              <Select
+                placeholder="选择具体模型名"
+                className="min-w-[200px]"
+                value={llmModelName || undefined}
+                onChange={(v) => setLlmModelName(v)}
+                options={llmNameOptions.map((v) => ({ value: v, label: v }))}
+              />
+            ) : (
+              <Input
+                placeholder="模型名称（JSON 未配置时在网关使用的 model 名）"
+                className="min-w-[220px] max-w-xs"
+                value={llmModelName}
+                onChange={(e) => setLlmModelName(e.target.value)}
+              />
+            )}
+            <Select
+              allowClear
+              placeholder="选择智能体 (Agent，可选)"
+              className="min-w-[200px]"
+              value={selectedAgentId}
+              onChange={(v) => setSelectedAgentId(v)}
+              options={promptAgents.map((p) => ({ value: p.id, label: p.title }))}
+            />
+            <Button
+              type="primary"
+              size="large"
+              loading={aiAnalyzing}
+              disabled={!libraryModels.some((m) => m.has_api_key)}
+              className="!bg-violet-600 !border-violet-600 hover:!bg-violet-500 hover:!border-violet-500"
+              onClick={() => void runAiDeepAnalysis()}
+            >
+              {hasAiInsight ? "重新运行 AI 深度分析" : "运行 AI 深度分析"}
+            </Button>
+          </Space>
+          {!libraryModels.some((m) => m.has_api_key) ? (
+            <div className="text-xs text-amber-700">请先在「配置中心 → 模型管理」添加至少一条带 API Key 的模型配置。</div>
+          ) : null}
+        </div>
       </div>
 
       <div className="space-y-2">

@@ -29,6 +29,11 @@ export type YouTubeAnalyzeResponse = {
     ai_expertise: string | null;
     ai_audience_age: string | null;
     ai_summary: string | null;
+    /** 最近一次详情页 AI 分析时间（UTC ISO） */
+    ai_analyzed_at?: string | null;
+    ai_source_model_library_id?: number | null;
+    ai_source_llm_model_name?: string | null;
+    ai_source_agent_id?: number | null;
     published_at: string | null;
     created_at: string;
     updated_at: string;
@@ -87,14 +92,27 @@ export async function getYouTubeChannelDetailApi(channelId: number) {
   return res.data as YouTubeAnalyzeResponse["channel"];
 }
 
-export async function analyzeYouTubeChannelAiApi(channelId: number) {
-  const res = await apiClient.post(`/api/youtube/channels/${channelId}/ai-analyze`);
-  return res.data as {
-    tags: string[];
-    expertise: string;
-    age_group: string;
-    summary: string;
-  };
+/** 博主详情页 AI 深度分析请求体（与后端 YouTubeChannelAiAnalyzeRequest 一致） */
+export type ChannelAiAnalyzePayload = {
+  model_library_id: number;
+  llm_model_name: string;
+  agent_id?: number | null;
+};
+
+export type ChannelAiAnalyzeResult = {
+  tags: string[];
+  expertise: string;
+  age_group: string;
+  summary: string;
+  analyzed_at?: string | null;
+  model_library_id?: number | null;
+  llm_model_name?: string | null;
+  agent_id?: number | null;
+};
+
+export async function analyzeYouTubeChannelAiApi(channelId: number, payload: ChannelAiAnalyzePayload) {
+  const res = await apiClient.post(`/api/youtube/channels/${channelId}/ai-analyze`, payload);
+  return res.data as ChannelAiAnalyzeResult;
 }
 
 export async function scrapeVideoCommentsApi(videoId: number, keyword: string) {

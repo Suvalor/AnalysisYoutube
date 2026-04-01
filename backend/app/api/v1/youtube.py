@@ -39,6 +39,7 @@ from app.schemas.youtube import (
     YouTubeBatchAnalyzeRequest,
     YouTubeBatchAnalyzeResponse,
     YouTubeChannelAIAnalyzeResponse,
+    YouTubeChannelAiAnalyzeRequest,
     YouTubeChannelRead,
     YouTubeVideoPageResponse,
     YouTubeVideoRead,
@@ -54,6 +55,7 @@ from app.services.field_encryption import encrypt_plaintext, try_decrypt
 from app.services.youtube_channel_enrich import (
     channel_needs_ai_tag_fill,
     enrich_youtube_channel_ai,
+    run_channel_detail_ai_analysis,
 )
 from app.services.youtube_service import (
     calc_recent_avg_views,
@@ -488,10 +490,11 @@ async def get_channel_detail(
 @router.post(
     "/channels/{channel_id}/ai-analyze",
     response_model=YouTubeChannelAIAnalyzeResponse,
-    summary="对频道执行 AI 深度洞察分析",
+    summary="对频道执行 AI 深度洞察分析（配置中心模型 + 可选智能体）",
 )
 async def analyze_channel_ai(
     channel_id: int,
+    body: YouTubeChannelAiAnalyzeRequest,
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> YouTubeChannelAIAnalyzeResponse:
@@ -499,16 +502,37 @@ async def analyze_channel_ai(
     if channel is None:
         raise HTTPException(status_code=404, detail="频道不存在或无权访问")
 
-    if not await enrich_youtube_channel_ai(db, channel):
-        raise HTTPException(status_code=502, detail="AI 分析失败，请检查火山引擎配置或稍后重试")
+    try:
+        result = await run_channel_detail_ai_analysis(
+            db,
+            channel=channel,
+            user_id=current_user.id,
+            model_library_id=body.model_library_id,
+            llm_model_name=body.llm_model_name.strip(),
+            agent_id=body.agent_id,
+        )
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as exc:  # noqa: BLE001
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"AI 分析失败: {exc}",
+        ) from exc
+
     await db.commit()
     await db.refresh(channel)
 
     return YouTubeChannelAIAnalyzeResponse(
-        tags=channel.ai_tags or [],
-        expertise=channel.ai_expertise or "",
-        age_group=channel.ai_audience_age or "",
-        summary=channel.ai_summary or "",
+        tags=result["tags"],
+        expertise=result["expertise"],
+        age_group=result["age_group"],
+        summary=result["summary"],
+        analyzed_at=result["analyzed_at"],
+        model_library_id=result["model_library_id"],
+        llm_model_name=result["llm_model_name"],
+        agent_id=result["agent_id"],
     )
 
 

@@ -24,6 +24,10 @@ class YouTubeChannel(Base):
     ai_expertise: Mapped[str | None] = mapped_column(Text, nullable=True)
     ai_audience_age: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_analyzed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ai_source_model_library_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ai_source_llm_model_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    ai_source_agent_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -43,6 +47,33 @@ class YouTubeChannel(Base):
     comments: Mapped[list["YouTubeComment"]] = relationship(
         "YouTubeComment", back_populates="channel", cascade="all, delete-orphan"
     )
+    insights: Mapped[list["YouTubeChannelInsight"]] = relationship(
+        "YouTubeChannelInsight", back_populates="channel", cascade="all, delete-orphan"
+    )
+
+
+class YouTubeChannelInsight(Base):
+    """博主 AI 深度洞察历史记录（每次分析一条）。"""
+
+    __tablename__ = "youtube_channel_insights"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    channel_id: Mapped[int] = mapped_column(
+        ForeignKey("youtube_channels.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    model_library_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    llm_model_name: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    agent_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ai_tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    ai_expertise: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_audience_age: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    ai_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    channel: Mapped["YouTubeChannel"] = relationship("YouTubeChannel", back_populates="insights")
 
 
 class UserCompetitorPool(Base):

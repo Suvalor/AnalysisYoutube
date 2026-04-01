@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.models.youtube import (
     YouTubeChannel,
     YouTubeChannelHistory,
+    YouTubeChannelInsight,
     YouTubeComment,
     YouTubeVideo,
     UserCompetitorPool,
@@ -318,6 +319,35 @@ async def update_channel_ai_insight(
         channel.ai_expertise = ai_expertise
     await session.flush()
     return channel
+
+
+async def create_youtube_channel_insight(
+    session: AsyncSession,
+    *,
+    channel_id: int,
+    user_id: int,
+    model_library_id: int | None,
+    llm_model_name: str,
+    agent_id: int | None,
+    ai_tags: list[str],
+    ai_expertise: str,
+    ai_audience_age: str,
+    ai_summary: str,
+) -> YouTubeChannelInsight:
+    row = YouTubeChannelInsight(
+        channel_id=channel_id,
+        user_id=user_id,
+        model_library_id=model_library_id,
+        llm_model_name=llm_model_name,
+        agent_id=agent_id,
+        ai_tags=ai_tags,
+        ai_expertise=ai_expertise,
+        ai_audience_age=ai_audience_age,
+        ai_summary=ai_summary,
+    )
+    session.add(row)
+    await session.flush()
+    return row
 
 
 async def get_video_for_user(

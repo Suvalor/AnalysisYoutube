@@ -11,6 +11,7 @@ from app.models.quota import ApiQuotaUsage  # noqa: F401,E402
 from app.models.youtube import (  # noqa: F401,E402
     YouTubeChannel,
     YouTubeChannelHistory,
+    YouTubeChannelInsight,
     UserCompetitorPool,
     YouTubeComment,
     YouTubeVideo,
