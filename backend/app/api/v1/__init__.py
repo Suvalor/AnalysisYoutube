@@ -5,6 +5,7 @@ from app.api.v1 import asset_library
 from app.api.v1 import auth
 from app.api.v1 import jimeng
 from app.api.v1 import materials
+from app.api.v1 import model_library
 from app.api.v1 import oss
 from app.api.v1 import prompt_library
 from app.api.v1 import scripts
@@ -21,6 +22,7 @@ api_router_v1.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router_v1.include_router(youtube.router, prefix="/youtube", tags=["youtube"])
 api_router_v1.include_router(prompt_library.router, prefix="/libraries/prompts", tags=["prompt-library"])
 api_router_v1.include_router(style_library.router, prefix="/libraries/styles", tags=["style-library"])
+api_router_v1.include_router(model_library.router, prefix="/libraries/models", tags=["model-library"])
 api_router_v1.include_router(asset_library.router, prefix="/libraries/assets", tags=["asset-library"])
 api_router_v1.include_router(asset_library.router, prefix="/assets", tags=["assets"])
 api_router_v1.include_router(script_library.router, prefix="/libraries/scripts", tags=["script-library"])

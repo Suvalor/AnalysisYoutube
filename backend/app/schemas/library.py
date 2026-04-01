@@ -52,6 +52,31 @@ class StyleRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ModelCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    api_base_url: str = Field(..., min_length=1, max_length=512)
+    api_key: str | None = Field(None, min_length=1, max_length=2048)
+    supported_models_json: str | None = None
+
+
+class ModelUpdate(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=255)
+    api_base_url: str | None = Field(None, min_length=1, max_length=512)
+    api_key: str | None = Field(None, min_length=1, max_length=2048)
+    supported_models_json: str | None = None
+
+
+class ModelRead(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    api_base_url: str
+    supported_models_json: str | None
+    has_api_key: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 class AssetCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     file_type: AssetFileTypeEnum

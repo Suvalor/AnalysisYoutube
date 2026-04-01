@@ -18,6 +18,17 @@ export type StyleItem = {
   updated_at: string;
 };
 
+export type ModelItem = {
+  id: number;
+  user_id: number;
+  name: string;
+  api_base_url: string;
+  supported_models_json: string | null;
+  has_api_key: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ScriptItem = {
   id: number;
   user_id: number;
@@ -56,9 +67,72 @@ export async function listPromptsApi() {
   return res.data as PromptItem[];
 }
 
+export async function createPromptApi(payload: { title: string; content: string }) {
+  const res = await apiClient.post("/api/libraries/prompts", payload);
+  return res.data as PromptItem;
+}
+
+export async function updatePromptApi(promptId: number, payload: { title?: string; content?: string }) {
+  const res = await apiClient.put(`/api/libraries/prompts/${promptId}`, payload);
+  return res.data as PromptItem;
+}
+
+export async function deletePromptApi(promptId: number) {
+  const res = await apiClient.delete(`/api/libraries/prompts/${promptId}`);
+  return res.data as { message: string };
+}
+
 export async function listStylesApi() {
   const res = await apiClient.get("/api/libraries/styles");
   return res.data as StyleItem[];
+}
+
+export async function createStyleApi(payload: { title: string; content: string }) {
+  const res = await apiClient.post("/api/libraries/styles", payload);
+  return res.data as StyleItem;
+}
+
+export async function updateStyleApi(styleId: number, payload: { title?: string; content?: string }) {
+  const res = await apiClient.put(`/api/libraries/styles/${styleId}`, payload);
+  return res.data as StyleItem;
+}
+
+export async function deleteStyleApi(styleId: number) {
+  const res = await apiClient.delete(`/api/libraries/styles/${styleId}`);
+  return res.data as { message: string };
+}
+
+export async function listModelsApi() {
+  const res = await apiClient.get("/api/libraries/models");
+  return res.data as ModelItem[];
+}
+
+export async function createModelApi(payload: {
+  name: string;
+  api_base_url: string;
+  api_key?: string;
+  supported_models_json?: string | null;
+}) {
+  const res = await apiClient.post("/api/libraries/models", payload);
+  return res.data as ModelItem;
+}
+
+export async function updateModelApi(
+  modelId: number,
+  payload: {
+    name?: string;
+    api_base_url?: string;
+    api_key?: string;
+    supported_models_json?: string | null;
+  }
+) {
+  const res = await apiClient.put(`/api/libraries/models/${modelId}`, payload);
+  return res.data as ModelItem;
+}
+
+export async function deleteModelApi(modelId: number) {
+  const res = await apiClient.delete(`/api/libraries/models/${modelId}`);
+  return res.data as { message: string };
 }
 
 export async function createScriptApi(payload: {
