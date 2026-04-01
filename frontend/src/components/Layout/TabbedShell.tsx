@@ -27,6 +27,7 @@ import ChannelDetail from "@/pages/youtube/ChannelDetail";
 import FeishuWorkspace from "@/pages/feishu/FeishuWorkspace";
 import AiModelSettings from "@/pages/settings/AiModelSettings";
 import ConfigCenter from "@/pages/settings/ConfigCenter";
+import ScriptWorkflowSOP from "@/pages/sop/ScriptWorkflowSOP";
 
 type NavDef = {
   path: string;
@@ -45,6 +46,7 @@ const navDefs: NavDef[] = [
   { path: "/knowledge-base", label: "知识库管理", icon: Library, type: "knowledge-base", tabId: "knowledge-base" },
   { path: "/assets", label: "素材库", icon: Image, type: "assets", tabId: "assets" },
   { path: "/video-board", label: "视频看板", icon: Kanban, type: "video-board", tabId: "video-board" },
+  { path: "/sop-workflow", label: "SOP 工作流", icon: Kanban, type: "sop-workflow", tabId: "sop-workflow" },
   { path: "/competitor-analysis", label: "对标图表", icon: BarChart3, type: "competitor-analysis", tabId: "competitor-analysis" },
   { path: "/feishu-workspace", label: "飞书云文档", icon: Library, type: "feishu-workspace", tabId: "feishu-workspace" },
 ];
@@ -67,6 +69,8 @@ function renderTabPanel(tab: TabItem) {
       return <AssetLibraryPage />;
     case "video-board":
       return <VideoBoard />;
+    case "sop-workflow":
+      return <ScriptWorkflowSOP />;
     case "competitor-analysis":
       return <CompetitorAnalysis />;
     case "feishu-workspace":

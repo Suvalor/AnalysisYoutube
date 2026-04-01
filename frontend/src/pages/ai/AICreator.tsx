@@ -1,5 +1,6 @@
 import { Button, Card, Input, Select, Typography, message } from "antd";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   createScriptApi,
   listModelsApi,
@@ -9,6 +10,8 @@ import {
   type PromptItem,
   type StyleItem,
 } from "@/services/libraryApi";
+import { useTabStore } from "@/store/useTabStore";
+import ScriptPreview from "@/components/ScriptPreview";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -44,6 +47,8 @@ function toModelOptions(rows: ModelItem[]): ModelOption[] {
 }
 
 export default function AICreator() {
+  const navigate = useNavigate();
+  const openTab = useTabStore((s) => s.openTab);
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const [promptRows, setPromptRows] = useState<PromptItem[]>([]);
   const [styleRows, setStyleRows] = useState<StyleItem[]>([]);
@@ -179,11 +184,22 @@ export default function AICreator() {
       return;
     }
     try {
+      const promptRow = promptRows.find((x) => x.id === selectedPrompt);
+      const styleRow = styleRows.find((x) => x.id === selectedStyle);
       await createScriptApi({
-        title: coreIdea.slice(0, 60),
+        title: coreIdea.slice(0, 60) || "未命名剧本",
         content: generatedText,
+        prompt_id: promptRow?.id ?? null,
+        style_id: styleRow?.id ?? null,
       });
       message.success("已保存到剧本库");
+      openTab({
+        id: "knowledge-base",
+        title: "知识库管理",
+        path: "/knowledge-base",
+        type: "knowledge-base",
+      });
+      navigate("/knowledge-base");
     } catch (e: any) {
       message.error(e?.response?.data?.detail ?? "保存失败");
     }
@@ -249,17 +265,13 @@ export default function AICreator() {
         </Card>
 
         <Card className={`lg:col-span-2 ${cardClass}`}>
-          <div className="flex items-center justify-between mb-4">
-            <Title level={4} className="!m-0 !text-slate-900">
-              剧本预览（实时流式）
-            </Title>
-            <Button onClick={saveScript} disabled={generating || !generatedText.trim()}>
-              保存到剧本库
-            </Button>
-          </div>
-          <div className="min-h-[520px] rounded-lg border border-slate-200 bg-white p-4 whitespace-pre-wrap leading-7 text-slate-800">
-            {generatedText || "点击「开始生成」后，这里会以打字机效果实时展示内容。"}
-          </div>
+          <ScriptPreview
+            title="剧本预览（实时流式）"
+            content={generatedText}
+            saving={false}
+            saveDisabled={generating || !generatedText.trim()}
+            onSave={saveScript}
+          />
         </Card>
       </div>
     </div>

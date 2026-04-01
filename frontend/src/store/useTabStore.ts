@@ -15,7 +15,8 @@ export type TabType =
   | "video-board"
   | "feishu-workspace"
   | "ai-model-settings"
-  | "config-center";
+  | "config-center"
+  | "sop-workflow";
 
 export type TabItem = {
   id: string;
