@@ -25,7 +25,7 @@ export default function ChannelList() {
   const openTab = useTabStore((s) => s.openTab);
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
-  const [sortBy, setSortBy] = useState<string>("added_desc");
+  const [sortBy, setSortBy] = useState<string>("subscriber_desc");
   const [urls, setUrls] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [updating, setUpdating] = useState(false);

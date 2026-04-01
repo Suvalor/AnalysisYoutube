@@ -8,6 +8,16 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
+# 安装 OpenCV/FFmpeg 运行时依赖（修复 libGL.so.1 缺失）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 # 安装依赖（使用清华 PyPI 镜像，降低 pip 下载超时概率）
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple && \

@@ -18,18 +18,27 @@ class Settings(BaseSettings):
     database_url: str | None = Field(None, alias="DATABASE_URL")
 
     secret_key: str = Field("change_me", alias="SECRET_KEY")
+    # 可选：与 JWT 分离的字段加密盐；未设置时回退使用 secret_key
+    field_encryption_secret: str = Field("", alias="FIELD_ENCRYPTION_SECRET")
     algorithm: str = Field("HS256", alias="ALGORITHM")
     access_token_expire_minutes: int = Field(1440, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     youtube_api_key: str = Field("", alias="YOUTUBE_API_KEY")
     volcengine_api_key: str = Field("", alias="VOLCENGINE_API_KEY")
     volcengine_endpoint_id: str = Field("", alias="VOLCENGINE_ENDPOINT_ID")
     volcengine_base_url: str = Field("", alias="VOLCENGINE_BASE_URL")
+    volcengine_model_gemini: str = Field("", alias="VOLCENGINE_MODEL_GEMINI")
+    volcengine_model_claude: str = Field("", alias="VOLCENGINE_MODEL_CLAUDE")
     aliyun_access_key_id: str = Field("", alias="ALIYUN_ACCESS_KEY_ID")
     aliyun_access_key_secret: str = Field("", alias="ALIYUN_ACCESS_KEY_SECRET")
     aliyun_role_arn: str = Field("", alias="ALIYUN_ROLE_ARN")
     aliyun_region_id: str = Field("", alias="ALIYUN_REGION_ID")
     aliyun_oss_bucket_name: str = Field("", alias="ALIYUN_OSS_BUCKET_NAME")
     aliyun_oss_endpoint: str = Field("", alias="ALIYUN_OSS_ENDPOINT")
+    jimeng_api_base_url: str = Field("", alias="JIMENG_API_BASE_URL")
+    jimeng_api_key: str = Field("", alias="JIMENG_API_KEY")
+    jimeng_auth_token: str = Field("", alias="JIMENG_AUTH_TOKEN")
+    jimeng_submit_path: str = Field("/v1/tasks", alias="JIMENG_SUBMIT_PATH")
+    jimeng_status_path_template: str = Field("/v1/tasks/{task_id}", alias="JIMENG_STATUS_PATH_TEMPLATE")
 
     # 支持单个 URL、逗号分隔字符串，或 JSON 数组字符串
     backend_cors_origins: str = Field(
