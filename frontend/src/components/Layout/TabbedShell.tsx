@@ -81,7 +81,7 @@ function renderTabPanel(tab: TabItem) {
     case "config-center":
       return <ConfigCenter />;
     case "agent-edit":
-      return <AgentEditorPage />;
+      return <AgentEditorPage promptId={tab.promptId ?? Number((tab.path.match(/\/config\/agent\/edit\/(\d+)$/)?.[1] ?? 0))} />;
     default:
       return null;
   }
@@ -130,6 +130,7 @@ export default function TabbedShell() {
         title: `编辑智能体 #${pid}`,
         path,
         type: "agent-edit",
+        promptId: pid,
       });
     }
   }, [location.pathname, openTab]);
