@@ -53,11 +53,23 @@ class YouTubeChannelRead(BaseModel):
     ai_expertise: str | None = None
     ai_audience_age: str | None = None
     ai_summary: str | None = None
+    ai_analyzed_at: datetime | None = None
+    ai_source_model_library_id: int | None = None
+    ai_source_llm_model_name: str | None = None
+    ai_source_agent_id: int | None = None
     published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class YouTubeChannelAiAnalyzeRequest(BaseModel):
+    """博主详情页 AI 深度分析：使用配置中心模型与智能体。"""
+
+    model_library_id: int = Field(..., ge=1, description="model_libraries 表主键")
+    llm_model_name: str = Field(..., min_length=1, max_length=128, description="该配置下要调用的具体模型名")
+    agent_id: int | None = Field(default=None, description="prompt_libraries 表主键，可选；不传则仅用默认分析师规则")
 
 
 class YouTubeAnalyzeResponse(BaseModel):
@@ -101,4 +113,8 @@ class YouTubeChannelAIAnalyzeResponse(BaseModel):
     expertise: str = Field(default="", description="AI 总结的擅长内容")
     age_group: str = Field(..., description="AI 推断的受众年龄段与性别倾向")
     summary: str = Field(..., description="AI 推断的频道定位与爆款套路总结")
+    analyzed_at: datetime | None = Field(None, description="本次分析写入库的时间")
+    model_library_id: int | None = None
+    llm_model_name: str | None = None
+    agent_id: int | None = None
 
