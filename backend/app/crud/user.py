@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -41,10 +41,12 @@ async def update_user_settings(
     session: AsyncSession,
     user: User,
     *,
-    feishu_doc_url: str | None,
+    patch: dict[str, Any],
 ) -> User:
-    """更新用户设置相关字段。"""
-    user.feishu_doc_url = feishu_doc_url
+    """按 patch 更新用户设置字段（仅包含需要写入的键）。"""
+    for key, value in patch.items():
+        if hasattr(user, key):
+            setattr(user, key, value)
     try:
         await session.commit()
     except IntegrityError:
@@ -52,4 +54,3 @@ async def update_user_settings(
         raise
     await session.refresh(user)
     return user
-

@@ -12,7 +12,9 @@ export type TabType =
   | "ai-creator"
   | "knowledge-base"
   | "assets"
-  | "video-board";
+  | "video-board"
+  | "feishu-workspace"
+  | "ai-model-settings";
 
 export type TabItem = {
   id: string;

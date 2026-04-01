@@ -56,12 +56,14 @@ class AssetCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     file_type: AssetFileTypeEnum
     file_url: str = Field(..., min_length=1, max_length=1024)
+    file_size: int | None = None
 
 
 class AssetUpdate(BaseModel):
     title: str | None = None
     file_type: AssetFileTypeEnum | None = None
     file_url: str | None = None
+    file_size: int | None = None
 
 
 class AssetRead(BaseModel):
@@ -70,6 +72,7 @@ class AssetRead(BaseModel):
     title: str
     file_type: AssetFileTypeEnum
     file_url: str
+    file_size: int | None = None
     created_at: datetime
     updated_at: datetime
 

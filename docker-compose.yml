@@ -42,8 +42,10 @@ services:
       BACKEND_CORS_ORIGINS: http://localhost:5173
       YOUTUBE_API_KEY: literal:REDACTED_YOUTUBE_API_KEY
       VOLCENGINE_API_KEY: literal:REDACTED_VOLCENGINE_API_KEY
-      VOLCENGINE_ENDPOINT_ID: minimax-m2.5
-      VOLCENGINE_BASE_URL: https://ark.cn-beijing.volces.com/api/coding
+      VOLCENGINE_ENDPOINT_ID: doubao-seed-2.0-pro
+      VOLCENGINE_BASE_URL: https://ark.cn-beijing.volces.com/api/coding/v3
+      VOLCENGINE_MODEL_GEMINI: gemini-1.5-pro
+      VOLCENGINE_MODEL_CLAUDE: claude-3-5-sonnet
       ALIYUN_ACCESS_KEY_ID: literal:REDACTED_ALIYUN_ACCESS_KEY_ID
       ALIYUN_ACCESS_KEY_SECRET: literal:REDACTED_ALIYUN_ACCESS_KEY_SECRET
       ALIYUN_ROLE_ARN: literal:REDACTED_ALIYUN_ROLE_ARN

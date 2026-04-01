@@ -1,12 +1,12 @@
 import {
   BarChart3,
-  Gauge,
   Home,
   Image,
   Kanban,
   Library,
   LogOut,
   Menu as MenuIcon,
+  Settings,
   WandSparkles,
   X,
   Youtube,
@@ -21,10 +21,11 @@ import KnowledgeBase from "@/pages/knowledge/KnowledgeBase";
 import AssetLibraryPage from "@/pages/knowledge/AssetLibrary";
 import VideoBoard from "@/pages/board/VideoBoard";
 import CompetitorAnalysis from "@/pages/youtube/CompetitorAnalysis";
-import YouTubeQuotaDashboard from "@/pages/youtube/YouTubeQuotaDashboard";
 import ChannelList from "@/pages/youtube/ChannelList";
 import GlobalVideoList from "@/pages/youtube/GlobalVideoList";
 import ChannelDetail from "@/pages/youtube/ChannelDetail";
+import FeishuWorkspace from "@/pages/feishu/FeishuWorkspace";
+import AiModelSettings from "@/pages/settings/AiModelSettings";
 
 type NavDef = {
   path: string;
@@ -38,12 +39,13 @@ const navDefs: NavDef[] = [
   { path: "/dashboard", label: "仪表盘", icon: Home, type: "dashboard", tabId: "dashboard" },
   { path: "/youtube/channels", label: "频道管理", icon: Youtube, type: "channel-list", tabId: "channel-list" },
   { path: "/youtube/videos", label: "全局视频", icon: Youtube, type: "global-videos", tabId: "global-videos" },
-  { path: "/youtube-quota", label: "YouTube API 仪表盘", icon: Gauge, type: "youtube-quota", tabId: "youtube-quota" },
   { path: "/ai-creator", label: "AI 剧本创作", icon: WandSparkles, type: "ai-creator", tabId: "ai-creator" },
+  { path: "/ai-model-settings", label: "模型配置", icon: Settings, type: "ai-model-settings", tabId: "ai-model-settings" },
   { path: "/knowledge-base", label: "知识库管理", icon: Library, type: "knowledge-base", tabId: "knowledge-base" },
   { path: "/assets", label: "素材库", icon: Image, type: "assets", tabId: "assets" },
   { path: "/video-board", label: "视频看板", icon: Kanban, type: "video-board", tabId: "video-board" },
   { path: "/competitor-analysis", label: "对标图表", icon: BarChart3, type: "competitor-analysis", tabId: "competitor-analysis" },
+  { path: "/feishu-workspace", label: "飞书云文档", icon: Library, type: "feishu-workspace", tabId: "feishu-workspace" },
 ];
 
 function renderTabPanel(tab: TabItem) {
@@ -56,8 +58,6 @@ function renderTabPanel(tab: TabItem) {
       return <GlobalVideoList />;
     case "channel-detail":
       return <ChannelDetail channelId={tab.channelId!} />;
-    case "youtube-quota":
-      return <YouTubeQuotaDashboard />;
     case "ai-creator":
       return <AICreator />;
     case "knowledge-base":
@@ -68,6 +68,10 @@ function renderTabPanel(tab: TabItem) {
       return <VideoBoard />;
     case "competitor-analysis":
       return <CompetitorAnalysis />;
+    case "feishu-workspace":
+      return <FeishuWorkspace />;
+    case "ai-model-settings":
+      return <AiModelSettings />;
     default:
       return null;
   }
@@ -82,6 +86,11 @@ export default function TabbedShell() {
 
   useEffect(() => {
     if (location.pathname === "/" || location.pathname === "") {
+      navigate("/dashboard", { replace: true });
+      return;
+    }
+    // 兼容旧链接：YouTube API 仪表盘已合并到仪表盘
+    if (location.pathname === "/youtube-quota") {
       navigate("/dashboard", { replace: true });
     }
   }, [location.pathname, navigate]);

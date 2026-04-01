@@ -3,8 +3,11 @@ from fastapi import APIRouter
 from app.api.v1 import ai
 from app.api.v1 import asset_library
 from app.api.v1 import auth
+from app.api.v1 import jimeng
+from app.api.v1 import materials
 from app.api.v1 import oss
 from app.api.v1 import prompt_library
+from app.api.v1 import scripts
 from app.api.v1 import script_library
 from app.api.v1 import style_library
 from app.api.v1 import users
@@ -22,6 +25,9 @@ api_router_v1.include_router(asset_library.router, prefix="/libraries/assets", t
 api_router_v1.include_router(asset_library.router, prefix="/assets", tags=["assets"])
 api_router_v1.include_router(script_library.router, prefix="/libraries/scripts", tags=["script-library"])
 api_router_v1.include_router(ai.router, prefix="/ai", tags=["ai"])
+api_router_v1.include_router(scripts.router, prefix="/v1/scripts", tags=["scripts"])
+api_router_v1.include_router(jimeng.router, prefix="/v1/jimeng", tags=["jimeng"])
+api_router_v1.include_router(materials.router, prefix="/v1/materials", tags=["materials"])
 api_router_v1.include_router(video_projects.router, prefix="/video-projects", tags=["video-projects"])
 api_router_v1.include_router(oss.router, prefix="/oss", tags=["oss"])
 api_router_v1.include_router(users.router, prefix="/users", tags=["users"])

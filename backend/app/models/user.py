@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -23,6 +23,10 @@ class User(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1")
     feishu_doc_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    ai_api_base_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    ai_models_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_prompt_config_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     competitor_pools: Mapped[list["UserCompetitorPool"]] = relationship(
         "UserCompetitorPool", back_populates="user", cascade="all, delete-orphan"
     )

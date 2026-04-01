@@ -1,7 +1,6 @@
 import json
 from typing import Any
 
-import httpx
 from fastapi import HTTPException, status
 from openai import AsyncOpenAI
 
@@ -78,31 +77,65 @@ def build_channel_ai_messages(
 
 async def analyze_channel_ai_insight(messages: list[dict[str, str]]) -> dict[str, str | list[str]]:
     _required_volcengine_config()
-    # 显式提供 httpx 客户端，避免 openai 与 httpx 版本在 proxies 参数上的兼容问题。
-    http_client = httpx.AsyncClient(timeout=60.0, trust_env=False)
     client = AsyncOpenAI(
         api_key=settings.volcengine_api_key,
         base_url=settings.volcengine_base_url,
-        http_client=http_client,
     )
+
+    system_prompt = ""
+    user_prompt = ""
+    for msg in messages:
+        role = str(msg.get("role") or "").strip()
+        content = str(msg.get("content") or "").strip()
+        if role == "system":
+            system_prompt = content
+        elif role == "user":
+            user_prompt = content
+    merged_input = f"{system_prompt}\n\n{user_prompt}".strip()
+
+    def _extract_output_text(resp: Any) -> str:
+        output_items = getattr(resp, "output", None)
+        if output_items is None and hasattr(resp, "model_dump"):
+            payload = resp.model_dump()
+            output_items = payload.get("output")
+        if not isinstance(output_items, list):
+            return ""
+
+        chunks: list[str] = []
+        for item in output_items:
+            item_type = getattr(item, "type", None)
+            role = getattr(item, "role", None)
+            content_list = getattr(item, "content", None)
+
+            if item_type is None and isinstance(item, dict):
+                item_type = item.get("type")
+                role = item.get("role")
+                content_list = item.get("content")
+
+            if item_type != "message" or role != "assistant" or not isinstance(content_list, list):
+                continue
+            for content in content_list:
+                c_type = getattr(content, "type", None)
+                text = getattr(content, "text", None)
+                if c_type is None and isinstance(content, dict):
+                    c_type = content.get("type")
+                    text = content.get("text")
+                if c_type == "output_text" and text:
+                    chunks.append(str(text))
+        return "\n".join(chunks).strip()
+
     try:
-        completion = await client.chat.completions.create(
+        response = await client.responses.create(
             model=settings.volcengine_endpoint_id,
-            stream=False,
-            temperature=0.2,
-            messages=messages,
+            input=merged_input,
         )
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"AI 分析调用失败: {exc}",
         ) from exc
-    finally:
-        await http_client.aclose()
 
-    raw_content = ""
-    if completion.choices and completion.choices[0].message and completion.choices[0].message.content:
-        raw_content = completion.choices[0].message.content
+    raw_content = _extract_output_text(response)
     try:
         parsed = _extract_json_object(raw_content)
     except Exception as exc:  # noqa: BLE001

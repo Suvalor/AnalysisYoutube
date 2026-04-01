@@ -1,5 +1,5 @@
-import { Alert, Button, Form, Input } from "antd";
-import { useState } from "react";
+import { Alert, Button, Checkbox, Form, Input } from "antd";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "@/components/Layout/AuthLayout";
 import { loginApi } from "@/services/authApi";
@@ -11,10 +11,25 @@ type FormValues = {
 };
 
 export default function LoginPage() {
+  const [form] = Form.useForm<FormValues>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rememberMe, setRememberMe] = useState(true);
   const navigate = useNavigate();
   const { setToken } = useAuth();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storedEmail = localStorage.getItem("rememberedEmail") || "";
+    const storedPassword = localStorage.getItem("rememberedPassword") || "";
+    if (storedEmail || storedPassword) {
+      form.setFieldsValue({
+        email: storedEmail,
+        password: storedPassword
+      });
+      setRememberMe(true);
+    }
+  }, [form]);
 
   const onFinish = async (values: FormValues) => {
     setLoading(true);
@@ -22,6 +37,15 @@ export default function LoginPage() {
     try {
       const res = await loginApi(values);
       setToken(res.access_token);
+      if (typeof window !== "undefined") {
+        if (rememberMe) {
+          localStorage.setItem("rememberedEmail", values.email);
+          localStorage.setItem("rememberedPassword", values.password);
+        } else {
+          localStorage.removeItem("rememberedEmail");
+          localStorage.removeItem("rememberedPassword");
+        }
+      }
       navigate("/dashboard");
     } catch (e: any) {
       const message =
@@ -39,7 +63,12 @@ export default function LoginPage() {
       title="登录 Creator SaaS"
       subtitle="为 YouTube 创作者打造的一站式效率工具"
     >
-      <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
+      <Form
+        layout="vertical"
+        onFinish={onFinish}
+        requiredMark={false}
+        form={form}
+      >
         {error && (
           <div className="mb-4">
             <Alert type="error" message={error} showIcon />
@@ -61,6 +90,14 @@ export default function LoginPage() {
           rules={[{ required: true, message: "请输入密码" }]}
         >
           <Input.Password placeholder="至少 8 位安全密码" size="large" />
+        </Form.Item>
+        <Form.Item>
+          <Checkbox
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+          >
+            记住账号和密码
+          </Checkbox>
         </Form.Item>
         <Form.Item className="mt-6 mb-2">
           <Button
