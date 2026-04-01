@@ -38,6 +38,8 @@ from app.crud.sop import (
     update_sop_segment,
     update_sop_shot,
 )
+from app.crud.library import get_by_user
+from app.models.library import ModelLibrary, PromptLibrary
 from app.schemas.sop import (
     SopAssetCreate,
     SopAiSplitRequest,
@@ -205,18 +207,33 @@ async def ai_split_segments_stream(
 @router.post("/segments/ai-split")
 async def ai_split_segments(
     payload: SopAiSplitRequest,
+    db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> StreamingResponse:
     outline = payload.outline_markdown.strip()
     if not outline:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="outline_markdown 不能为空")
 
+    selected_model: str | None = None
+    selected_agent_prompt: str | None = None
+    if payload.model_id is not None:
+        row = await get_by_user(db, ModelLibrary, current_user.id, payload.model_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="模型不存在")
+        selected_model = (row.name or "").strip() or None
+    if payload.agent_id is not None:
+        row = await get_by_user(db, PromptLibrary, current_user.id, payload.agent_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="智能体/提示词不存在")
+        selected_agent_prompt = (row.content or "").strip() or None
+
     async def event_generator():
         try:
             async for delta in split_outline_markdown_with_ai_stream(
                 user=current_user,
                 outline_markdown=outline,
-                model=payload.model,
+                model=selected_model,
+                agent_prompt=selected_agent_prompt,
             ):
                 if not delta:
                     continue
