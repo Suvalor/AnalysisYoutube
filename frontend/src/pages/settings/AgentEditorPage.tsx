@@ -110,7 +110,7 @@ export default function AgentEditorPage({ promptId: promptIdFromTab }: AgentEdit
           </div>
           <div className="flex items-center gap-2">
             <Popconfirm
-              title="确认返回配置中心？"
+              title="确认返回设置中心？"
               description={isDirty() ? "存在未保存修改，返回将丢失本次编辑。" : "将返回到智能体管理列表。"}
               okText="返回"
               cancelText="取消"

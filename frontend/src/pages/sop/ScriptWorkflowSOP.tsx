@@ -327,14 +327,14 @@ export default function ScriptWorkflowSOP() {
       if (inspirationLinkId) {
         try {
           await linkInspirationPlotApi(inspirationLinkId, { plot_id: sid });
-          message.success("灵感池已标记为「已生成剧情」并关联剧情 ID");
+          message.success("灵感中心已标记为「已生成剧情」并关联剧情 ID");
         } catch (e: unknown) {
           const msg =
             e && typeof e === "object" && "response" in e
               ? (e as { response?: { data?: { detail?: string } } }).response?.data?.detail
               : undefined;
           message.warning(
-            typeof msg === "string" ? msg : "关联灵感池失败，可在灵感池中查看或重试保存片段"
+            typeof msg === "string" ? msg : "关联灵感中心失败，可在灵感中心查看或重试保存片段"
           );
         }
       }

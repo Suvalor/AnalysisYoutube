@@ -11,11 +11,11 @@ const navItems = [
   { key: "/dashboard", label: "仪表盘", icon: Home },
   { key: "/youtube-monitor", label: "YouTube 对标监控", icon: Youtube },
   { key: "/youtube-quota", label: "YouTube API 仪表盘", icon: Gauge },
-  { key: "/ai-creator", label: "AI 剧本创作", icon: WandSparkles },
+  { key: "/ai-creator", label: "AI 脚本工坊", icon: WandSparkles },
   { key: "/knowledge-base", label: "知识库管理", icon: Library },
   { key: "/assets", label: "素材库", icon: Image },
   { key: "/video-board", label: "视频看板", icon: Kanban },
-  { key: "/competitor-analysis", label: "对标图表", icon: BarChart3 },
+  { key: "/competitor-analysis", label: "竞对洞察", icon: BarChart3 },
 ];
 
 function titleByPath(pathname: string) {

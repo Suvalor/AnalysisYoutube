@@ -191,7 +191,7 @@ export default function ChannelDetail({ channelId }: Props) {
 
   const runAiDeepAnalysis = async () => {
     if (selectedModelLibId === undefined) {
-      message.warning("请选择模型配置（来自配置中心-模型管理）");
+      message.warning("请选择模型配置（来自设置中心 - 模型管理）");
       return;
     }
     const name = llmModelName.trim();
@@ -478,7 +478,7 @@ export default function ChannelDetail({ channelId }: Props) {
             </Button>
           </Space>
           {!libraryModels.some((m) => m.has_api_key) ? (
-            <div className="text-xs text-amber-700">请先在「配置中心 → 模型管理」添加至少一条带 API Key 的模型配置。</div>
+            <div className="text-xs text-amber-700">请先在「设置中心 → 模型管理」添加至少一条带 API Key 的模型配置。</div>
           ) : null}
         </div>
       </div>

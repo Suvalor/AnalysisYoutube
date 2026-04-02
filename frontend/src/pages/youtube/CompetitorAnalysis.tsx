@@ -73,7 +73,7 @@ export default function CompetitorAnalysis() {
       <div className="max-w-7xl mx-auto space-y-6">
         <Card className="!bg-white !border-slate-200 !shadow-sm">
           <Title level={3} style={{ color: "#0f172a", marginBottom: 8 }}>
-            对标分析图表
+            竞对洞察
           </Title>
           <Text style={{ color: "#64748b" }}>
             勾选 2-3 个监控频道，生成总播放量与订阅量增长趋势图。

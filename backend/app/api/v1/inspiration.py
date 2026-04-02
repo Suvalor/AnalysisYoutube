@@ -21,6 +21,20 @@ from app.schemas.inspiration import (
 
 router = APIRouter()
 
+_PLACEHOLDER_IMAGE_ONLY = "（图片灵感）"
+
+
+def _normalize_create_payload(data: dict) -> dict:
+    """纯图片时写入占位正文，便于列表与旧逻辑展示。"""
+    text = (data.get("content") or "").strip()
+    img = (data.get("image_url") or "").strip() or None
+    data["image_url"] = img
+    if img and not text:
+        data["content"] = _PLACEHOLDER_IMAGE_ONLY
+    else:
+        data["content"] = text or data.get("content") or ""
+    return data
+
 
 @router.get("", response_model=list[InspirationRead])
 async def list_inspirations_api(db: DBSessionDep, current_user: CurrentUserDep) -> list[InspirationRead]:
@@ -34,7 +48,7 @@ async def create_inspiration_api(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> InspirationRead:
-    data = payload.model_dump()
+    data = _normalize_create_payload(payload.model_dump())
     if data.get("recorded_at") is None:
         data["recorded_at"] = datetime.now(timezone.utc)
     row = await create_inspiration(db, current_user.id, data)
@@ -67,7 +81,27 @@ async def update_inspiration_api(
     patch = payload.model_dump(exclude_unset=True)
     if not patch:
         return InspirationRead.model_validate(row)
-    row = await update_inspiration(db, row, patch)
+
+    new_content = (patch["content"] if "content" in patch else row.content) or ""
+    new_content = new_content.strip()
+    if "image_url" in patch:
+        raw_u = patch["image_url"]
+        new_image = None if raw_u is None else ((str(raw_u) or "").strip() or None)
+    else:
+        new_image = row.image_url
+
+    if not new_content and not new_image:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="更新后须至少保留文字灵感或图片之一",
+        )
+    if new_image and not new_content:
+        new_content = _PLACEHOLDER_IMAGE_ONLY
+
+    apply_patch = {**patch, "content": new_content}
+    if "image_url" in patch:
+        apply_patch["image_url"] = new_image
+    row = await update_inspiration(db, row, apply_patch)
     await db.commit()
     await db.refresh(row)
     return InspirationRead.model_validate(row)
@@ -79,6 +113,10 @@ async def delete_inspiration_api(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> None:
+    """
+    删除灵感记录。图片若已上传至 OSS，与素材库策略一致：不在此接口删除远端对象，
+    避免误删仍被其他功能引用的同一 URL。
+    """
     row = await get_inspiration(db, current_user.id, inspiration_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="灵感不存在")

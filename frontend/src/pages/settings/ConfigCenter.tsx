@@ -93,7 +93,7 @@ export default function ConfigCenter() {
       setPrompts(promptList);
       setStyles(styleList);
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "加载配置中心数据失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? "加载设置中心数据失败");
     } finally {
       setLoading(false);
     }

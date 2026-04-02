@@ -16,6 +16,7 @@ class Inspiration(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     source: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
