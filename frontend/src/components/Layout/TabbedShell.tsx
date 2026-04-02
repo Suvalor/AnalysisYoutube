@@ -1,5 +1,7 @@
 import {
   BarChart3,
+  Clapperboard,
+  Cloud,
   Home,
   Image,
   Kanban,
@@ -8,6 +10,7 @@ import {
   LogOut,
   Menu as MenuIcon,
   Settings,
+  Video,
   WandSparkles,
   X,
   Youtube,
@@ -32,6 +35,31 @@ import AgentEditorPage from "@/pages/settings/AgentEditorPage";
 import ScriptWorkflowSOP from "@/pages/sop/ScriptWorkflowSOP";
 import InspirationPool from "@/pages/inspiration/InspirationPool";
 
+/** 品牌色 Ant Design 主蓝，侧边栏 Logo 占位（无独立图片资源时使用） */
+const BRAND_BLUE = "#1890ff";
+
+function BrandMark() {
+  return (
+    <svg
+      width={36}
+      height={36}
+      viewBox="0 0 36 36"
+      className="shrink-0"
+      aria-hidden
+    >
+      <rect x="2" y="2" width="32" height="32" rx="9" fill={BRAND_BLUE} fillOpacity={0.12} />
+      <path
+        d="M11 24 L18 9 L25 24 Z"
+        fill="none"
+        stroke={BRAND_BLUE}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      <circle cx="18" cy="24" r="2.25" fill={BRAND_BLUE} />
+    </svg>
+  );
+}
+
 type NavDef = {
   path: string;
   label: string;
@@ -40,19 +68,20 @@ type NavDef = {
   tabId: string;
 };
 
+/** 顺序：创作 → 管理 → 监控 → 系统 */
 const navDefs: NavDef[] = [
-  { path: "/dashboard", label: "仪表盘", icon: Home, type: "dashboard", tabId: "dashboard" },
-  { path: "/youtube/channels", label: "频道管理", icon: Youtube, type: "channel-list", tabId: "channel-list" },
-  { path: "/youtube/videos", label: "全局视频", icon: Youtube, type: "global-videos", tabId: "global-videos" },
-  { path: "/ai-creator", label: "AI 剧本创作", icon: WandSparkles, type: "ai-creator", tabId: "ai-creator" },
-  { path: "/config-center", label: "配置中心", icon: Settings, type: "config-center", tabId: "config-center" },
-  { path: "/inspiration-pool", label: "灵感池", icon: Lightbulb, type: "inspiration-pool", tabId: "inspiration-pool" },
-  { path: "/knowledge-base", label: "知识库管理", icon: Library, type: "knowledge-base", tabId: "knowledge-base" },
+  { path: "/inspiration-pool", label: "灵感中心", icon: Lightbulb, type: "inspiration-pool", tabId: "inspiration-pool" },
+  { path: "/ai-creator", label: "AI 脚本工坊", icon: WandSparkles, type: "ai-creator", tabId: "ai-creator" },
+  { path: "/sop-workflow", label: "SOP 工作流", icon: Clapperboard, type: "sop-workflow", tabId: "sop-workflow" },
   { path: "/assets", label: "素材库", icon: Image, type: "assets", tabId: "assets" },
+  { path: "/knowledge-base", label: "知识库管理", icon: Library, type: "knowledge-base", tabId: "knowledge-base" },
+  { path: "/youtube/channels", label: "频道管理", icon: Youtube, type: "channel-list", tabId: "channel-list" },
+  { path: "/youtube/videos", label: "全局视频", icon: Video, type: "global-videos", tabId: "global-videos" },
   { path: "/video-board", label: "视频看板", icon: Kanban, type: "video-board", tabId: "video-board" },
-  { path: "/sop-workflow", label: "SOP 工作流", icon: Kanban, type: "sop-workflow", tabId: "sop-workflow" },
-  { path: "/competitor-analysis", label: "对标图表", icon: BarChart3, type: "competitor-analysis", tabId: "competitor-analysis" },
-  { path: "/feishu-workspace", label: "飞书云文档", icon: Library, type: "feishu-workspace", tabId: "feishu-workspace" },
+  { path: "/competitor-analysis", label: "竞对洞察", icon: BarChart3, type: "competitor-analysis", tabId: "competitor-analysis" },
+  { path: "/dashboard", label: "仪表盘", icon: Home, type: "dashboard", tabId: "dashboard" },
+  { path: "/config-center", label: "设置中心", icon: Settings, type: "config-center", tabId: "config-center" },
+  { path: "/feishu-workspace", label: "飞书云文档", icon: Cloud, type: "feishu-workspace", tabId: "feishu-workspace" },
 ];
 
 function renderTabPanel(tab: TabItem) {
@@ -158,12 +187,15 @@ export default function TabbedShell() {
   };
 
   const SidebarContent = (
-    <aside className="h-full bg-white border-r border-slate-200 flex flex-col">
-      <div className="h-16 px-4 flex items-center border-b border-slate-200">
-        <div className="h-9 w-9 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">C</div>
-        <span className="ml-3 font-semibold text-slate-900">Creator SaaS</span>
+    <aside className="h-full bg-white border-r border-slate-200/90 shadow-[4px_0_24px_rgba(15,23,42,0.07)] flex flex-col">
+      <div className="min-h-[4rem] px-4 py-3 flex items-center gap-3 border-b border-slate-200/90 shrink-0">
+        <BrandMark />
+        <div className="min-w-0 flex flex-col justify-center">
+          <span className="font-semibold text-slate-900 text-[15px] leading-snug truncate">Creator SaaS</span>
+          <span className="text-[11px] text-slate-500 leading-tight truncate">创作与增长工作台</span>
+        </div>
       </div>
-      <nav className="p-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {navDefs.map((def) => {
           const Icon = def.icon;
           const active = activeTabId === def.tabId;
@@ -172,12 +204,14 @@ export default function TabbedShell() {
               key={def.path}
               type="button"
               onClick={() => handleNav(def)}
-              className={`w-full flex items-center px-3 py-2 rounded-lg text-sm transition-colors text-left ${
-                active ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-slate-50"
+              className={`w-full flex items-center gap-3 rounded-lg text-sm text-left transition-all duration-150 px-3 py-2.5 ${
+                active
+                  ? "bg-[#e6f4ff] text-[#1890ff] font-semibold shadow-sm ring-1 ring-[#1890ff]/15"
+                  : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
               }`}
             >
-              <Icon size={16} />
-              <span className="ml-2">{def.label}</span>
+              <Icon size={18} className={active ? "opacity-100" : "opacity-85"} strokeWidth={active ? 2.25 : 2} />
+              <span className="truncate">{def.label}</span>
             </button>
           );
         })}

@@ -189,6 +189,28 @@ export async function deleteAssetApi(assetId: number) {
   return res.data as { message: string };
 }
 
+/** 与素材库相同的上传链路：OSS 持久化，返回可公开访问的 file_url */
+export type MaterialUploadResult = {
+  id: number;
+  title: string;
+  file_type: "image" | "video";
+  file_url: string;
+  file_size?: number | null;
+  created_at: string;
+  remove_watermark?: boolean;
+};
+
+export async function uploadMaterialImageApi(file: File, removeWatermark = false) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("remove_watermark", String(removeWatermark));
+  const res = await apiClient.post("/api/v1/materials/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 120000,
+  });
+  return res.data as MaterialUploadResult;
+}
+
 export async function uploadAssetWithProcessApi(payload: {
   file: File;
   remove_watermark: boolean;

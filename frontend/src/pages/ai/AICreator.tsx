@@ -113,7 +113,7 @@ export default function AICreator() {
     const promptRow = promptRows.find((x) => x.id === selectedPrompt);
     const styleRow = styleRows.find((x) => x.id === selectedStyle);
     if (!promptRow || !styleRow) {
-      message.warning("请先在配置中心维护可用的智能体和风格");
+      message.warning("请先在设置中心维护可用的智能体和风格");
       return;
     }
     setGenerating(true);
@@ -212,7 +212,7 @@ export default function AICreator() {
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className={`lg:col-span-1 ${cardClass}`}>
           <Title level={4} className="!mb-4 !text-slate-900">
-            AI 创作控制台
+            AI 脚本工坊
           </Title>
           <div className="space-y-4">
             <div>
