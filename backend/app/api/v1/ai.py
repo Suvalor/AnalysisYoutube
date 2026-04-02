@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from openai import AsyncOpenAI
 
 from app.api.deps import CurrentUserDep, DBSessionDep
-from app.core.config import settings
+from app.services.config_manager import resolve_integration_config
 from app.crud.library import get_by_user
 from app.models.library import PromptLibrary, StyleLibrary
 from app.schemas.library import GenerateScriptStreamRequest
@@ -33,15 +33,16 @@ async def generate_script_stream(
             detail="提示词或风格不存在",
         )
 
-    if not settings.volcengine_api_key or not settings.volcengine_base_url or not settings.volcengine_endpoint_id:
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    if not icfg.volcengine_api_key or not icfg.volcengine_base_url or not icfg.volcengine_endpoint_id:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="火山引擎配置不完整",
         )
 
     client = AsyncOpenAI(
-        api_key=settings.volcengine_api_key,
-        base_url=settings.volcengine_base_url,
+        api_key=icfg.volcengine_api_key,
+        base_url=icfg.volcengine_base_url,
     )
     system_prompt = (
         "你是一个专业的内容创作者。\n"
@@ -53,7 +54,7 @@ async def generate_script_stream(
     async def event_generator() -> AsyncGenerator[str, None]:
         try:
             stream = await client.chat.completions.create(
-                model=settings.volcengine_endpoint_id,
+                model=icfg.volcengine_endpoint_id,
                 stream=True,
                 messages=[
                     {"role": "system", "content": system_prompt},

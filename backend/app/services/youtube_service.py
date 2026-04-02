@@ -7,8 +7,6 @@ import re
 import httpx
 from fastapi import HTTPException, status
 
-from app.core.config import settings
-
 YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3"
 
 CHANNEL_ID_REGEX = re.compile(r"(?:youtube\.com/channel/)(UC[a-zA-Z0-9_-]{22})")
@@ -68,11 +66,11 @@ def parse_youtube_identifier(youtube_url: str) -> dict[str, str]:
     )
 
 
-def _require_api_key() -> None:
-    if not settings.youtube_api_key:
+def _require_api_key(youtube_api_key: str) -> None:
+    if not (youtube_api_key or "").strip():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="后端未配置 YOUTUBE_API_KEY",
+            detail="未配置 YouTube Data API Key（请在设置中心填写或配置环境变量 YOUTUBE_API_KEY）",
         )
 
 
@@ -91,13 +89,13 @@ def enrich_video_items(items: list[dict]) -> None:
         item["_parsed_published_at"] = parse_datetime(pub)
 
 
-async def fetch_channel_info(identifier: dict[str, str]) -> dict:
+async def fetch_channel_info(identifier: dict[str, str], *, youtube_api_key: str) -> dict:
     """调用 channels 端点获取频道信息。"""
-    _require_api_key()
+    _require_api_key(youtube_api_key)
 
     params = {
         "part": "snippet,statistics",
-        "key": settings.youtube_api_key,
+        "key": youtube_api_key,
     }
     if "channel_id" in identifier:
         params["id"] = identifier["channel_id"]
@@ -120,8 +118,9 @@ async def _channels_get(
     client: httpx.AsyncClient,
     *,
     params: dict,
+    youtube_api_key: str,
 ) -> dict:
-    q = {"key": settings.youtube_api_key, **params}
+    q = {"key": youtube_api_key, **params}
     resp = await client.get(f"{YOUTUBE_API_BASE}/channels", params=q)
     if resp.status_code != 200:
         raise _http_error(f"YouTube channels API 调用失败：{resp.text}")
@@ -133,6 +132,7 @@ async def _playlist_items_get(
     *,
     playlist_id: str,
     max_results: int,
+    youtube_api_key: str,
 ) -> dict:
     resp = await client.get(
         f"{YOUTUBE_API_BASE}/playlistItems",
@@ -140,7 +140,7 @@ async def _playlist_items_get(
             "part": "snippet",
             "playlistId": playlist_id,
             "maxResults": max(1, min(max_results, 50)),
-            "key": settings.youtube_api_key,
+            "key": youtube_api_key,
         },
     )
     if resp.status_code != 200:
@@ -148,13 +148,18 @@ async def _playlist_items_get(
     return resp.json()
 
 
-async def _videos_get(client: httpx.AsyncClient, *, video_ids: list[str]) -> dict:
+async def _videos_get(
+    client: httpx.AsyncClient,
+    *,
+    video_ids: list[str],
+    youtube_api_key: str,
+) -> dict:
     resp = await client.get(
         f"{YOUTUBE_API_BASE}/videos",
         params={
             "part": "contentDetails,status,statistics,snippet",
             "id": ",".join(video_ids),
-            "key": settings.youtube_api_key,
+            "key": youtube_api_key,
         },
     )
     if resp.status_code != 200:
@@ -175,13 +180,14 @@ async def fetch_recent_videos(
     channel_id: str,
     limit: int = 10,
     *,
+    youtube_api_key: str,
     return_quota: bool = False,
 ) -> list[dict] | tuple[list[dict], FetchRecentVideosQuota]:
     """
     通过 uploads 播放列表 + videos.list 获取近期视频（不使用 Search API）。
     消耗：channels 1 + playlistItems 1 + videos 按 50 个分块。
     """
-    _require_api_key()
+    _require_api_key(youtube_api_key)
     limit = max(1, min(limit, 50))
     quota = FetchRecentVideosQuota()
 
@@ -192,6 +198,7 @@ async def fetch_recent_videos(
                 "part": "contentDetails",
                 "id": channel_id,
             },
+            youtube_api_key=youtube_api_key,
         )
         quota.channels_calls = 1
         items_ch = data.get("items", [])
@@ -207,7 +214,12 @@ async def fetch_recent_videos(
         if not uploads:
             return ([], quota) if return_quota else []
 
-        pl_data = await _playlist_items_get(client, playlist_id=uploads, max_results=limit)
+        pl_data = await _playlist_items_get(
+            client,
+            playlist_id=uploads,
+            max_results=limit,
+            youtube_api_key=youtube_api_key,
+        )
         quota.playlist_items_calls = 1
         pl_items = pl_data.get("items", [])
         video_ids: list[str] = []
@@ -220,7 +232,7 @@ async def fetch_recent_videos(
 
         all_videos: list[dict] = []
         for group in chunked(video_ids, MAX_IDS_PER_REQUEST):
-            vdata = await _videos_get(client, video_ids=group)
+            vdata = await _videos_get(client, video_ids=group, youtube_api_key=youtube_api_key)
             quota.videos_list_calls += 1
             all_videos.extend(vdata.get("items", []))
 
@@ -230,12 +242,17 @@ async def fetch_recent_videos(
     return all_videos
 
 
-async def fetch_channels_by_ids(channel_ids: list[str], return_call_count: bool = False):
+async def fetch_channels_by_ids(
+    channel_ids: list[str],
+    *,
+    youtube_api_key: str,
+    return_call_count: bool = False,
+):
     """批量按 channel id 拉取频道详情，单次最多 50 个。"""
     if not channel_ids:
         return [] if not return_call_count else ([], 0)
 
-    _require_api_key()
+    _require_api_key(youtube_api_key)
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
         all_items: list[dict] = []
         call_count = 0
@@ -247,6 +264,7 @@ async def fetch_channels_by_ids(channel_ids: list[str], return_call_count: bool 
                     "part": "snippet,statistics",
                     "id": ",".join(group),
                 },
+                youtube_api_key=youtube_api_key,
             )
             all_items.extend(data.get("items", []))
     if return_call_count:
@@ -257,13 +275,14 @@ async def fetch_channels_by_ids(channel_ids: list[str], return_call_count: bool 
 async def resolve_handles_to_channel_ids(
     client: httpx.AsyncClient,
     handles: list[str],
+    *,
+    youtube_api_key: str,
 ) -> tuple[dict[str, str], list[str]]:
     """
     forHandle 逐个解析，返回 {handle原样: yt_channel_id} 与失败说明列表。
     每次请求消耗 1 点配额。
     """
     errors: list[str] = []
-    # 使用有序去重，保持确定性
     seen: set[str] = set()
     ordered_handles: list[str] = []
     for h in handles:
@@ -279,7 +298,7 @@ async def resolve_handles_to_channel_ids(
             params={
                 "part": "id",
                 "forHandle": handle_param,
-                "key": settings.youtube_api_key,
+                "key": youtube_api_key,
             },
         )
         if resp.status_code != 200:
@@ -299,6 +318,8 @@ async def resolve_handles_to_channel_ids(
 async def fetch_channels_with_content_details(
     client: httpx.AsyncClient,
     channel_ids: list[str],
+    *,
+    youtube_api_key: str,
 ) -> tuple[list[dict], int]:
     """按 50 个一组拉取 snippet,statistics,contentDetails。返回 (items, 请求次数)。"""
     if not channel_ids:
@@ -313,6 +334,7 @@ async def fetch_channels_with_content_details(
                 "part": "snippet,statistics,contentDetails",
                 "id": ",".join(group),
             },
+            youtube_api_key=youtube_api_key,
         )
         all_items.extend(data.get("items", []))
     return all_items, calls
@@ -321,11 +343,12 @@ async def fetch_channels_with_content_details(
 async def fetch_videos_in_chunks(
     client: httpx.AsyncClient,
     video_ids: list[str],
+    *,
+    youtube_api_key: str,
 ) -> tuple[list[dict], int]:
     """按 50 个一组拉取视频详情。返回 (items, 请求次数)。"""
     if not video_ids:
         return [], 0
-    # 去重且保持顺序
     seen: set[str] = set()
     ordered: list[str] = []
     for vid in video_ids:
@@ -337,7 +360,7 @@ async def fetch_videos_in_chunks(
     calls = 0
     for group in chunked(ordered, MAX_IDS_PER_REQUEST):
         calls += 1
-        data = await _videos_get(client, video_ids=group)
+        data = await _videos_get(client, video_ids=group, youtube_api_key=youtube_api_key)
         all_items.extend(data.get("items", []))
     return all_items, calls
 
@@ -358,6 +381,8 @@ class BulkAnalyzePipelineResult:
 async def _pipeline_fetch_channels_and_videos(
     client: httpx.AsyncClient,
     channel_id_list: list[str],
+    *,
+    youtube_api_key: str,
 ) -> BulkAnalyzePipelineResult:
     """
     步骤 C–E：批量 channels（含 contentDetails）→ 各频道 uploads 的 playlistItems → 批量 videos。
@@ -366,7 +391,9 @@ async def _pipeline_fetch_channels_and_videos(
     if not channel_id_list:
         return result
 
-    channel_items, ch_calls = await fetch_channels_with_content_details(client, channel_id_list)
+    channel_items, ch_calls = await fetch_channels_with_content_details(
+        client, channel_id_list, youtube_api_key=youtube_api_key
+    )
     result.channel_items = channel_items
     result.channels_list_calls = ch_calls
 
@@ -383,27 +410,32 @@ async def _pipeline_fetch_channels_and_videos(
                 result.errors.append(f"频道 {cid}: 无 uploads 播放列表，跳过视频拉取")
             continue
 
-        pl_data = await _playlist_items_get(client, playlist_id=uploads, max_results=50)
+        pl_data = await _playlist_items_get(
+            client,
+            playlist_id=uploads,
+            max_results=50,
+            youtube_api_key=youtube_api_key,
+        )
         result.playlist_items_calls += 1
         for pl in pl_data.get("items", []):
             vid = pl.get("snippet", {}).get("resourceId", {}).get("videoId")
             if vid:
                 all_video_ids.append(vid)
 
-    video_items, v_calls = await fetch_videos_in_chunks(client, all_video_ids)
+    video_items, v_calls = await fetch_videos_in_chunks(client, all_video_ids, youtube_api_key=youtube_api_key)
     result.video_items = video_items
     result.videos_list_calls = v_calls
     enrich_video_items(result.video_items)
     return result
 
 
-async def run_bulk_analyze_pipeline(urls: str) -> BulkAnalyzePipelineResult:
+async def run_bulk_analyze_pipeline(urls: str, *, youtube_api_key: str) -> BulkAnalyzePipelineResult:
     """
     高性价比批量抓取：解析 → forHandle → channels 批量 → playlistItems → videos 批量。
     不使用 Search API。
     """
     result = BulkAnalyzePipelineResult()
-    _require_api_key()
+    _require_api_key(youtube_api_key)
 
     handles, direct_ids = extract_handles_and_channel_ids_from_bulk(urls)
     if not handles and not direct_ids:
@@ -412,7 +444,9 @@ async def run_bulk_analyze_pipeline(urls: str) -> BulkAnalyzePipelineResult:
 
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
         if handles:
-            mapping, herr = await resolve_handles_to_channel_ids(client, list(handles))
+            mapping, herr = await resolve_handles_to_channel_ids(
+                client, list(handles), youtube_api_key=youtube_api_key
+            )
             result.errors.extend(herr)
             result.for_handle_calls = len(handles)
             for _h, cid in mapping.items():
@@ -423,7 +457,7 @@ async def run_bulk_analyze_pipeline(urls: str) -> BulkAnalyzePipelineResult:
             result.errors.append("所有 Handle 均解析失败，且无直接频道 ID")
             return result
 
-        inner = await _pipeline_fetch_channels_and_videos(client, channel_id_list)
+        inner = await _pipeline_fetch_channels_and_videos(client, channel_id_list, youtube_api_key=youtube_api_key)
         result.channel_items = inner.channel_items
         result.video_items = inner.video_items
         result.errors.extend(inner.errors)
@@ -436,18 +470,20 @@ async def run_bulk_analyze_pipeline(urls: str) -> BulkAnalyzePipelineResult:
 
 async def run_refresh_pipeline_for_youtube_channel_ids(
     yt_channel_ids: list[str],
+    *,
+    youtube_api_key: str,
 ) -> BulkAnalyzePipelineResult:
     """
     监控池「一键更新」：仅按已知的 YouTube 频道 ID 执行 C–E，无解析与 forHandle。
     """
     result = BulkAnalyzePipelineResult()
-    _require_api_key()
+    _require_api_key(youtube_api_key)
     unique = sorted({x.strip() for x in yt_channel_ids if x and x.strip()})
     if not unique:
         return result
 
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-        inner = await _pipeline_fetch_channels_and_videos(client, unique)
+        inner = await _pipeline_fetch_channels_and_videos(client, unique, youtube_api_key=youtube_api_key)
         result.channel_items = inner.channel_items
         result.video_items = inner.video_items
         result.errors.extend(inner.errors)
@@ -523,13 +559,14 @@ async def fetch_comment_threads_with_search(
     video_yt_id: str,
     keyword: str,
     *,
+    youtube_api_key: str,
     max_total: int = 100,
 ) -> tuple[list[dict], int]:
     """
     调用 commentThreads.list（支持 searchTerms），最多收集 max_total 条。
     返回 (解析后的评论行列表, YouTube API 调用次数)。
     """
-    _require_api_key()
+    _require_api_key(youtube_api_key)
     if not keyword.strip():
         raise HTTPException(status_code=400, detail="keyword 不能为空")
 
@@ -546,7 +583,7 @@ async def fetch_comment_threads_with_search(
                 "searchTerms": keyword.strip(),
                 "maxResults": batch,
                 "textFormat": "plainText",
-                "key": settings.youtube_api_key,
+                "key": youtube_api_key,
             }
             if page_token:
                 params["pageToken"] = page_token

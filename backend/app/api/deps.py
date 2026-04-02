@@ -1,3 +1,9 @@
+"""API 依赖与当前用户解析。
+
+数据隔离说明：用户归属 ``org_id``（组织）；云存储、YouTube 等集成配置以 **组织** 维度共享（``org_settings``）。
+业务资源仍以 ``current_user.id`` 为主键隔离（灵感、素材、模型库、SOP 等），避免横向越权。
+"""
+
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status

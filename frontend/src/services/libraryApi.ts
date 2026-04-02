@@ -46,8 +46,35 @@ export type AssetItem = {
   title: string;
   file_type: "image" | "video" | "audio";
   file_url: string;
+  /** 私有桶列表/预览应优先使用（后端签名 + 自定义域名） */
+  access_url: string;
+  source?: string;
+  storage_platform?: string;
+  storage_object_key?: string | null;
+  file_size?: number | null;
   created_at: string;
   updated_at: string;
+};
+
+export type AssetListParams = {
+  page?: number;
+  page_size?: number;
+  file_type?: "image" | "video" | "audio";
+  /** YYYY-MM-DD */
+  date_start?: string;
+  date_end?: string;
+  q?: string;
+  sort_by?: "created_at" | "file_size";
+  sort_order?: "asc" | "desc";
+};
+
+export type AssetListResult = {
+  items: AssetItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  sort_by: "created_at" | "file_size";
+  sort_order: "asc" | "desc";
 };
 
 export type JimengTaskSubmitResponse = {
@@ -170,23 +197,80 @@ export async function restoreScriptApi(scriptId: number) {
   return res.data as ScriptItem;
 }
 
-export async function listAssetsApi() {
-  const res = await apiClient.get("/api/assets");
-  return res.data as AssetItem[];
+export async function listAssetsApi(params?: AssetListParams) {
+  const res = await apiClient.get("/api/assets", { params });
+  return res.data as AssetListResult;
 }
 
 export async function createAssetApi(payload: {
   title: string;
   file_type: "image" | "video" | "audio";
   file_url: string;
+  file_size?: number | null;
+  source?: string;
+  storage_platform?: string;
+  storage_object_key?: string | null;
 }) {
   const res = await apiClient.post("/api/assets", payload);
   return res.data as AssetItem;
 }
 
+/** 申请浏览器 PUT 直传预签名（不走 Node SDK） */
+export type AssetPresignUploadBody = {
+  filename: string;
+  content_type?: string | null;
+  module?: "MANUAL" | "SOP" | "INSPIRATION";
+};
+
+export type AssetPresignUploadResult = {
+  upload_url: string;
+  final_access_url: string;
+  storage_platform: string;
+  storage_object_key: string;
+  file_type: "image" | "video" | "audio";
+  expires_in: number;
+  method: "PUT";
+  required_headers: Record<string, string>;
+};
+
+export async function getAssetUploadParamsApi(body: AssetPresignUploadBody, expires = 600) {
+  const res = await apiClient.post("/api/assets/get_upload_params", body, {
+    params: { expires },
+  });
+  return res.data as AssetPresignUploadResult;
+}
+
+/**
+ * 使用原生 fetch PUT 上传至云厂商预签名 URL（避免 axios 走 Node 适配器链）。
+ * required_headers 须与签发预签名时一致（尤其 Content-Type）。
+ */
+export async function putFileToPresignedUrl(
+  uploadUrl: string,
+  file: File,
+  requiredHeaders: Record<string, string>
+): Promise<void> {
+  const headers = new Headers();
+  for (const [k, v] of Object.entries(requiredHeaders || {})) {
+    if (v) headers.set(k, v);
+  }
+  const res = await fetch(uploadUrl, { method: "PUT", body: file, headers });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`对象存储直传失败（HTTP ${res.status}）${text ? `：${text.slice(0, 240)}` : ""}`);
+  }
+}
+
 export async function deleteAssetApi(assetId: number) {
   const res = await apiClient.delete(`/api/assets/${assetId}`);
   return res.data as { message: string };
+}
+
+/** 素材库单条访问地址（私有桶为 presigned，Host 已按组织配置替换自定义域名） */
+export async function getAssetAccessUrlApi(assetId: number, expires = 3600) {
+  const res = await apiClient.get(`/api/assets/${assetId}/access-url`, {
+    params: { expires },
+  });
+  return res.data as { url: string; mode: "presigned" | "public_fallback"; expires_in: number | null };
 }
 
 /** 与素材库相同的上传链路：OSS 持久化，返回可公开访问的 file_url */
@@ -195,15 +279,28 @@ export type MaterialUploadResult = {
   title: string;
   file_type: "image" | "video";
   file_url: string;
+  access_url?: string;
+  source?: string;
+  storage_platform?: string;
+  storage_object_key?: string | null;
   file_size?: number | null;
   created_at: string;
   remove_watermark?: boolean;
 };
 
+/** 按素材记录的存储平台生成访问 URL（签名或公开回退），不依赖前端全局开关 */
+export async function getMaterialAccessUrlApi(materialId: number, expires = 3600) {
+  const res = await apiClient.get(`/api/v1/materials/${materialId}/access-url`, {
+    params: { expires },
+  });
+  return res.data as { url: string; mode: "presigned" | "public_fallback"; expires_in: number | null };
+}
+
 export async function uploadMaterialImageApi(file: File, removeWatermark = false) {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("remove_watermark", String(removeWatermark));
+  formData.append("source", "INSPIRATION");
   const res = await apiClient.post("/api/v1/materials/upload", formData, {
     headers: { "Content-Type": "multipart/form-data" },
     timeout: 120000,
@@ -211,23 +308,70 @@ export async function uploadMaterialImageApi(file: File, removeWatermark = false
   return res.data as MaterialUploadResult;
 }
 
+export type AssetUploadResult = {
+  id: number;
+  title: string;
+  file_type: "image" | "video" | "audio";
+  file_url: string;
+  access_url?: string;
+  source?: string;
+  storage_platform?: string;
+  storage_object_key?: string | null;
+  file_size?: number | null;
+  created_at: string;
+  remove_watermark?: boolean;
+};
+
 export async function uploadAssetWithProcessApi(payload: {
   file: File;
   remove_watermark: boolean;
-}) {
-  const formData = new FormData();
-  formData.append("file", payload.file);
-  formData.append("remove_watermark", String(payload.remove_watermark));
-  const res = await apiClient.post("/api/assets/upload", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-    timeout: 120000,
+  /** 素材库页勿传；SOP 内上传传 SOP */
+  source?: "MANUAL" | "SOP" | "INSPIRATION";
+}): Promise<AssetUploadResult> {
+  const source = payload.source ?? "MANUAL";
+  const file = payload.file;
+
+  if (payload.remove_watermark) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("remove_watermark", "true");
+    formData.append("source", source);
+    const res = await apiClient.post("/api/assets/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 120000,
+    });
+    return res.data as AssetUploadResult;
+  }
+
+  const ct = file.type?.trim() || "application/octet-stream";
+  const presign = await getAssetUploadParamsApi(
+    { filename: file.name, content_type: ct, module: source },
+    600
+  );
+  await putFileToPresignedUrl(presign.upload_url, file, presign.required_headers);
+
+  const row = await createAssetApi({
+    title: file.name,
+    file_type: presign.file_type,
+    file_url: presign.final_access_url,
+    file_size: file.size,
+    source,
+    storage_platform: presign.storage_platform,
+    storage_object_key: presign.storage_object_key,
   });
-  return res.data as {
-    id?: number;
-    title?: string;
-    file_type?: "image" | "video" | "audio";
-    file_url?: string;
-    created_at?: string;
+
+  return {
+    id: row.id,
+    title: row.title,
+    file_type: row.file_type,
+    file_url: row.file_url,
+    access_url: row.access_url,
+    source: row.source,
+    storage_platform: row.storage_platform,
+    storage_object_key: row.storage_object_key ?? null,
+    file_size: row.file_size ?? file.size,
+    created_at: row.created_at,
+    remove_watermark: false,
   };
 }
 

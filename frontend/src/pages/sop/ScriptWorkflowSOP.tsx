@@ -49,6 +49,11 @@ import { linkInspirationPlotApi } from "@/services/inspirationApi";
 const { Text, Title } = Typography;
 const { TextArea } = Input;
 
+/** 私有桶下优先使用后端签名的 access_url 做展示与可下载链接 */
+function sopFileDisplayUrl(row: { access_url?: string | null; file_url?: string | null }): string {
+  return (row.access_url || row.file_url || "").trim();
+}
+
 type SourceScript = {
   id: number;
   title: string;
@@ -438,12 +443,18 @@ export default function ScriptWorkflowSOP() {
 
   const handleUploadToShot = async (shotId: number, file: File) => {
     try {
-      const uploadRes = await uploadAssetWithProcessApi({ file, remove_watermark: false });
+      const uploadRes = await uploadAssetWithProcessApi({
+        file,
+        remove_watermark: false,
+        source: "SOP",
+      });
       const created = await createSopAssetApi({
         shot_id: shotId,
         name: uploadRes.title || file.name,
         asset_type: uploadRes.file_type || "image",
         file_url: uploadRes.file_url || null,
+        storage_platform: uploadRes.storage_platform ?? undefined,
+        storage_object_key: uploadRes.storage_object_key ?? undefined,
         status: "draft",
       });
       setAssets((prev) => [...prev, created]);
@@ -604,7 +615,8 @@ export default function ScriptWorkflowSOP() {
 
   const handlePublishYouTube = async () => {
     const targetMedia = mediaRows.find((x) => x.id === publishMediaId) ?? null;
-    if (!targetMedia?.file_url) {
+    const publishUrl = targetMedia ? sopFileDisplayUrl(targetMedia) : "";
+    if (!publishUrl) {
       message.warning("暂无可发布视频");
       return;
     }
@@ -615,7 +627,7 @@ export default function ScriptWorkflowSOP() {
     setPublishing(true);
     try {
       const res = await publishYouTubeApi({
-        media_url: targetMedia.file_url,
+        media_url: publishUrl,
         title: publishTitle.trim(),
         description: publishDescription.trim().slice(0, 5000),
         privacy_status: publishPrivacy,
@@ -630,7 +642,7 @@ export default function ScriptWorkflowSOP() {
   };
 
   const openPublishModal = () => {
-    const firstMedia = mediaRows.find((x) => x.file_url);
+    const firstMedia = mediaRows.find((x) => sopFileDisplayUrl(x));
     setPublishMediaId(firstMedia?.id ?? null);
     setPublishTitle(sourceScript?.title || "");
     setPublishDescription((sourceScript?.content || "").slice(0, 5000));
@@ -818,15 +830,17 @@ export default function ScriptWorkflowSOP() {
                 { title: "状态", dataIndex: "status", width: 120 },
                 {
                   title: "文件地址",
-                  dataIndex: "file_url",
-                  render: (v: string | null) =>
-                    v ? (
-                      <a href={v} target="_blank" rel="noreferrer">
+                  key: "play_url",
+                  render: (_: unknown, row: SopMedia) => {
+                    const href = sopFileDisplayUrl(row);
+                    return href ? (
+                      <a href={href} target="_blank" rel="noreferrer">
                         查看
                       </a>
                     ) : (
                       "-"
-                    ),
+                    );
+                  },
                 },
               ]}
             />
@@ -854,7 +868,7 @@ export default function ScriptWorkflowSOP() {
               value={publishMediaId ?? undefined}
               onChange={(v) => setPublishMediaId(v)}
               options={mediaRows
-                .filter((x) => Boolean(x.file_url))
+                .filter((x) => Boolean(sopFileDisplayUrl(x)))
                 .map((x) => ({ value: x.id, label: `媒体 ${x.id} | 分镜 ${x.shot_id} | ${x.status}` }))}
               className="w-full"
               placeholder="请选择要发布的媒体"
@@ -909,8 +923,12 @@ function ShotEditableCard({
   const { isOver, setNodeRef } = useDroppable({ id: `shot-drop-${shot.id}` });
 
   const renderAssetThumb = (asset: SopAsset) => {
-    const url = asset.file_url || "";
-    const isVideo = /\.(mp4|webm|mov|m4v)$/i.test(url);
+    const url = sopFileDisplayUrl(asset);
+    const pathHint = (asset.file_url || url).split("?")[0];
+    const isVideo =
+      asset.asset_type === "video" ||
+      /\.(mp4|webm|mov|m4v)$/i.test(pathHint) ||
+      /\.(mp4|webm|mov|m4v)$/i.test(asset.name);
     if (isVideo) {
       return <video src={url} className="w-full h-24 object-cover rounded border border-slate-200 bg-black" />;
     }

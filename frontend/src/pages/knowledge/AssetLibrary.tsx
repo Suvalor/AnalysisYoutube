@@ -2,19 +2,31 @@ import {
   Button,
   Card,
   Checkbox,
+  Col,
   DatePicker,
+  Empty,
+  Input,
   Modal,
+  Pagination,
+  Row,
   Select,
+  Space,
+  Spin,
   Typography,
   Upload,
   message,
 } from "antd";
-import { DownloadOutlined, EyeOutlined, FileImageOutlined, VideoCameraOutlined } from "@ant-design/icons";
+import {
+  DownloadOutlined,
+  EyeOutlined,
+  FileImageOutlined,
+  SoundOutlined,
+  VideoCameraOutlined,
+} from "@ant-design/icons";
 import { type Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 import {
-  createAssetApi,
   deleteAssetApi,
   listAssetsApi,
   uploadAssetWithProcessApi,
@@ -22,29 +34,31 @@ import {
 } from "@/services/libraryApi";
 
 const { Text } = Typography;
-const { RangePicker } = DatePicker;
-const { Dragger } = Upload;
 
-const MOCK_ASSETS: AssetItem[] = [
-  {
-    id: -1,
-    user_id: 0,
-    title: "示例图片素材",
-    file_type: "image",
-    file_url: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80",
-    created_at: dayjs().subtract(1, "day").toISOString(),
-    updated_at: dayjs().subtract(1, "day").toISOString(),
-  },
-  {
-    id: -2,
-    user_id: 0,
-    title: "示例视频素材",
-    file_type: "video",
-    file_url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
-    created_at: dayjs().subtract(3, "day").toISOString(),
-    updated_at: dayjs().subtract(3, "day").toISOString(),
-  },
-];
+type TypeFilter = "all" | "image" | "video" | "audio";
+type NormalizedFileType = "image" | "video" | "audio" | "unknown";
+
+/** 防止接口返回异常 file_type 导致渲染分支异常或非预期 DOM */
+function normalizeAssetFileType(ft: unknown): NormalizedFileType {
+  if (ft === "image" || ft === "video" || ft === "audio") return ft;
+  return "unknown";
+}
+type SortPreset = "time_desc" | "time_asc" | "size_desc" | "size_asc";
+
+function sortPresetToApi(preset: SortPreset): { sort_by: "created_at" | "file_size"; sort_order: "asc" | "desc" } {
+  switch (preset) {
+    case "time_desc":
+      return { sort_by: "created_at", sort_order: "desc" };
+    case "time_asc":
+      return { sort_by: "created_at", sort_order: "asc" };
+    case "size_desc":
+      return { sort_by: "file_size", sort_order: "desc" };
+    case "size_asc":
+      return { sort_by: "file_size", sort_order: "asc" };
+    default:
+      return { sort_by: "created_at", sort_order: "desc" };
+  }
+}
 
 function inferType(file: File) {
   if (file.type.startsWith("image/")) return "image";
@@ -53,39 +67,91 @@ function inferType(file: File) {
   return null;
 }
 
+function formatBytes(n: number | null | undefined): string {
+  if (n == null || n < 0) return "—";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** 展示与下载统一走 access_url（后端签名 + 自定义域名），避免私有桶直链 file_url 失效 */
+function mediaSrc(a: AssetItem): string {
+  return (a.access_url || a.file_url || "").trim();
+}
+
 export default function AssetLibraryPage() {
-  const [assets, setAssets] = useState<AssetItem[]>([]);
+  const [items, setItems] = useState<AssetItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [listLoading, setListLoading] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [removeWatermark, setRemoveWatermark] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<"all" | "image" | "video">("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
+  const [keyword, setKeyword] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [sortPreset, setSortPreset] = useState<SortPreset>("time_desc");
   const [previewAsset, setPreviewAsset] = useState<AssetItem | null>(null);
+  const [thumbErrorIds, setThumbErrorIds] = useState<Record<number, boolean>>({});
 
-  const loadAssets = async () => {
-    const data = await listAssetsApi();
-    setAssets(data);
-  };
+  const sortApi = useMemo(() => sortPresetToApi(sortPreset), [sortPreset]);
+  /** 与 page 无关的强制刷新（例如上传成功但仍在第 1 页） */
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
-    void loadAssets();
-  }, []);
-
-  const displayAssets = useMemo(() => (assets.length > 0 ? assets : MOCK_ASSETS), [assets]);
-
-  const filteredAssets = useMemo(() => {
-    return displayAssets.filter((asset) => {
-      if (typeFilter !== "all" && asset.file_type !== typeFilter) return false;
-      if (dateRange) {
-        const createdAt = dayjs(asset.created_at);
-        if (createdAt.isBefore(dateRange[0], "day") || createdAt.isAfter(dateRange[1], "day")) {
-          return false;
+    let cancelled = false;
+    (async () => {
+      setListLoading(true);
+      try {
+        const res = await listAssetsApi({
+          page,
+          page_size: pageSize,
+          file_type: typeFilter === "all" ? undefined : typeFilter,
+          date_start: dateRange?.[0]?.format("YYYY-MM-DD"),
+          date_end: dateRange?.[1]?.format("YYYY-MM-DD"),
+          q: searchText.trim() || undefined,
+          sort_by: sortApi.sort_by,
+          sort_order: sortApi.sort_order,
+        });
+        if (!cancelled) {
+          setItems(res.items);
+          setTotal(res.total);
+          setThumbErrorIds({});
         }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          const d =
+            err && typeof err === "object" && "response" in err
+              ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+              : undefined;
+          message.error(typeof d === "string" ? d : "加载素材列表失败");
+          setItems([]);
+          setTotal(0);
+        }
+      } finally {
+        if (!cancelled) setListLoading(false);
       }
-      return true;
-    });
-  }, [displayAssets, typeFilter, dateRange]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    page,
+    pageSize,
+    typeFilter,
+    dateRange,
+    searchText,
+    sortApi.sort_by,
+    sortApi.sort_order,
+    reloadToken,
+  ]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [typeFilter, dateRange, searchText, sortPreset]);
 
   const onConfirmUpload = async () => {
     if (!selectedFile) {
@@ -103,115 +169,255 @@ export default function AssetLibraryPage() {
         file: selectedFile,
         remove_watermark: removeWatermark,
       });
-      if (uploadRes.file_url) {
-        await createAssetApi({
-          title: uploadRes.title || selectedFile.name,
-          file_type: uploadRes.file_type || type,
-          file_url: uploadRes.file_url,
-        });
+      if (!uploadRes.access_url && !uploadRes.file_url) {
+        message.error("上传未返回可访问地址");
+        return;
       }
-      await loadAssets();
+      setPage(1);
+      setReloadToken((t) => t + 1);
       message.success("上传成功");
       setUploadModalOpen(false);
       setSelectedFile(null);
       setRemoveWatermark(false);
-    } catch (err: any) {
-      message.error(err?.response?.data?.detail || err?.message || "上传失败，请稍后重试");
+    } catch (err: unknown) {
+      const d =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          : undefined;
+      message.error(typeof d === "string" ? d : "上传失败，请稍后重试");
     } finally {
       setUploading(false);
     }
   };
 
   const onDelete = async (id: number) => {
-    await deleteAssetApi(id);
-    setAssets((prev) => prev.filter((x) => x.id !== id));
-    message.success("删除成功");
+    try {
+      await deleteAssetApi(id);
+      message.success("删除成功");
+      const nextTotal = Math.max(0, total - 1);
+      const maxPage = Math.max(1, Math.ceil(nextTotal / pageSize));
+      if (page > maxPage) setPage(maxPage);
+      setReloadToken((t) => t + 1);
+    } catch (err: unknown) {
+      const d =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          : undefined;
+      message.error(typeof d === "string" ? d : "删除失败");
+    }
   };
 
   const onDownload = (asset: AssetItem) => {
+    const href = mediaSrc(asset);
+    if (!href) {
+      message.warning("无可下载地址");
+      return;
+    }
     const a = document.createElement("a");
-    a.href = asset.file_url;
+    a.href = href;
     a.download = asset.title;
+    a.target = "_blank";
+    a.rel = "noreferrer";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  };
+
+  const markThumbError = (id: number) => {
+    setThumbErrorIds((prev) => ({ ...prev, [id]: true }));
   };
 
   return (
     <div className="p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-5">
         <Card className="!bg-slate-900/80 !border-slate-800 shadow-2xl">
-          <div className="flex flex-col md:flex-row md:items-center gap-3">
-            <Button type="primary" onClick={() => setUploadModalOpen(true)} loading={uploading}>
-              上传素材
-            </Button>
-            <div className="w-full md:w-44">
-              <Select
+          <Row gutter={[12, 12]} align="middle">
+            <Col xs={24} sm={12} md={6} lg={5}>
+              <Button type="primary" block onClick={() => setUploadModalOpen(true)} loading={uploading}>
+                上传素材
+              </Button>
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={5}>
+              <Select<TypeFilter>
                 className="w-full"
                 value={typeFilter}
                 onChange={setTypeFilter}
                 options={[
-                  { label: "全部", value: "all" },
+                  { label: "全部类型", value: "all" },
                   { label: "图片", value: "image" },
                   { label: "视频", value: "video" },
+                  { label: "音频", value: "audio" },
                 ]}
               />
-            </div>
-            <RangePicker
-              className="w-full md:w-[320px]"
-              value={dateRange}
-              onChange={(v) => setDateRange((v as [Dayjs, Dayjs] | null) ?? null)}
-            />
-          </div>
+            </Col>
+            <Col xs={24} sm={24} md={12} lg={8}>
+              <DatePicker.RangePicker
+                className="w-full"
+                value={dateRange}
+                onChange={(v) => setDateRange((v as [Dayjs, Dayjs] | null) ?? null)}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Select<SortPreset>
+                className="w-full"
+                value={sortPreset}
+                onChange={setSortPreset}
+                options={[
+                  { label: "上传时间 · 从新到旧", value: "time_desc" },
+                  { label: "上传时间 · 从旧到新", value: "time_asc" },
+                  { label: "文件大小 · 从大到小", value: "size_desc" },
+                  { label: "文件大小 · 从小到大", value: "size_asc" },
+                ]}
+              />
+            </Col>
+            <Col xs={24} sm={24} md={24} lg={24}>
+              <Space.Compact className="w-full">
+                <Input
+                  allowClear
+                  className="flex-1 min-w-0"
+                  placeholder="按素材名称搜索"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  onPressEnter={() => setSearchText(keyword.trim())}
+                />
+                <Button type="primary" onClick={() => setSearchText(keyword.trim())}>
+                  搜索
+                </Button>
+              </Space.Compact>
+            </Col>
+          </Row>
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredAssets.map((asset) => (
-            <Card key={asset.id} className="!bg-slate-900/80 !border-slate-800 shadow-xl overflow-hidden">
-              <div className="mb-3 relative group">
-                {asset.file_type === "image" && (
-                  <img src={asset.file_url} alt={asset.title} className="w-full h-52 rounded-lg object-cover" />
-                )}
-                {asset.file_type === "video" && (
-                  <video src={asset.file_url} className="w-full h-52 rounded-lg bg-black object-cover" />
-                )}
-                {asset.file_type === "audio" && (
-                  <div className="rounded-lg border border-slate-700 bg-slate-950 p-3">
-                    <audio src={asset.file_url} controls className="w-full" />
-                  </div>
-                )}
-                {(asset.file_type === "image" || asset.file_type === "video") && (
-                  <div className="absolute inset-0 bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <Button
-                      size="small"
-                      icon={<EyeOutlined />}
-                      onClick={() => setPreviewAsset(asset)}
-                    >
-                      预览
-                    </Button>
-                    <Button size="small" icon={<DownloadOutlined />} onClick={() => onDownload(asset)}>
-                      下载
-                    </Button>
-                  </div>
-                )}
-              </div>
-              <h3 className="font-medium mb-1 line-clamp-1">{asset.title}</h3>
-              <div className="text-xs text-slate-400 mb-2 flex items-center gap-2">
-                {asset.file_type === "image" ? (
-                  <FileImageOutlined className="text-cyan-400" />
-                ) : asset.file_type === "video" ? (
-                  <VideoCameraOutlined className="text-violet-400" />
-                ) : null}
-                <Text style={{ color: "#94a3b8" }}>{dayjs(asset.created_at).format("YYYY-MM-DD HH:mm")}</Text>
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button danger size="small" onClick={() => onDelete(asset.id)}>
-                  删除
-                </Button>
-              </div>
+        <Spin spinning={listLoading}>
+          {items.length === 0 && !listLoading ? (
+            <Card className="!bg-slate-900/60 !border-slate-800">
+              <Empty description="暂无素材，点击上传或调整筛选条件" />
             </Card>
-          ))}
-        </div>
+          ) : (
+            <Row gutter={[16, 16]}>
+              {items.map((asset) => {
+                const src = mediaSrc(asset);
+                const broken = thumbErrorIds[asset.id];
+                const ft = normalizeAssetFileType(asset.file_type);
+                return (
+                  <Col key={asset.id} xs={24} sm={12} lg={8} xl={6}>
+                    <Card
+                      className="h-full !bg-slate-900/80 !border-slate-800 shadow-xl overflow-hidden transition-all duration-200 hover:!border-slate-600 hover:shadow-2xl hover:-translate-y-0.5"
+                      styles={{ body: { padding: 12 } }}
+                    >
+                      <div className="mb-3 relative group rounded-lg overflow-hidden bg-slate-950/80 min-h-[160px]">
+                        {ft === "image" && (
+                          <>
+                            {!broken && src ? (
+                              <img
+                                src={src}
+                                alt={asset.title}
+                                loading="lazy"
+                                decoding="async"
+                                className="w-full h-52 object-cover"
+                                onError={() => markThumbError(asset.id)}
+                              />
+                            ) : (
+                              <div className="w-full h-52 flex items-center justify-center text-slate-500 text-xs px-3 text-center">
+                                图片无法加载。请确认 access_url 有效，或在 OSS/COS/CDN 配置 CORS 允许当前站点。
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {ft === "video" && (
+                          <>
+                            {src ? (
+                              <video
+                                src={src}
+                                className="w-full h-52 bg-black object-cover"
+                                preload="metadata"
+                                muted
+                                playsInline
+                              />
+                            ) : (
+                              <div className="w-full h-52 flex items-center justify-center text-slate-500 text-xs px-3 text-center">
+                                暂无视频地址
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {ft === "audio" && (
+                          <div className="rounded-lg border border-slate-700 bg-slate-950 p-3 min-h-[120px] flex flex-col justify-center">
+                            {src ? (
+                              <audio src={src} controls className="w-full" preload="metadata" />
+                            ) : (
+                              <div className="text-slate-500 text-xs text-center px-2">暂无音频地址</div>
+                            )}
+                          </div>
+                        )}
+                        {ft === "unknown" && (
+                          <div className="w-full h-52 flex items-center justify-center text-slate-500 text-xs px-3 text-center">
+                            无法识别的素材类型，请刷新列表或联系管理员。
+                          </div>
+                        )}
+                        {(ft === "image" || ft === "video") && src && !broken && (
+                          <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none group-hover:pointer-events-auto">
+                            <Button size="small" icon={<EyeOutlined />} onClick={() => setPreviewAsset(asset)}>
+                              预览
+                            </Button>
+                            <Button size="small" icon={<DownloadOutlined />} onClick={() => onDownload(asset)}>
+                              下载
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="font-medium text-slate-100 text-sm line-clamp-2 min-h-[2.5rem]" title={asset.title}>
+                          {asset.title}
+                        </h3>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400">
+                          {ft === "image" ? (
+                            <FileImageOutlined className="text-cyan-400" aria-hidden />
+                          ) : ft === "video" ? (
+                            <VideoCameraOutlined className="text-violet-400" aria-hidden />
+                          ) : ft === "audio" ? (
+                            <SoundOutlined className="text-amber-400" aria-hidden />
+                          ) : (
+                            <FileImageOutlined className="text-slate-500" aria-hidden />
+                          )}
+                          <span>
+                            {ft === "image" ? "图片" : ft === "video" ? "视频" : ft === "audio" ? "音频" : "未知类型"}
+                          </span>
+                          <span>·</span>
+                          <span>{dayjs(asset.created_at).format("YYYY-MM-DD HH:mm")}</span>
+                          <span>·</span>
+                          <span>{formatBytes(asset.file_size)}</span>
+                        </div>
+                        <div className="flex justify-end pt-2">
+                          <Button danger size="small" onClick={() => void onDelete(asset.id)}>
+                            删除
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  </Col>
+                );
+              })}
+            </Row>
+          )}
+        </Spin>
+
+        {total > 0 ? (
+          <div className="flex justify-end pt-2">
+            <Pagination
+              current={page}
+              pageSize={pageSize}
+              total={total}
+              showSizeChanger
+              showTotal={(t) => `共 ${t} 条`}
+              pageSizeOptions={[12, 20, 40, 60]}
+              onChange={(p, ps) => {
+                setPage(p);
+                setPageSize(ps);
+              }}
+            />
+          </div>
+        ) : null}
       </div>
 
       <Modal
@@ -223,13 +429,13 @@ export default function AssetLibraryPage() {
           setSelectedFile(null);
           setRemoveWatermark(false);
         }}
-        onOk={onConfirmUpload}
+        onOk={() => void onConfirmUpload()}
         confirmLoading={uploading}
         okText="确定上传"
         cancelText="取消"
       >
         <div className="space-y-4">
-          <Dragger
+          <Upload.Dragger
             maxCount={1}
             beforeUpload={(file) => {
               setSelectedFile(file);
@@ -251,12 +457,12 @@ export default function AssetLibraryPage() {
             }}
           >
             <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-            <p className="ant-upload-hint">支持图片、视频文件。上传前可选择 AI 去水印处理。</p>
-          </Dragger>
+            <p className="ant-upload-hint">支持图片、视频、音频。上传前可选择 AI 去水印（仅对图片/视频尝试）。</p>
+          </Upload.Dragger>
           <Checkbox checked={removeWatermark} onChange={(e) => setRemoveWatermark(e.target.checked)}>
             一键去水印（AI 智能处理）
           </Checkbox>
-          {uploading && <Text style={{ color: "#94a3b8" }}>上传处理中，请稍候...</Text>}
+          {uploading ? <Text style={{ color: "#94a3b8" }}>上传处理中，请稍候...</Text> : null}
         </div>
       </Modal>
 
@@ -268,15 +474,28 @@ export default function AssetLibraryPage() {
         style={{ top: 20 }}
       >
         <div className="bg-black rounded-lg min-h-[70vh] flex items-center justify-center">
-          {previewAsset?.file_type === "image" && (
-            <img src={previewAsset.file_url} alt={previewAsset.title} className="max-h-[78vh] max-w-full object-contain" />
+          {previewAsset && normalizeAssetFileType(previewAsset.file_type) === "image" && (
+            <img
+              src={mediaSrc(previewAsset)}
+              alt={previewAsset.title}
+              loading="lazy"
+              decoding="async"
+              className="max-h-[78vh] max-w-full object-contain"
+            />
           )}
-          {previewAsset?.file_type === "video" && (
-            <video src={previewAsset.file_url} controls autoPlay className="max-h-[78vh] max-w-full" />
+          {previewAsset && normalizeAssetFileType(previewAsset.file_type) === "video" && (
+            <video src={mediaSrc(previewAsset)} controls autoPlay className="max-h-[78vh] max-w-full" />
+          )}
+          {previewAsset && normalizeAssetFileType(previewAsset.file_type) === "audio" && (
+            <div className="w-full max-w-lg p-6">
+              <audio src={mediaSrc(previewAsset)} controls className="w-full" preload="metadata" />
+            </div>
+          )}
+          {previewAsset && normalizeAssetFileType(previewAsset.file_type) === "unknown" && (
+            <p className="text-slate-400 text-sm px-4">该素材类型不支持预览。</p>
           )}
         </div>
       </Modal>
     </div>
   );
 }
-

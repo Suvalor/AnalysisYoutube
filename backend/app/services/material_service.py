@@ -4,14 +4,10 @@ import logging
 import os
 import shutil
 import tempfile
-from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
-import oss2
 from fastapi import HTTPException, status
-
-from app.core.config import settings
 from app.services.watermark_remover import auto_remove_text_watermark
 from app.services.video_watermark_remover import auto_remove_video_watermark
 
@@ -52,12 +48,35 @@ def infer_file_type(content_type: str | None) -> str:
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="仅支持图片或视频文件")
 
 
-def build_public_oss_url(object_key: str) -> str:
-    endpoint = settings.aliyun_oss_endpoint
-    bucket = settings.aliyun_oss_bucket_name
-    if endpoint.startswith("http://") or endpoint.startswith("https://"):
-        return f"{endpoint.rstrip('/')}/{object_key}"
-    return f"https://{bucket}.{endpoint}/{object_key}"
+def infer_asset_library_file_type(content_type: str | None) -> str:
+    """素材库（/api/assets/upload）支持图片、视频、音频。"""
+    if content_type and content_type.startswith("image/"):
+        return "image"
+    if content_type and content_type.startswith("video/"):
+        return "video"
+    if content_type and content_type.startswith("audio/"):
+        return "audio"
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="仅支持图片、视频或音频文件")
+
+
+def infer_asset_library_file_type_loose(content_type: str | None, filename: str) -> str:
+    """预签名直传：优先 MIME，其次根据扩展名推断。"""
+    if content_type and content_type.strip():
+        try:
+            return infer_asset_library_file_type(content_type)
+        except HTTPException:
+            pass
+    ext = Path(filename or "").suffix.lower()
+    if ext in {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".svg", ".ico"}:
+        return "image"
+    if ext in {".mp4", ".webm", ".mov", ".m4v", ".avi", ".mkv"}:
+        return "video"
+    if ext in {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac"}:
+        return "audio"
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="无法识别文件类型，请提供正确的 Content-Type 或使用常见图片/视频/音频扩展名",
+    )
 
 
 def save_upload_to_temp(upload_filename: str, binary_content: bytes) -> tuple[str, str]:
@@ -72,33 +91,3 @@ def save_upload_to_temp(upload_filename: str, binary_content: bytes) -> tuple[st
 def remove_temp_dir(tmp_dir: str) -> None:
     if tmp_dir and os.path.exists(tmp_dir):
         shutil.rmtree(tmp_dir, ignore_errors=True)
-
-
-def upload_to_oss(final_file_path: str, file_type: str, original_name: str) -> str:
-    required_values = [
-        settings.aliyun_access_key_id,
-        settings.aliyun_access_key_secret,
-        settings.aliyun_oss_bucket_name,
-        settings.aliyun_oss_endpoint,
-    ]
-    if not all(required_values):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="阿里云 OSS 配置不完整",
-        )
-
-    # OSS 初始化（可替换为 STS 临时凭证版本）
-    auth = oss2.Auth(settings.aliyun_access_key_id, settings.aliyun_access_key_secret)
-    bucket = oss2.Bucket(auth, f"https://{settings.aliyun_oss_endpoint}", settings.aliyun_oss_bucket_name)
-
-    ext = Path(original_name).suffix
-    object_key = f"materials/{file_type}/{datetime.utcnow():%Y/%m/%d}/{uuid4().hex}{ext}"
-    try:
-        bucket.put_object_from_file(object_key, final_file_path)
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"上传 OSS 失败: {exc}",
-        ) from exc
-
-    return build_public_oss_url(object_key)

@@ -26,6 +26,7 @@ async def create_user(
     user = User(
         email=user_in.email,
         hashed_password=hashed_password,
+        org_id=1,
     )
     session.add(user)
     try:

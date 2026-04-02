@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUserDep
 from app.api.deps import DBSessionDep
-from app.core.config import settings
 from app.crud.library import list_by_user
+from app.services.config_manager import resolve_integration_config, resolve_model_alias_for_volcengine
 from app.models.library import ModelLibrary
 from app.services.script_user_ai import (
     DEFAULT_MODEL_OPTIONS,
@@ -33,19 +33,6 @@ class ScriptGenerateRequest(BaseModel):
 
 def _sse(data: dict) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-
-
-def _resolve_model_name(model_alias: str) -> str:
-    """环境变量火山引擎路径下的模型别名解析。"""
-    model_alias = (model_alias or "").strip()
-    if not model_alias:
-        return settings.volcengine_endpoint_id
-
-    alias_map = {
-        "gemini-1.5-pro": settings.volcengine_model_gemini or settings.volcengine_endpoint_id,
-        "claude-3-5-sonnet": settings.volcengine_model_claude or settings.volcengine_endpoint_id,
-    }
-    return alias_map.get(model_alias, model_alias)
 
 
 def _parse_models_from_library_rows(rows: list[ModelLibrary]) -> list[dict[str, str]]:
@@ -98,27 +85,28 @@ async def list_script_models(
 @router.post("/generate")
 async def generate_script(
     payload: ScriptGenerateRequest,
+    db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> StreamingResponse:
-    # 与 get_current_user 同请求内 ORM 实例，依赖注入顺序保证 db 可用
     creds = user_custom_openai_credentials(current_user)
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
     if creds:
         api_key, base_url = creds
-        resolved_model = (payload.model or "").strip()
-        if not resolved_model:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="请选择或填写模型",
-            )
+        resolved_model = resolve_model_alias_for_volcengine(payload.model, icfg)
     else:
-        if not settings.volcengine_api_key or not settings.volcengine_base_url:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="未配置个人 API 且服务端火山引擎环境变量不完整",
-            )
-        api_key = settings.volcengine_api_key
-        base_url = settings.volcengine_base_url
-        resolved_model = _resolve_model_name(payload.model)
+        api_key = icfg.volcengine_api_key
+        base_url = icfg.volcengine_base_url.rstrip("/")
+        resolved_model = resolve_model_alias_for_volcengine(payload.model, icfg)
+    if not resolved_model:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="请选择或填写模型",
+        )
+    if not api_key or not base_url:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="LLM 未配置：请在用户设置中配置自建 API，或在设置中心填写火山集成配置",
+        )
 
     prompt_text, style_text = resolve_prompt_and_style(
         current_user,

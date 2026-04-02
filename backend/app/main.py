@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import api_router_v1
+from app.api.v1 import api_router_v1, integration_settings, users
 from app.core.config import settings
 from app.services.scheduler_service import shutdown_scheduler, start_scheduler
 
@@ -33,6 +33,9 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router_v1, prefix="/api")
+    # 部分网关会把 /api 前缀剥掉再转发到后端，补挂 /users/... 以免集成配置与域名校验 404
+    app.include_router(users.router, prefix="/users")
+    app.include_router(integration_settings.router, prefix="/users")
 
     @app.get("/health")
     async def health_check() -> dict[str, str]:

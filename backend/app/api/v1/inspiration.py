@@ -11,13 +11,15 @@ from app.crud.inspiration import (
     update_inspiration,
 )
 from app.crud.sop import get_sop_script
+from app.models.library import AssetLibrary
 from app.schemas.inspiration import (
     InspirationCreate,
     InspirationLinkPlotBody,
     InspirationRead,
     InspirationUpdate,
 )
-
+from app.services.asset_access_service import library_row_access_url
+from app.services.config_manager import resolve_integration_config
 
 router = APIRouter()
 
@@ -36,10 +38,27 @@ def _normalize_create_payload(data: dict) -> dict:
     return data
 
 
+async def _finalize_inspiration_read(
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    row,
+) -> InspirationRead:
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    access: str | None = None
+    if getattr(row, "image_asset_id", None):
+        ar = await db.get(AssetLibrary, row.image_asset_id)
+        if ar is not None and ar.user_id == current_user.id:
+            access = library_row_access_url(ar, icfg)
+    elif (row.image_url or "").strip():
+        access = (row.image_url or "").strip()
+    base = InspirationRead.model_validate(row)
+    return base.model_copy(update={"image_access_url": access})
+
+
 @router.get("", response_model=list[InspirationRead])
 async def list_inspirations_api(db: DBSessionDep, current_user: CurrentUserDep) -> list[InspirationRead]:
     rows = await list_inspirations(db, current_user.id)
-    return [InspirationRead.model_validate(x) for x in rows]
+    return [await _finalize_inspiration_read(db, current_user, x) for x in rows]
 
 
 @router.post("", response_model=InspirationRead, status_code=status.HTTP_201_CREATED)
@@ -48,12 +67,21 @@ async def create_inspiration_api(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> InspirationRead:
-    data = _normalize_create_payload(payload.model_dump())
+    data = payload.model_dump()
+    iaid = data.pop("image_asset_id", None)
+    if iaid is not None:
+        ar = await db.get(AssetLibrary, iaid)
+        if ar is None or ar.user_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="无效的图片素材 id")
+        data["image_asset_id"] = iaid
+        data["image_url"] = ar.file_url
+    data = _normalize_create_payload(data)
     if data.get("recorded_at") is None:
         data["recorded_at"] = datetime.now(timezone.utc)
     row = await create_inspiration(db, current_user.id, data)
     await db.commit()
-    return InspirationRead.model_validate(row)
+    await db.refresh(row)
+    return await _finalize_inspiration_read(db, current_user, row)
 
 
 @router.get("/{inspiration_id}", response_model=InspirationRead)
@@ -65,7 +93,7 @@ async def get_inspiration_api(
     row = await get_inspiration(db, current_user.id, inspiration_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="灵感不存在")
-    return InspirationRead.model_validate(row)
+    return await _finalize_inspiration_read(db, current_user, row)
 
 
 @router.put("/{inspiration_id}", response_model=InspirationRead)
@@ -80,31 +108,45 @@ async def update_inspiration_api(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="灵感不存在")
     patch = payload.model_dump(exclude_unset=True)
     if not patch:
-        return InspirationRead.model_validate(row)
+        return await _finalize_inspiration_read(db, current_user, row)
 
-    new_content = (patch["content"] if "content" in patch else row.content) or ""
-    new_content = new_content.strip()
-    if "image_url" in patch:
+    content = row.content if "content" not in patch else (patch.get("content") or "")
+    image_url = row.image_url
+    image_asset_id = row.image_asset_id
+
+    if "image_asset_id" in patch:
+        iaid = patch.get("image_asset_id")
+        if iaid is None:
+            image_asset_id = None
+            image_url = patch["image_url"] if "image_url" in patch else None
+        else:
+            ar = await db.get(AssetLibrary, iaid)
+            if ar is None or ar.user_id != current_user.id:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="无效的图片素材 id")
+            image_asset_id = iaid
+            image_url = ar.file_url
+    elif "image_url" in patch:
         raw_u = patch["image_url"]
-        new_image = None if raw_u is None else ((str(raw_u) or "").strip() or None)
-    else:
-        new_image = row.image_url
+        image_url = None if raw_u is None else ((str(raw_u) or "").strip() or None)
+        image_asset_id = None
 
-    if not new_content and not new_image:
+    text = (content or "").strip()
+    img = (image_url or "").strip() or None
+    if not text and not img:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="更新后须至少保留文字灵感或图片之一",
         )
-    if new_image and not new_content:
-        new_content = _PLACEHOLDER_IMAGE_ONLY
+    if img and not text:
+        content = _PLACEHOLDER_IMAGE_ONLY
+    else:
+        content = text or content or ""
 
-    apply_patch = {**patch, "content": new_content}
-    if "image_url" in patch:
-        apply_patch["image_url"] = new_image
+    apply_patch = {**patch, "content": content, "image_url": image_url, "image_asset_id": image_asset_id}
     row = await update_inspiration(db, row, apply_patch)
     await db.commit()
     await db.refresh(row)
-    return InspirationRead.model_validate(row)
+    return await _finalize_inspiration_read(db, current_user, row)
 
 
 @router.delete("/{inspiration_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -113,10 +155,6 @@ async def delete_inspiration_api(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> None:
-    """
-    删除灵感记录。图片若已上传至 OSS，与素材库策略一致：不在此接口删除远端对象，
-    避免误删仍被其他功能引用的同一 URL。
-    """
     row = await get_inspiration(db, current_user.id, inspiration_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="灵感不存在")
@@ -131,7 +169,6 @@ async def link_inspiration_plot_api(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> InspirationRead:
-    """将灵感标记为已生成剧情，并关联 sop_scripts 主键（plot_id）。"""
     row = await get_inspiration(db, current_user.id, inspiration_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="灵感不存在")
@@ -145,4 +182,4 @@ async def link_inspiration_plot_api(
     )
     await db.commit()
     await db.refresh(row)
-    return InspirationRead.model_validate(row)
+    return await _finalize_inspiration_read(db, current_user, row)

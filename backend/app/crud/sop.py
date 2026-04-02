@@ -202,6 +202,9 @@ async def create_sop_asset(session: AsyncSession, payload: dict) -> SopAsset:
         source = await session.get(SopAsset, source_asset_id)
         if source and not payload.get("file_url"):
             payload["file_url"] = source.file_url
+        if source and not payload.get("storage_object_key"):
+            payload["storage_platform"] = source.storage_platform
+            payload["storage_object_key"] = source.storage_object_key
         if source and not payload.get("prompt_text"):
             payload["prompt_text"] = source.prompt_text
         if source and not payload.get("asset_type"):

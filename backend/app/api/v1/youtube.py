@@ -21,7 +21,7 @@ from app.crud.youtube import (
     get_channel_histories_for_compare,
     get_video_for_user,
     list_user_competitor_channels,
-    list_distinct_monitored_channels,
+    list_distinct_monitored_channels_for_org,
     query_videos,
     upsert_channel,
     upsert_channel_history,
@@ -68,6 +68,7 @@ from app.services.youtube_service import (
     run_refresh_pipeline_for_youtube_channel_ids,
 )
 from app.services.quota_service import record_api_quota_usage, record_bulk_pipeline_quota
+from app.services.config_manager import resolve_integration_config
 
 
 router = APIRouter()
@@ -98,8 +99,9 @@ async def analyze_youtube_channel(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> YouTubeAnalyzeResponse:
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
     identifier = parse_youtube_identifier(payload.youtube_url)
-    item = await fetch_channel_info(identifier)
+    item = await fetch_channel_info(identifier, youtube_api_key=icfg.youtube_api_key)
     await record_api_quota_usage(db, "channels")
 
     snippet = item.get("snippet", {})
@@ -119,7 +121,10 @@ async def analyze_youtube_channel(
     )
 
     recent_videos_raw, fr_quota = await fetch_recent_videos(
-        channel_id=channel_id, limit=10, return_quota=True
+        channel_id=channel_id,
+        limit=10,
+        youtube_api_key=icfg.youtube_api_key,
+        return_quota=True,
     )
     await record_bulk_pipeline_quota(
         db,
@@ -149,7 +154,7 @@ async def analyze_youtube_channel(
     await db.commit()
     await db.refresh(channel)
 
-    if await enrich_youtube_channel_ai(db, channel):
+    if await enrich_youtube_channel_ai(db, channel, integration=icfg):
         await db.commit()
         await db.refresh(channel)
 
@@ -177,7 +182,8 @@ async def analyze_youtube_batch(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> YouTubeBatchAnalyzeResponse:
-    pipeline = await run_bulk_analyze_pipeline(payload.urls)
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    pipeline = await run_bulk_analyze_pipeline(payload.urls, youtube_api_key=icfg.youtube_api_key)
     if not pipeline.channel_items:
         raise HTTPException(
             status_code=400,
@@ -225,7 +231,7 @@ async def analyze_youtube_batch(
         ch = row.scalar_one_or_none()
         if ch is None:
             continue
-        if await enrich_youtube_channel_ai(db, ch):
+        if await enrich_youtube_channel_ai(db, ch, integration=icfg):
             await db.commit()
 
     return YouTubeBatchAnalyzeResponse(
@@ -442,9 +448,11 @@ async def scrape_video_comments(
     if video is None:
         raise HTTPException(status_code=404, detail="视频不存在或无权访问")
 
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
     parsed, api_calls = await fetch_comment_threads_with_search(
         video.yt_video_id,
         payload.keyword,
+        youtube_api_key=icfg.youtube_api_key,
         max_total=100,
     )
     quota_used = await record_api_quota_usage(db, "commentThreads", times=api_calls)
@@ -581,8 +589,8 @@ async def batch_update_channels(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> dict:
-    _ = current_user
-    channels = await list_distinct_monitored_channels(db)
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    channels = await list_distinct_monitored_channels_for_org(db, current_user.org_id)
     if not channels:
         return {"estimated_points": 0, "updated_channels": 0, "updated_videos": 0, "quota_used": 0}
 
@@ -590,7 +598,10 @@ async def batch_update_channels(
     # 最坏情况：channels 分块 + 每频道 playlistItems + 视频按 50 分块
     estimated_points = (n + 49) // 50 + 2 * n
 
-    pipeline = await run_refresh_pipeline_for_youtube_channel_ids([c.yt_channel_id for c in channels])
+    pipeline = await run_refresh_pipeline_for_youtube_channel_ids(
+        [c.yt_channel_id for c in channels],
+        youtube_api_key=icfg.youtube_api_key,
+    )
 
     quota_used = await record_bulk_pipeline_quota(
         db,
@@ -620,13 +631,13 @@ async def batch_update_channels(
 
     await db.commit()
 
-    monitored = await list_distinct_monitored_channels(db)
+    monitored = await list_distinct_monitored_channels_for_org(db, current_user.org_id)
     ai_enriched = 0
     ai_failed = 0
     for ch in monitored:
         if not channel_needs_ai_tag_fill(ch):
             continue
-        if await enrich_youtube_channel_ai(db, ch):
+        if await enrich_youtube_channel_ai(db, ch, integration=icfg):
             await db.commit()
             ai_enriched += 1
         else:

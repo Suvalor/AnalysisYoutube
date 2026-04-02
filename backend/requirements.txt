@@ -17,6 +17,7 @@ openai==1.52.2
 alibabacloud_sts20150401==1.2.0
 alibabacloud_tea_openapi==0.4.1
 oss2==2.19.1
+cos-python-sdk-v5>=1.9.0,<2
 paddleocr
 opencv-python
 numpy

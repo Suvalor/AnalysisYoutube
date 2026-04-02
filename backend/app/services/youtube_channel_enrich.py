@@ -16,6 +16,7 @@ from app.crud.youtube import create_youtube_channel_insight, update_channel_ai_i
 from app.models.library import ModelLibrary, PromptLibrary
 from app.models.youtube import YouTubeChannel, YouTubeComment, YouTubeVideo
 from app.services.field_encryption import try_decrypt
+from app.services.config_manager import ResolvedIntegrationConfig, merge_integration_config
 from app.services.youtube_ai_service import analyze_channel_ai_insight, build_channel_ai_messages
 
 logger = logging.getLogger(__name__)
@@ -92,10 +93,15 @@ def _ensure_llm_allowed_for_library(ml: ModelLibrary, llm_model_name: str) -> No
         )
 
 
-async def enrich_youtube_channel_ai(session: AsyncSession, channel: YouTubeChannel) -> bool:
+async def enrich_youtube_channel_ai(
+    session: AsyncSession,
+    channel: YouTubeChannel,
+    *,
+    integration: ResolvedIntegrationConfig | None = None,
+) -> bool:
     """
     基于频道简介、高播放量视频标题、视频标签与热门评论调用 LLM，写入 ai_tags / ai_expertise / ai_summary / ai_audience_age。
-    使用环境变量中的火山/OpenAI 兼容配置；失败时记录日志并返回 False。
+    integration 为合并后的用户+环境配置；未传时仅使用环境变量。
     """
     try:
         top_video_titles, merged_tags, hot_comments = await load_channel_ai_context(session, channel)
@@ -106,7 +112,8 @@ async def enrich_youtube_channel_ai(session: AsyncSession, channel: YouTubeChann
             merged_tags=merged_tags,
             hot_comments=hot_comments,
         )
-        ai_result = await analyze_channel_ai_insight(messages)
+        icfg = integration if integration is not None else merge_integration_config({})
+        ai_result = await analyze_channel_ai_insight(messages, integration=icfg)
 
         tags = list(ai_result["tags"]) if isinstance(ai_result.get("tags"), list) else []
         await update_channel_ai_insight(

@@ -41,6 +41,10 @@ export type SopAsset = {
   asset_type: string;
   name: string;
   file_url: string | null;
+  /** 私有桶展示用签名 URL（自定义域名） */
+  access_url?: string | null;
+  storage_platform?: string | null;
+  storage_object_key?: string | null;
   prompt_text: string | null;
   status: string;
   created_at: string;
@@ -52,6 +56,9 @@ export type SopMedia = {
   shot_id: number;
   media_type: string;
   file_url: string | null;
+  access_url?: string | null;
+  storage_platform?: string | null;
+  storage_object_key?: string | null;
   duration_seconds: number | null;
   status: string;
   created_at: string;
@@ -144,6 +151,8 @@ export async function createSopAssetApi(payload: {
   asset_type?: string;
   name: string;
   file_url?: string | null;
+  storage_platform?: string | null;
+  storage_object_key?: string | null;
   prompt_text?: string | null;
   status?: string;
 }) {

@@ -4,6 +4,7 @@ from app.api.v1 import ai
 from app.api.v1 import asset_library
 from app.api.v1 import auth
 from app.api.v1 import inspiration
+from app.api.v1 import integration_settings
 from app.api.v1 import jimeng
 from app.api.v1 import materials
 from app.api.v1 import model_library
@@ -37,4 +38,5 @@ api_router_v1.include_router(materials.router, prefix="/v1/materials", tags=["ma
 api_router_v1.include_router(video_projects.router, prefix="/video-projects", tags=["video-projects"])
 api_router_v1.include_router(oss.router, prefix="/oss", tags=["oss"])
 api_router_v1.include_router(users.router, prefix="/users", tags=["users"])
+api_router_v1.include_router(integration_settings.router, prefix="/users", tags=["integration-settings"])
 

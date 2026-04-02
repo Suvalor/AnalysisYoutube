@@ -45,7 +45,6 @@ services:
       VOLCENGINE_ENDPOINT_ID: doubao-seed-2.0-pro
       VOLCENGINE_BASE_URL: https://ark.cn-beijing.volces.com/api/coding/v3
       VOLCENGINE_MODEL_GEMINI: gemini-1.5-pro
-      VOLCENGINE_MODEL_CLAUDE: claude-3-5-sonnet
       ALIYUN_ACCESS_KEY_ID: LTAI5tLpJRy1E5eeUkg8csgm
       ALIYUN_ACCESS_KEY_SECRET: mriIs1IwxIYqsdpSjpYXwYAlKNbeWe
       ALIYUN_ROLE_ARN: acs:ram::1379506082945137:user/suvalor
@@ -54,6 +53,10 @@ services:
       ALIYUN_OSS_ENDPOINT: oss-cn-guangzhou.aliyuncs.com
     ports:
       - "8000:8000"
+    # 挂载本地 backend：容器内 Alembic/应用代码与仓库一致；宿主 entrypoint.sh 须可执行（chmod +x）
+    # 纯镜像部署到生产时，请删除本 volumes 段并仅使用 build 产物镜像
+    volumes:
+      - ./backend:/app
 
 volumes:
   mysql_data:

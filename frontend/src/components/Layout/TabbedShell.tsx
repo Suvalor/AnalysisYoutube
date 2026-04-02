@@ -116,8 +116,15 @@ function renderTabPanel(tab: TabItem) {
       return <ConfigCenter />;
     case "agent-edit":
       return <AgentEditorPage promptId={tab.promptId ?? Number((tab.path.match(/\/config\/agent\/edit\/(\d+)$/)?.[1] ?? 0))} />;
+    case "youtube-quota":
+    case "youtube-import":
+      return <Dashboard />;
     default:
-      return null;
+      return (
+        <div className="p-6 text-slate-600 text-sm">
+          无法识别该标签类型（{String(tab.type)}），请关闭标签后从左侧菜单重新打开对应页面。
+        </div>
+      );
   }
 }
 

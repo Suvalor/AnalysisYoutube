@@ -5,6 +5,7 @@ from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.user import User
 from app.models.youtube import (
     YouTubeChannel,
     YouTubeChannelHistory,
@@ -386,6 +387,19 @@ async def list_distinct_monitored_channels(session: AsyncSession) -> list[YouTub
     result = await session.execute(
         select(YouTubeChannel)
         .join(UserCompetitorPool, UserCompetitorPool.channel_id == YouTubeChannel.id)
+        .distinct()
+        .order_by(YouTubeChannel.id.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def list_distinct_monitored_channels_for_org(session: AsyncSession, org_id: int) -> list[YouTubeChannel]:
+    """某组织下：所有已加入监控池的频道（去重）。"""
+    result = await session.execute(
+        select(YouTubeChannel)
+        .join(UserCompetitorPool, UserCompetitorPool.channel_id == YouTubeChannel.id)
+        .join(User, User.id == UserCompetitorPool.user_id)
+        .where(User.org_id == org_id)
         .distinct()
         .order_by(YouTubeChannel.id.asc())
     )

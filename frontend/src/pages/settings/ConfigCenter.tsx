@@ -1,5 +1,5 @@
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
-import { Button, Form, Input, Modal, Popconfirm, Space, Spin, Table, Tabs, Tag, message } from "antd";
+import { Button, Card, Form, Input, Modal, Popconfirm, Radio, Space, Spin, Table, Tabs, Tag, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -20,9 +20,35 @@ import {
   type PromptItem,
   type StyleItem,
 } from "@/services/libraryApi";
+import {
+  deleteIntegrationSettingsApi,
+  getIntegrationSettingsApi,
+  testStorageIntegrationApi,
+  testYoutubeIntegrationApi,
+  updateIntegrationSettingsApi,
+  validateStorageCustomDomainApi,
+  type IntegrationSettingsRead,
+  type IntegrationSettingsUpdatePayload,
+} from "@/services/userApi";
+
+const SECRET_MASK = "********";
+
+/** 与后端 is_secret_placeholder 对齐：勿把占位符当新密钥提交 */
+function looksLikeMaskedSecret(s: string | undefined): boolean {
+  const t = (s ?? "").trim();
+  if (!t) return false;
+  if (t === SECRET_MASK) return true;
+  return /^[*•.·]+$/.test(t) && t.length >= 4;
+}
+
+function normStorageProviderRadio(raw: string | undefined): "ALIYUN" | "TENCENT" {
+  const u = (raw ?? "").trim().toUpperCase();
+  if (u === "ALIYUN" || u === "OSS" || u === "ALIYUN_OSS") return "ALIYUN";
+  return "TENCENT";
+}
 
 type EditorMode = "create" | "edit";
-type ActiveTabKey = "models" | "prompts" | "styles";
+type ActiveTabKey = "models" | "prompts" | "styles" | "integration";
 
 type ModelFormValues = {
   name: string;
@@ -34,6 +60,33 @@ type ModelFormValues = {
 type TextFormValues = {
   title: string;
   content: string;
+};
+
+type StorageFormValues = {
+  active_storage_provider: "ALIYUN" | "TENCENT";
+  aliyun_access_key_id: string;
+  aliyun_access_key_secret: string;
+  aliyun_role_arn: string;
+  aliyun_region_id: string;
+  aliyun_oss_bucket_name: string;
+  aliyun_oss_endpoint: string;
+  aliyun_custom_domain: string;
+  tencent_cos_secret_id: string;
+  tencent_cos_secret_key: string;
+  tencent_cos_region: string;
+  tencent_cos_bucket: string;
+  tencent_custom_domain: string;
+};
+
+type YoutubeFormValues = {
+  youtube_api_key: string;
+};
+
+type VolcFormValues = {
+  volcengine_api_key: string;
+  volcengine_endpoint_id: string;
+  volcengine_base_url: string;
+  volcengine_model_gemini: string;
 };
 
 export default function ConfigCenter() {
@@ -57,6 +110,16 @@ export default function ConfigCenter() {
 
   const [modelForm] = Form.useForm<ModelFormValues>();
   const [textForm] = Form.useForm<TextFormValues>();
+  const [storageForm] = Form.useForm<StorageFormValues>();
+  const [youtubeForm] = Form.useForm<YoutubeFormValues>();
+  const [volcForm] = Form.useForm<VolcFormValues>();
+  const [integrationMeta, setIntegrationMeta] = useState<IntegrationSettingsRead | null>(null);
+  const [integrationLoading, setIntegrationLoading] = useState(false);
+  const [integrationSaving, setIntegrationSaving] = useState(false);
+  const [integrationSubTab, setIntegrationSubTab] = useState<"storage" | "youtube" | "volc">("storage");
+  const [testYoutubeLoading, setTestYoutubeLoading] = useState(false);
+  const [testStorageLoading, setTestStorageLoading] = useState(false);
+  const [domainCheckLoading, setDomainCheckLoading] = useState<null | "aliyun" | "tencent">(null);
 
   const parseSupportedModels = (raw: string | null | undefined): Array<{ label: string; value: string }> => {
     if (!raw || !raw.trim()) return [];
@@ -103,12 +166,59 @@ export default function ConfigCenter() {
     void loadAll();
   }, [loadAll]);
 
+  const applyIntegrationReadToForms = useCallback((data: IntegrationSettingsRead) => {
+    setIntegrationMeta(data);
+    storageForm.setFieldsValue({
+      active_storage_provider: normStorageProviderRadio(data.active_storage_provider),
+      aliyun_access_key_id: data.aliyun_access_key_id || "",
+      aliyun_access_key_secret: "",
+      aliyun_role_arn: data.aliyun_role_arn || "",
+      aliyun_region_id: data.aliyun_region_id || "",
+      aliyun_oss_bucket_name: data.aliyun_oss_bucket_name || "",
+      aliyun_oss_endpoint: data.aliyun_oss_endpoint || "",
+      aliyun_custom_domain: data.aliyun_custom_domain || "",
+      tencent_cos_secret_id: data.tencent_cos_secret_id || "",
+      tencent_cos_secret_key: "",
+      tencent_cos_region: data.tencent_cos_region || "",
+      tencent_cos_bucket: data.tencent_cos_bucket || "",
+      tencent_custom_domain: data.tencent_custom_domain || "",
+    });
+    youtubeForm.setFieldsValue({ youtube_api_key: "" });
+    volcForm.setFieldsValue({
+      volcengine_api_key: "",
+      volcengine_endpoint_id: data.volcengine_endpoint_id || "",
+      volcengine_base_url: data.volcengine_base_url || "",
+      volcengine_model_gemini: data.volcengine_model_gemini || "",
+    });
+  }, [storageForm, youtubeForm, volcForm]);
+
+  const loadIntegration = useCallback(async () => {
+    setIntegrationLoading(true);
+    try {
+      const data = await getIntegrationSettingsApi();
+      applyIntegrationReadToForms(data);
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail ?? e?.message ?? "加载集成配置失败");
+    } finally {
+      setIntegrationLoading(false);
+    }
+  }, [applyIntegrationReadToForms]);
+
   useEffect(() => {
     const queryTab = new URLSearchParams(location.search).get("tab");
-    if (queryTab === "models" || queryTab === "prompts" || queryTab === "styles") {
+    if (
+      queryTab === "models" ||
+      queryTab === "prompts" ||
+      queryTab === "styles" ||
+      queryTab === "integration"
+    ) {
       setActiveTab(queryTab);
     }
   }, [location.search]);
+
+  useEffect(() => {
+    if (activeTab === "integration") void loadIntegration();
+  }, [activeTab, loadIntegration]);
 
   const openCreateModel = () => {
     setModelMode("create");
@@ -308,6 +418,129 @@ export default function ConfigCenter() {
     [loadAll, navigate]
   );
 
+  const trimOrNull = (s: string | undefined) => {
+    const t = (s ?? "").trim();
+    return t.length ? t : null;
+  };
+
+  const submitStorageSettings = async () => {
+    try {
+      const values = await storageForm.validateFields();
+      setIntegrationSaving(true);
+      const payload: IntegrationSettingsUpdatePayload = {
+        active_storage_provider: values.active_storage_provider,
+        aliyun_access_key_id: trimOrNull(values.aliyun_access_key_id),
+        aliyun_role_arn: trimOrNull(values.aliyun_role_arn),
+        aliyun_region_id: trimOrNull(values.aliyun_region_id),
+        aliyun_oss_bucket_name: trimOrNull(values.aliyun_oss_bucket_name),
+        aliyun_oss_endpoint: trimOrNull(values.aliyun_oss_endpoint),
+        aliyun_custom_domain: trimOrNull(values.aliyun_custom_domain),
+        tencent_cos_secret_id: trimOrNull(values.tencent_cos_secret_id),
+        tencent_cos_region: trimOrNull(values.tencent_cos_region),
+        tencent_cos_bucket: trimOrNull(values.tencent_cos_bucket),
+        tencent_custom_domain: trimOrNull(values.tencent_custom_domain),
+      };
+      const asec = (values.aliyun_access_key_secret ?? "").trim();
+      if (asec && !looksLikeMaskedSecret(asec)) payload.aliyun_access_key_secret = asec;
+      const tsec = (values.tencent_cos_secret_key ?? "").trim();
+      if (tsec && !looksLikeMaskedSecret(tsec)) payload.tencent_cos_secret_key = tsec;
+
+      const updated = await updateIntegrationSettingsApi(payload);
+      applyIntegrationReadToForms(updated);
+      message.success("云存储配置已保存（仅提交本页字段，组织内成员共享）");
+    } catch (e: any) {
+      if (e?.errorFields) return;
+      message.error(e?.response?.data?.detail ?? e?.message ?? "保存失败");
+    } finally {
+      setIntegrationSaving(false);
+    }
+  };
+
+  const submitYoutubeSettings = async () => {
+    try {
+      const values = await youtubeForm.validateFields();
+      setIntegrationSaving(true);
+      const payload: IntegrationSettingsUpdatePayload = {};
+      const y = (values.youtube_api_key ?? "").trim();
+      if (y && !looksLikeMaskedSecret(y)) payload.youtube_api_key = y;
+      const updated = await updateIntegrationSettingsApi(payload);
+      applyIntegrationReadToForms(updated);
+      message.success("YouTube 配置已保存");
+    } catch (e: any) {
+      if (e?.errorFields) return;
+      message.error(e?.response?.data?.detail ?? e?.message ?? "保存失败");
+    } finally {
+      setIntegrationSaving(false);
+    }
+  };
+
+  const submitVolcSettings = async () => {
+    try {
+      const values = await volcForm.validateFields();
+      setIntegrationSaving(true);
+      const payload: IntegrationSettingsUpdatePayload = {
+        volcengine_endpoint_id: trimOrNull(values.volcengine_endpoint_id),
+        volcengine_base_url: trimOrNull(values.volcengine_base_url),
+        volcengine_model_gemini: trimOrNull(values.volcengine_model_gemini),
+      };
+      const vk = (values.volcengine_api_key ?? "").trim();
+      if (vk && !looksLikeMaskedSecret(vk)) payload.volcengine_api_key = vk;
+      const updated = await updateIntegrationSettingsApi(payload);
+      applyIntegrationReadToForms(updated);
+      message.success("火山引擎配置已保存");
+    } catch (e: any) {
+      if (e?.errorFields) return;
+      message.error(e?.response?.data?.detail ?? e?.message ?? "保存失败");
+    } finally {
+      setIntegrationSaving(false);
+    }
+  };
+
+  const runTestYoutube = async () => {
+    setTestYoutubeLoading(true);
+    try {
+      const r = await testYoutubeIntegrationApi();
+      if (r.ok) message.success(r.message);
+      else message.error(r.message);
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail ?? e?.message ?? "测试失败");
+    } finally {
+      setTestYoutubeLoading(false);
+    }
+  };
+
+  const runTestStorage = async () => {
+    setTestStorageLoading(true);
+    try {
+      const r = await testStorageIntegrationApi();
+      if (r.ok) message.success(r.message);
+      else message.error(r.message);
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail ?? e?.message ?? "测试失败");
+    } finally {
+      setTestStorageLoading(false);
+    }
+  };
+
+  const runValidateStorageDomain = async (platform: "aliyun" | "tencent") => {
+    const field = platform === "aliyun" ? "aliyun_custom_domain" : "tencent_custom_domain";
+    const domain = ((storageForm.getFieldValue(field) as string | undefined) ?? "").trim();
+    if (!domain) {
+      message.warning("请先填写自定义访问域名（须含 https:// 或 http://）");
+      return;
+    }
+    setDomainCheckLoading(platform);
+    try {
+      const r = await validateStorageCustomDomainApi({ platform, domain });
+      if (r.ok) message.success(r.message);
+      else message.error(r.message);
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail ?? e?.message ?? "校验失败");
+    } finally {
+      setDomainCheckLoading(null);
+    }
+  };
+
   const styleColumns: ColumnsType<StyleItem> = useMemo(
     () => [
       { title: "名称", dataIndex: "title", key: "title" },
@@ -391,6 +624,230 @@ export default function ConfigCenter() {
                     </div>
                     <Table rowKey="id" columns={styleColumns} dataSource={styles} pagination={{ pageSize: 10 }} />
                   </>
+                ),
+              },
+              {
+                key: "integration",
+                label: "云存储与外部 API",
+                children: (
+                  <Spin spinning={integrationLoading}>
+                    <p className="text-slate-600 text-sm mb-3">
+                      配置归属组织：<strong>{integrationMeta?.org_name || "—"}</strong>
+                      （org_id: {integrationMeta?.org_id ?? "—"}）。<strong>组织库内配置优先于环境变量</strong>
+                      ；同组织成员共享。每页仅提交当前 Tab 的字段（增量合并）。请勿将接口返回的{" "}
+                      <code className="text-xs">{SECRET_MASK}</code> 当作新密钥填写。
+                    </p>
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      <Popconfirm
+                        title="确认清除本组织在库内的全部集成覆盖？"
+                        description="清除后本组织将完全依赖环境变量默认值。"
+                        onConfirm={async () => {
+                          try {
+                            await deleteIntegrationSettingsApi();
+                            message.success("已清除");
+                            await loadIntegration();
+                          } catch (e: any) {
+                            message.error(e?.response?.data?.detail ?? e?.message ?? "清除失败");
+                          }
+                        }}
+                      >
+                        <Button danger>清除本组织覆盖</Button>
+                      </Popconfirm>
+                    </div>
+                    <Tabs
+                      activeKey={integrationSubTab}
+                      onChange={(k) => setIntegrationSubTab(k as "storage" | "youtube" | "volc")}
+                      items={[
+                        {
+                          key: "storage",
+                          label: "云存储",
+                          children: (
+                            <div className="pt-2">
+                              <div className="mb-3 flex flex-wrap gap-2">
+                                <Button type="primary" loading={integrationSaving} onClick={() => void submitStorageSettings()}>
+                                  保存云存储配置
+                                </Button>
+                                <Button loading={testStorageLoading} onClick={() => void runTestStorage()}>
+                                  测试连接
+                                </Button>
+                              </div>
+                              <Form form={storageForm} layout="vertical" disabled={integrationLoading}>
+                                <Card size="small" title="存储平台（新上传默认）" className="mb-4">
+                                  <Form.Item
+                                    name="active_storage_provider"
+                                    label="默认提供商"
+                                    rules={[{ required: true, message: "请选择存储平台" }]}
+                                  >
+                                    <Radio.Group>
+                                      <Radio value="ALIYUN">阿里云 OSS</Radio>
+                                      <Radio value="TENCENT">腾讯云 COS</Radio>
+                                    </Radio.Group>
+                                  </Form.Item>
+                                </Card>
+                                <Card size="small" title="阿里云 OSS" className="mb-4">
+                                  <Form.Item name="aliyun_access_key_id" label="AccessKey ID">
+                                    <Input autoComplete="off" />
+                                  </Form.Item>
+                                  <Form.Item
+                                    name="aliyun_access_key_secret"
+                                    label="AccessKey Secret"
+                                    extra={
+                                      integrationMeta?.has_aliyun_access_key_secret
+                                        ? `已配置（展示为 ${SECRET_MASK}），留空不修改`
+                                        : undefined
+                                    }
+                                  >
+                                    <Input.Password
+                                      placeholder={
+                                        integrationMeta?.has_aliyun_access_key_secret
+                                          ? "留空不修改"
+                                          : "填写后写入组织配置"
+                                      }
+                                      autoComplete="new-password"
+                                    />
+                                  </Form.Item>
+                                  <Form.Item name="aliyun_role_arn" label="Role ARN（STS）">
+                                    <Input placeholder="acs:ram::..." />
+                                  </Form.Item>
+                                  <Form.Item name="aliyun_region_id" label="Region ID">
+                                    <Input placeholder="cn-hangzhou" />
+                                  </Form.Item>
+                                  <Form.Item name="aliyun_oss_bucket_name" label="Bucket">
+                                    <Input />
+                                  </Form.Item>
+                                  <Form.Item name="aliyun_oss_endpoint" label="Endpoint">
+                                    <Input placeholder="oss-cn-xxx.aliyuncs.com" />
+                                  </Form.Item>
+                                  <Form.Item
+                                    label="自定义访问域名 (Custom Domain)"
+                                    extra="对外展示与签名链接的 Host 将使用该域名（须与阿里云/CDN 绑定一致）。示例：https://cdn.example.com"
+                                  >
+                                    <Space.Compact className="w-full max-w-xl">
+                                      <Form.Item name="aliyun_custom_domain" noStyle>
+                                        <Input placeholder="https://cdn.example.com" allowClear />
+                                      </Form.Item>
+                                      <Button
+                                        loading={domainCheckLoading === "aliyun"}
+                                        onClick={() => void runValidateStorageDomain("aliyun")}
+                                      >
+                                        检查
+                                      </Button>
+                                    </Space.Compact>
+                                  </Form.Item>
+                                </Card>
+                                <Card size="small" title="腾讯云 COS">
+                                  <Form.Item name="tencent_cos_secret_id" label="SecretId">
+                                    <Input autoComplete="off" />
+                                  </Form.Item>
+                                  <Form.Item
+                                    name="tencent_cos_secret_key"
+                                    label="SecretKey"
+                                    extra={
+                                      integrationMeta?.has_tencent_cos_secret_key
+                                        ? `已配置（${SECRET_MASK}），留空不修改`
+                                        : undefined
+                                    }
+                                  >
+                                    <Input.Password placeholder="留空不修改" autoComplete="new-password" />
+                                  </Form.Item>
+                                  <Form.Item name="tencent_cos_region" label="Region">
+                                    <Input placeholder="ap-guangzhou" />
+                                  </Form.Item>
+                                  <Form.Item name="tencent_cos_bucket" label="Bucket">
+                                    <Input />
+                                  </Form.Item>
+                                  <Form.Item
+                                    label="自定义访问域名 (Custom Domain)"
+                                    extra="对外展示与签名链接的 Host 将使用该域名（须与 COS 自定义域名/CDN 一致）。示例：https://cdn.example.com"
+                                  >
+                                    <Space.Compact className="w-full max-w-xl">
+                                      <Form.Item name="tencent_custom_domain" noStyle>
+                                        <Input placeholder="https://cdn.example.com" allowClear />
+                                      </Form.Item>
+                                      <Button
+                                        loading={domainCheckLoading === "tencent"}
+                                        onClick={() => void runValidateStorageDomain("tencent")}
+                                      >
+                                        检查
+                                      </Button>
+                                    </Space.Compact>
+                                  </Form.Item>
+                                </Card>
+                              </Form>
+                            </div>
+                          ),
+                        },
+                        {
+                          key: "youtube",
+                          label: "YouTube Data API",
+                          children: (
+                            <div className="pt-2 max-w-xl">
+                              <div className="mb-3 flex flex-wrap gap-2">
+                                <Button type="primary" loading={integrationSaving} onClick={() => void submitYoutubeSettings()}>
+                                  保存 YouTube 配置
+                                </Button>
+                                <Button loading={testYoutubeLoading} onClick={() => void runTestYoutube()}>
+                                  测试连接
+                                </Button>
+                              </div>
+                              <Form form={youtubeForm} layout="vertical" disabled={integrationLoading}>
+                                <Form.Item
+                                  name="youtube_api_key"
+                                  label="YOUTUBE_API_KEY"
+                                  extra={
+                                    integrationMeta?.has_youtube_api_key
+                                      ? `已配置（${SECRET_MASK}），留空不修改；定时任务按组织使用该 Key`
+                                      : "未配置时使用环境变量"
+                                  }
+                                >
+                                  <Input.Password placeholder="粘贴新 Key 以覆盖组织配置" autoComplete="new-password" />
+                                </Form.Item>
+                              </Form>
+                            </div>
+                          ),
+                        },
+                        {
+                          key: "volc",
+                          label: "火山引擎（LLM）",
+                          children: (
+                            <div className="pt-2 max-w-xl">
+                              <div className="mb-3">
+                                <Button type="primary" loading={integrationSaving} onClick={() => void submitVolcSettings()}>
+                                  保存火山配置
+                                </Button>
+                              </div>
+                              <Form form={volcForm} layout="vertical" disabled={integrationLoading}>
+                                <Form.Item
+                                  name="volcengine_api_key"
+                                  label="API Key"
+                                  extra={
+                                    integrationMeta?.has_volcengine_api_key
+                                      ? `已配置（${SECRET_MASK}），留空不修改`
+                                      : undefined
+                                  }
+                                >
+                                  <Input.Password placeholder="留空不修改" autoComplete="new-password" />
+                                </Form.Item>
+                                <Form.Item name="volcengine_endpoint_id" label="Endpoint / 默认模型 ID">
+                                  <Input />
+                                </Form.Item>
+                                <Form.Item name="volcengine_base_url" label="Base URL">
+                                  <Input placeholder="https://ark.../v3" />
+                                </Form.Item>
+                                <Form.Item
+                                  name="volcengine_model_gemini"
+                                  label="Gemini 别名（gemini-1.5-pro）"
+                                  tooltip="Claude 别名使用 Endpoint ID"
+                                >
+                                  <Input />
+                                </Form.Item>
+                              </Form>
+                            </div>
+                          ),
+                        },
+                      ]}
+                    />
+                  </Spin>
                 ),
               },
             ]}
