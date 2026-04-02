@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1 import ai
 from app.api.v1 import asset_library
 from app.api.v1 import auth
+from app.api.v1 import inspiration
 from app.api.v1 import jimeng
 from app.api.v1 import materials
 from app.api.v1 import model_library
@@ -20,6 +21,7 @@ from app.api.v1 import youtube
 api_router_v1 = APIRouter()
 
 api_router_v1.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router_v1.include_router(inspiration.router, prefix="/inspirations", tags=["inspirations"])
 api_router_v1.include_router(youtube.router, prefix="/youtube", tags=["youtube"])
 api_router_v1.include_router(prompt_library.router, prefix="/libraries/prompts", tags=["prompt-library"])
 api_router_v1.include_router(style_library.router, prefix="/libraries/styles", tags=["style-library"])

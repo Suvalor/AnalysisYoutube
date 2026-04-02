@@ -4,6 +4,7 @@ import {
   Image,
   Kanban,
   Library,
+  Lightbulb,
   LogOut,
   Menu as MenuIcon,
   Settings,
@@ -29,6 +30,7 @@ import AiModelSettings from "@/pages/settings/AiModelSettings";
 import ConfigCenter from "@/pages/settings/ConfigCenter";
 import AgentEditorPage from "@/pages/settings/AgentEditorPage";
 import ScriptWorkflowSOP from "@/pages/sop/ScriptWorkflowSOP";
+import InspirationPool from "@/pages/inspiration/InspirationPool";
 
 type NavDef = {
   path: string;
@@ -44,6 +46,7 @@ const navDefs: NavDef[] = [
   { path: "/youtube/videos", label: "全局视频", icon: Youtube, type: "global-videos", tabId: "global-videos" },
   { path: "/ai-creator", label: "AI 剧本创作", icon: WandSparkles, type: "ai-creator", tabId: "ai-creator" },
   { path: "/config-center", label: "配置中心", icon: Settings, type: "config-center", tabId: "config-center" },
+  { path: "/inspiration-pool", label: "灵感池", icon: Lightbulb, type: "inspiration-pool", tabId: "inspiration-pool" },
   { path: "/knowledge-base", label: "知识库管理", icon: Library, type: "knowledge-base", tabId: "knowledge-base" },
   { path: "/assets", label: "素材库", icon: Image, type: "assets", tabId: "assets" },
   { path: "/video-board", label: "视频看板", icon: Kanban, type: "video-board", tabId: "video-board" },
@@ -72,6 +75,8 @@ function renderTabPanel(tab: TabItem) {
       return <VideoBoard />;
     case "sop-workflow":
       return <ScriptWorkflowSOP />;
+    case "inspiration-pool":
+      return <InspirationPool />;
     case "competitor-analysis":
       return <CompetitorAnalysis />;
     case "feishu-workspace":
@@ -107,9 +112,10 @@ export default function TabbedShell() {
 
   useEffect(() => {
     const path = location.pathname;
+    const fullPath = location.search ? `${path}${location.search}` : path;
     const def = navDefs.find((n) => n.path === path);
     if (def) {
-      openTab({ id: def.tabId, title: def.label, path: def.path, type: def.type });
+      openTab({ id: def.tabId, title: def.label, path: fullPath, type: def.type });
     }
     const m = path.match(/^\/youtube\/channel\/(\d+)$/);
     if (m) {
@@ -133,7 +139,7 @@ export default function TabbedShell() {
         promptId: pid,
       });
     }
-  }, [location.pathname, openTab]);
+  }, [location.pathname, location.search, openTab]);
 
   const pageTitle = useMemo(() => {
     const tab = tabs.find((x) => x.id === activeTabId);

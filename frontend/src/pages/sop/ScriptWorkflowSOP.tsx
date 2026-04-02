@@ -44,6 +44,7 @@ import {
   publishYouTubeApi,
   type YouTubeOAuthStatusResponse,
 } from "@/services/youtubeApi";
+import { linkInspirationPlotApi } from "@/services/inspirationApi";
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -57,6 +58,12 @@ type SourceScript = {
 export default function ScriptWorkflowSOP() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const inspirationIdParam = searchParams.get("inspirationId");
+  const inspirationLinkId = useMemo(() => {
+    if (!inspirationIdParam) return null;
+    const n = Number(inspirationIdParam);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [inspirationIdParam]);
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [splitting, setSplitting] = useState(false);
@@ -317,6 +324,20 @@ export default function ScriptWorkflowSOP() {
         .join("\n\n");
       setAiSegmentsMarkdown(hydrated);
       message.success("片段已保存到 segments");
+      if (inspirationLinkId) {
+        try {
+          await linkInspirationPlotApi(inspirationLinkId, { plot_id: sid });
+          message.success("灵感池已标记为「已生成剧情」并关联剧情 ID");
+        } catch (e: unknown) {
+          const msg =
+            e && typeof e === "object" && "response" in e
+              ? (e as { response?: { data?: { detail?: string } } }).response?.data?.detail
+              : undefined;
+          message.warning(
+            typeof msg === "string" ? msg : "关联灵感池失败，可在灵感池中查看或重试保存片段"
+          );
+        }
+      }
     } catch (e: any) {
       message.error(e?.response?.data?.detail ?? e?.message ?? "保存片段失败");
     } finally {
