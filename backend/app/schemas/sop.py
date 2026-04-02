@@ -95,6 +95,8 @@ class SopAssetCreate(BaseModel):
     asset_type: str = Field(default="image", max_length=32)
     name: str = Field(..., min_length=1, max_length=255)
     file_url: str | None = Field(None, max_length=1024)
+    storage_platform: str | None = Field(None, max_length=32)
+    storage_object_key: str | None = Field(None, max_length=512)
     prompt_text: str | None = None
     status: str = Field(default="draft", max_length=32)
 
@@ -104,6 +106,8 @@ class SopAssetUpdate(BaseModel):
     asset_type: str | None = Field(None, max_length=32)
     name: str | None = Field(None, min_length=1, max_length=255)
     file_url: str | None = Field(None, max_length=1024)
+    storage_platform: str | None = Field(None, max_length=32)
+    storage_object_key: str | None = Field(None, max_length=512)
     prompt_text: str | None = None
     status: str | None = Field(None, max_length=32)
 
@@ -115,6 +119,9 @@ class SopAssetRead(BaseModel):
     asset_type: str
     name: str
     file_url: str | None
+    storage_platform: str | None = None
+    storage_object_key: str | None = None
+    access_url: str | None = Field(default=None, description="展示用签名 URL")
     prompt_text: str | None
     status: str
     created_at: datetime
@@ -127,6 +134,8 @@ class SopMediaCreate(BaseModel):
     shot_id: int
     media_type: str = Field(default="video", max_length=16)
     file_url: str | None = Field(None, max_length=1024)
+    storage_platform: str | None = Field(None, max_length=32)
+    storage_object_key: str | None = Field(None, max_length=512)
     duration_seconds: float | None = None
     status: str = Field(default="pending", max_length=32)
 
@@ -134,6 +143,8 @@ class SopMediaCreate(BaseModel):
 class SopMediaUpdate(BaseModel):
     media_type: str | None = Field(None, max_length=16)
     file_url: str | None = Field(None, max_length=1024)
+    storage_platform: str | None = Field(None, max_length=32)
+    storage_object_key: str | None = Field(None, max_length=512)
     duration_seconds: float | None = None
     status: str | None = Field(None, max_length=32)
 
@@ -143,6 +154,9 @@ class SopMediaRead(BaseModel):
     shot_id: int
     media_type: str
     file_url: str | None
+    storage_platform: str | None = None
+    storage_object_key: str | None = None
+    access_url: str | None = None
     duration_seconds: float | None
     status: str
     created_at: datetime

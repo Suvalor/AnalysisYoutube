@@ -7,6 +7,8 @@ from app.models.yt_channel import YtChannel  # noqa: F401,E402
 from app.models.library import AssetLibrary, ModelLibrary, PromptLibrary, ScriptLibrary, StyleLibrary  # noqa: F401,E402
 from app.models.video_project import VideoProject  # noqa: F401,E402
 from app.models.inspiration import Inspiration  # noqa: F401,E402
+from app.models.organization import Organization  # noqa: F401,E402
+from app.models.org_settings import OrgSettings  # noqa: F401,E402
 from app.models.sop import SopAsset, SopMedia, SopScript, SopSegment, SopShot  # noqa: F401,E402
 from app.models.quota import ApiQuotaUsage  # noqa: F401,E402
 from app.models.youtube import (  # noqa: F401,E402

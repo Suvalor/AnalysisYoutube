@@ -46,7 +46,8 @@ function bubbleLayout(id: number, weight: number) {
 }
 
 function bubbleWeight(row: InspirationItem) {
-  return Math.max((row.content || "").length, row.image_url ? 72 : 0);
+  const hasImg = Boolean((row.image_access_url || row.image_url || "").trim());
+  return Math.max((row.content || "").length, hasImg ? 72 : 0);
 }
 
 function isPlotDone(row: InspirationItem) {
@@ -54,7 +55,10 @@ function isPlotDone(row: InspirationItem) {
 }
 
 function isPlaceholderOnlyText(row: InspirationItem) {
-  return (row.content || "").trim() === INSPIRATION_IMAGE_PLACEHOLDER && !!row.image_url?.trim();
+  return (
+    (row.content || "").trim() === INSPIRATION_IMAGE_PLACEHOLDER &&
+    !!(row.image_access_url || row.image_url || "").trim()
+  );
 }
 
 export default function InspirationPool() {
@@ -65,11 +69,13 @@ export default function InspirationPool() {
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
   const [draftImageUrl, setDraftImageUrl] = useState<string | null>(null);
+  const [draftImageAssetId, setDraftImageAssetId] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<InspirationItem | null>(null);
   const [editForm] = Form.useForm();
   const [editImageUrl, setEditImageUrl] = useState<string | null>(null);
+  const [editImageAssetId, setEditImageAssetId] = useState<number | null>(null);
   const [editUploading, setEditUploading] = useState(false);
 
   const contentWatch = Form.useWatch("content", form) as string | undefined;
@@ -106,15 +112,18 @@ export default function InspirationPool() {
     setBusy(true);
     try {
       const res = await uploadMaterialImageApi(file, false);
-      if (!res.file_url) {
-        message.error("上传未返回图片地址");
+      const show = (res.access_url || res.file_url || "").trim();
+      if (!show) {
+        message.error("上传未返回可访问地址");
         return;
       }
       if (mode === "create") {
-        setDraftImageUrl(res.file_url);
+        setDraftImageUrl(show);
+        setDraftImageAssetId(res.id);
         form.setFieldsValue({ content: "" });
       } else {
-        setEditImageUrl(res.file_url);
+        setEditImageUrl(show);
+        setEditImageAssetId(res.id);
         editForm.setFieldsValue({ content: "" });
       }
       message.success("图片已上传");
@@ -167,7 +176,8 @@ export default function InspirationPool() {
       const recorded = v.recorded_at as dayjs.Dayjs | undefined;
       await createInspirationApi({
         content: hasImg ? "" : text,
-        image_url: hasImg ? draftImageUrl : undefined,
+        image_asset_id: hasImg && draftImageAssetId != null ? draftImageAssetId : undefined,
+        image_url: hasImg && draftImageAssetId == null ? draftImageUrl : undefined,
         source: String(v.source || "").trim(),
         recorded_at: recorded ? recorded.toISOString() : undefined,
       });
@@ -175,6 +185,7 @@ export default function InspirationPool() {
       form.resetFields();
       form.setFieldsValue({ recorded_at: dayjs() });
       setDraftImageUrl(null);
+      setDraftImageAssetId(null);
       await reload();
     } catch (e: unknown) {
       if (e && typeof e === "object" && "errorFields" in e) return;
@@ -194,7 +205,8 @@ export default function InspirationPool() {
       source: row.source,
       recorded_at: dayjs(row.recorded_at),
     });
-    setEditImageUrl(row.image_url?.trim() || null);
+    setEditImageUrl((row.image_access_url || row.image_url || "").trim() || null);
+    setEditImageAssetId(row.image_asset_id ?? null);
     setEditOpen(true);
   };
 
@@ -213,16 +225,29 @@ export default function InspirationPool() {
     try {
       const v = await editForm.validateFields(["source", "recorded_at"]);
       const recorded = v.recorded_at as dayjs.Dayjs | undefined;
-      await updateInspirationApi(editing.id, {
-        content: hasImg ? "" : text,
-        image_url: hasImg ? editImageUrl : null,
+      const patch: Parameters<typeof updateInspirationApi>[1] = {
         source: String(v.source || "").trim(),
         recorded_at: recorded ? recorded.toISOString() : undefined,
-      });
+      };
+      if (hasImg) {
+        patch.content = "";
+        if (editImageAssetId != null) {
+          patch.image_asset_id = editImageAssetId;
+        } else {
+          patch.image_asset_id = null;
+          patch.image_url = editImageUrl;
+        }
+      } else {
+        patch.content = text;
+        patch.image_url = null;
+        patch.image_asset_id = null;
+      }
+      await updateInspirationApi(editing.id, patch);
       message.success("已更新");
       setEditOpen(false);
       setEditing(null);
       setEditImageUrl(null);
+      setEditImageAssetId(null);
       await reload();
     } catch (e: unknown) {
       if (e && typeof e === "object" && "errorFields" in e) return;
@@ -240,9 +265,9 @@ export default function InspirationPool() {
       key: "preview",
       width: 72,
       render: (_, row) =>
-        row.image_url ? (
+        row.image_url || row.image_access_url ? (
           <img
-            src={row.image_url}
+            src={row.image_access_url || row.image_url || ""}
             alt=""
             className="w-11 h-11 rounded-md object-cover border border-slate-200"
           />
@@ -327,10 +352,10 @@ export default function InspirationPool() {
 
   const bubbleContent = (row: InspirationItem) => (
     <div className="max-w-sm">
-      {row.image_url ? (
+      {(row.image_access_url || row.image_url) ? (
         <div className="mb-2">
           <img
-            src={row.image_url}
+            src={row.image_access_url || row.image_url || ""}
             alt=""
             className="max-h-48 w-full rounded-lg object-contain bg-slate-100 border border-slate-200"
           />
@@ -387,7 +412,10 @@ export default function InspirationPool() {
               placeholder={draftImageUrl ? "已选择图片模式，请先移除图片再输入文字" : "写下你的想法…"}
               disabled={!!draftImageUrl}
               onChange={(e) => {
-                if (e.target.value.trim()) setDraftImageUrl(null);
+                if (e.target.value.trim()) {
+                  setDraftImageUrl(null);
+                  setDraftImageAssetId(null);
+                }
               }}
             />
           </Form.Item>
@@ -427,7 +455,10 @@ export default function InspirationPool() {
                       type="default"
                       size="small"
                       icon={<Trash2 size={14} />}
-                      onClick={() => setDraftImageUrl(null)}
+                      onClick={() => {
+                        setDraftImageUrl(null);
+                        setDraftImageAssetId(null);
+                      }}
                     >
                       移除图片
                     </Button>
@@ -483,7 +514,7 @@ export default function InspirationPool() {
             {rows.map((row) => {
               const { leftPct, topPct, size } = bubbleLayout(row.id, bubbleWeight(row));
               const done = isPlotDone(row);
-              const img = row.image_url?.trim();
+              const img = (row.image_access_url || row.image_url || "").trim();
               return (
                 <Popover key={row.id} title={`灵感 #${row.id}`} content={bubbleContent(row)} trigger="click">
                   <button
@@ -532,6 +563,7 @@ export default function InspirationPool() {
           setEditOpen(false);
           setEditing(null);
           setEditImageUrl(null);
+          setEditImageAssetId(null);
         }}
         onOk={() => void submitEdit()}
         destroyOnClose
@@ -545,7 +577,10 @@ export default function InspirationPool() {
               placeholder={editImageUrl ? "已选择图片模式，请先移除图片" : ""}
               disabled={!!editImageUrl}
               onChange={(e) => {
-                if (e.target.value.trim()) setEditImageUrl(null);
+                if (e.target.value.trim()) {
+                  setEditImageUrl(null);
+                  setEditImageAssetId(null);
+                }
               }}
             />
           </Form.Item>
@@ -571,7 +606,14 @@ export default function InspirationPool() {
               {editImageUrl ? (
                 <div className="flex items-start gap-3">
                   <img src={editImageUrl} alt="" className="h-20 w-20 rounded object-cover border" />
-                  <Button size="small" danger onClick={() => setEditImageUrl(null)}>
+                  <Button
+                    size="small"
+                    danger
+                    onClick={() => {
+                      setEditImageUrl(null);
+                      setEditImageAssetId(null);
+                    }}
+                  >
                     移除图片
                   </Button>
                 </div>

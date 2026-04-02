@@ -5,20 +5,9 @@ import httpx
 from openai import AsyncOpenAI
 import re
 
-from app.core.config import settings
 from app.models.user import User
+from app.services.config_manager import ResolvedIntegrationConfig, resolve_model_alias_for_volcengine
 from app.services.script_user_ai import parse_models_from_user_json, user_custom_openai_credentials
-
-
-def _resolve_model_name(model_alias: str) -> str:
-    model_alias = (model_alias or "").strip()
-    if not model_alias:
-        return settings.volcengine_endpoint_id
-    alias_map = {
-        "gemini-1.5-pro": settings.volcengine_model_gemini or settings.volcengine_endpoint_id,
-        "claude-3-5-sonnet": settings.volcengine_model_claude or settings.volcengine_endpoint_id,
-    }
-    return alias_map.get(model_alias, model_alias)
 
 
 async def split_outline_markdown_with_ai(
@@ -27,6 +16,7 @@ async def split_outline_markdown_with_ai(
     outline_markdown: str,
     model: str | None = None,
     agent_prompt: str | None = None,
+    integration: ResolvedIntegrationConfig | None = None,
 ) -> str:
     parts: list[str] = []
     async for chunk in split_outline_markdown_with_ai_stream(
@@ -34,6 +24,7 @@ async def split_outline_markdown_with_ai(
         outline_markdown=outline_markdown,
         model=model,
         agent_prompt=agent_prompt,
+        integration=integration,
     ):
         parts.append(chunk)
     return "".join(parts).strip()
@@ -45,6 +36,7 @@ async def split_outline_markdown_with_ai_stream(
     outline_markdown: str,
     model: str | None = None,
     agent_prompt: str | None = None,
+    integration: ResolvedIntegrationConfig | None = None,
 ) -> AsyncGenerator[str, None]:
     fast_result = _fast_split_markdown(outline_markdown)
     if fast_result:
@@ -57,9 +49,11 @@ async def split_outline_markdown_with_ai_stream(
         default_model = parse_models_from_user_json(user.ai_models_json)[0]["value"]
         resolved_model = (model or default_model or "").strip()
     else:
-        api_key = settings.volcengine_api_key
-        base_url = settings.volcengine_base_url
-        resolved_model = _resolve_model_name(model or "")
+        if integration is None:
+            raise ValueError("未配置自建 LLM 时，必须在请求内解析并传入用户集成配置 integration")
+        api_key = integration.volcengine_api_key
+        base_url = integration.volcengine_base_url
+        resolved_model = resolve_model_alias_for_volcengine(model or "", integration)
     if not api_key or not base_url or not resolved_model:
         raise ValueError("LLM 配置不完整，无法执行 AI 拆解")
 

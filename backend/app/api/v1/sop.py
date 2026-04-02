@@ -40,6 +40,8 @@ from app.crud.sop import (
 )
 from app.crud.library import get_by_user
 from app.models.library import PromptLibrary
+from app.services.asset_access_service import sop_file_access_url
+from app.services.config_manager import resolve_integration_config
 from app.schemas.sop import (
     SopAssetCreate,
     SopAiSplitRequest,
@@ -65,6 +67,26 @@ from app.services.sop_ai_service import split_outline_markdown_with_ai_stream
 
 
 router = APIRouter()
+
+
+def _sop_asset_read_with_access(icfg, row) -> SopAssetRead:
+    au = sop_file_access_url(
+        storage_platform=row.storage_platform,
+        storage_object_key=row.storage_object_key,
+        file_url=row.file_url,
+        cfg=icfg,
+    )
+    return SopAssetRead.model_validate(row).model_copy(update={"access_url": au})
+
+
+def _sop_media_read_with_access(icfg, row) -> SopMediaRead:
+    au = sop_file_access_url(
+        storage_platform=row.storage_platform,
+        storage_object_key=row.storage_object_key,
+        file_url=row.file_url,
+        cfg=icfg,
+    )
+    return SopMediaRead.model_validate(row).model_copy(update={"access_url": au})
 
 
 @dataclass
@@ -112,10 +134,19 @@ async def _run_ai_split_task(task_id: str) -> None:
     await state.queue.put({"type": "status", "status": "running"})
     user_obj = SimpleNamespace(**state.user_snapshot)
     try:
+        from app.db.session import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as session:
+            from app.models.user import User as UserModel
+
+            u = await session.get(UserModel, state.user_id)
+            oid = int(u.org_id) if u and u.org_id is not None else None
+            icfg = await resolve_integration_config(session, org_id=oid)
         async for delta in split_outline_markdown_with_ai_stream(
             user=user_obj,
             outline_markdown=state.outline_markdown,
             model=state.model,
+            integration=icfg,
         ):
             if not delta:
                 continue
@@ -224,6 +255,8 @@ async def ai_split_segments(
             raise HTTPException(status_code=404, detail="智能体/提示词不存在")
         selected_agent_prompt = (row.content or "").strip() or None
 
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+
     async def event_generator():
         try:
             async for delta in split_outline_markdown_with_ai_stream(
@@ -231,6 +264,7 @@ async def ai_split_segments(
                 outline_markdown=outline,
                 model=selected_model,
                 agent_prompt=selected_agent_prompt,
+                integration=icfg,
             ):
                 if not delta:
                     continue
@@ -479,7 +513,8 @@ async def list_assets(
     shot_id: int | None = Query(None),
 ) -> list[SopAssetRead]:
     rows = await list_sop_assets(db, current_user.id, shot_id)
-    return [SopAssetRead.model_validate(x) for x in rows]
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    return [_sop_asset_read_with_access(icfg, x) for x in rows]
 
 
 @router.post("/assets", response_model=SopAssetRead)
@@ -492,7 +527,8 @@ async def create_asset(payload: SopAssetCreate, db: DBSessionDep, current_user: 
         if source is None:
             raise HTTPException(status_code=404, detail="source_asset_id 对应资产不存在")
     row = await create_sop_asset(db, payload.model_dump())
-    return SopAssetRead.model_validate(row)
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    return _sop_asset_read_with_access(icfg, row)
 
 
 @router.get("/assets/{asset_id}", response_model=SopAssetRead)
@@ -500,7 +536,8 @@ async def get_asset(asset_id: int, db: DBSessionDep, current_user: CurrentUserDe
     row = await get_sop_asset(db, current_user.id, asset_id)
     if row is None:
         raise HTTPException(status_code=404, detail="资产不存在")
-    return SopAssetRead.model_validate(row)
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    return _sop_asset_read_with_access(icfg, row)
 
 
 @router.put("/assets/{asset_id}", response_model=SopAssetRead)
@@ -519,7 +556,8 @@ async def update_asset(
         if source is None:
             raise HTTPException(status_code=404, detail="source_asset_id 对应资产不存在")
     row = await update_sop_asset(db, row, updates)
-    return SopAssetRead.model_validate(row)
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    return _sop_asset_read_with_access(icfg, row)
 
 
 @router.delete("/assets/{asset_id}")
@@ -538,7 +576,8 @@ async def list_media(
     shot_id: int | None = Query(None),
 ) -> list[SopMediaRead]:
     rows = await list_sop_media(db, current_user.id, shot_id)
-    return [SopMediaRead.model_validate(x) for x in rows]
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    return [_sop_media_read_with_access(icfg, x) for x in rows]
 
 
 @router.post("/media", response_model=SopMediaRead)
@@ -547,7 +586,8 @@ async def create_media(payload: SopMediaCreate, db: DBSessionDep, current_user: 
     if shot is None:
         raise HTTPException(status_code=404, detail="所属分镜不存在")
     row = await create_sop_media(db, payload.model_dump())
-    return SopMediaRead.model_validate(row)
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    return _sop_media_read_with_access(icfg, row)
 
 
 @router.get("/media/{media_id}", response_model=SopMediaRead)
@@ -555,7 +595,8 @@ async def get_media(media_id: int, db: DBSessionDep, current_user: CurrentUserDe
     row = await get_sop_media(db, current_user.id, media_id)
     if row is None:
         raise HTTPException(status_code=404, detail="媒体不存在")
-    return SopMediaRead.model_validate(row)
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    return _sop_media_read_with_access(icfg, row)
 
 
 @router.put("/media/{media_id}", response_model=SopMediaRead)
@@ -569,7 +610,8 @@ async def update_media(
     if row is None:
         raise HTTPException(status_code=404, detail="媒体不存在")
     row = await update_sop_media(db, row, payload.model_dump(exclude_unset=True))
-    return SopMediaRead.model_validate(row)
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    return _sop_media_read_with_access(icfg, row)
 
 
 @router.delete("/media/{media_id}")

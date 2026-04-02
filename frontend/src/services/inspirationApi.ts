@@ -5,6 +5,9 @@ export type InspirationItem = {
   user_id: number;
   content: string;
   image_url: string | null;
+  image_asset_id: number | null;
+  /** 后端签名 URL，私有桶展示用 */
+  image_access_url: string | null;
   source: string;
   recorded_at: string;
   status: string;
@@ -18,7 +21,7 @@ export const INSPIRATION_IMAGE_PLACEHOLDER = "（图片灵感）";
 
 /** 生成进入 SOP 剧情拆解用的剧本大纲：包含正文与 Markdown 图片语法及 URL 文本，便于模型理解 */
 export function buildScriptOutlineFromInspiration(row: InspirationItem): string {
-  const url = row.image_url?.trim();
+  const url = (row.image_access_url || row.image_url || "").trim();
   const textRaw = (row.content || "").trim();
   const text = textRaw === INSPIRATION_IMAGE_PLACEHOLDER ? "" : textRaw;
   const parts: string[] = [];
@@ -35,6 +38,8 @@ export function buildScriptOutlineFromInspiration(row: InspirationItem): string 
 export type InspirationCreatePayload = {
   content?: string;
   image_url?: string | null;
+  /** 上传素材接口返回的 id，与 image_url 二选一（新流程推荐） */
+  image_asset_id?: number | null;
   source?: string;
   /** ISO 字符串，可选 */
   recorded_at?: string | null;

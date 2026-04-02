@@ -22,3 +22,87 @@ export async function updateUserSettingsApi(payload: UserSettingsUpdatePayload) 
   const res = await apiClient.put("/api/users/me/settings", payload);
   return res.data as UserSettings;
 }
+
+/** 组织级集成配置（合并后非密钥 + has_* + display 占位，勿将 display 当密钥提交） */
+export type IntegrationSettingsRead = {
+  org_id: number;
+  org_name: string;
+  active_storage_provider: string;
+  aliyun_access_key_id: string;
+  aliyun_role_arn: string;
+  aliyun_region_id: string;
+  aliyun_oss_bucket_name: string;
+  aliyun_oss_endpoint: string;
+  aliyun_custom_domain: string;
+  tencent_cos_secret_id: string;
+  tencent_cos_region: string;
+  tencent_cos_bucket: string;
+  tencent_custom_domain: string;
+  volcengine_endpoint_id: string;
+  volcengine_base_url: string;
+  volcengine_model_gemini: string;
+  has_youtube_api_key: boolean;
+  has_aliyun_access_key_secret: boolean;
+  has_tencent_cos_secret_key: boolean;
+  has_volcengine_api_key: boolean;
+  youtube_api_key_display: string | null;
+  aliyun_access_key_secret_display: string | null;
+  tencent_cos_secret_key_display: string | null;
+  volcengine_api_key_display: string | null;
+};
+
+export type IntegrationTestResult = { ok: boolean; message: string };
+
+export type IntegrationSettingsUpdatePayload = Partial<{
+  youtube_api_key: string | null;
+  active_storage_provider: string | null;
+  aliyun_access_key_id: string | null;
+  aliyun_access_key_secret: string | null;
+  aliyun_role_arn: string | null;
+  aliyun_region_id: string | null;
+  aliyun_oss_bucket_name: string | null;
+  aliyun_oss_endpoint: string | null;
+  aliyun_custom_domain: string | null;
+  tencent_cos_secret_id: string | null;
+  tencent_cos_secret_key: string | null;
+  tencent_cos_region: string | null;
+  tencent_cos_bucket: string | null;
+  tencent_custom_domain: string | null;
+  volcengine_api_key: string | null;
+  volcengine_endpoint_id: string | null;
+  volcengine_base_url: string | null;
+  volcengine_model_gemini: string | null;
+}>;
+
+export async function getIntegrationSettingsApi() {
+  const res = await apiClient.get("/api/users/me/integration-settings");
+  return res.data as IntegrationSettingsRead;
+}
+
+export async function updateIntegrationSettingsApi(payload: IntegrationSettingsUpdatePayload) {
+  const res = await apiClient.put("/api/users/me/integration-settings", payload);
+  return res.data as IntegrationSettingsRead;
+}
+
+export async function deleteIntegrationSettingsApi() {
+  await apiClient.delete("/api/users/me/integration-settings");
+}
+
+export async function testYoutubeIntegrationApi() {
+  const res = await apiClient.post("/api/users/me/integration-settings/test-youtube");
+  return res.data as IntegrationTestResult;
+}
+
+export async function testStorageIntegrationApi() {
+  const res = await apiClient.post("/api/users/me/integration-settings/test-storage");
+  return res.data as IntegrationTestResult;
+}
+
+/** 校验自定义访问域名格式与网络可达性（不写入数据库） */
+export async function validateStorageCustomDomainApi(payload: {
+  platform: "aliyun" | "tencent";
+  domain: string;
+}) {
+  const res = await apiClient.post("/api/users/me/integration-settings/validate-storage-custom-domain", payload);
+  return res.data as IntegrationTestResult;
+}

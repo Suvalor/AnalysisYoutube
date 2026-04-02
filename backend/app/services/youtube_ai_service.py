@@ -5,7 +5,7 @@ import httpx
 from fastapi import HTTPException, status
 from openai import AsyncOpenAI
 
-from app.core.config import settings
+from app.services.config_manager import ResolvedIntegrationConfig, merge_integration_config
 
 
 def _extract_json_object(raw_text: str) -> dict[str, Any]:
@@ -117,18 +117,20 @@ async def analyze_channel_ai_insight(
     api_key: str | None = None,
     base_url: str | None = None,
     model: str | None = None,
+    integration: ResolvedIntegrationConfig | None = None,
 ) -> dict[str, str | list[str]]:
     """
     使用 OpenAI 兼容的 chat.completions 调用 LLM（适用于配置中心自建网关、火山 OpenAI 兼容端等）。
-    未传 api_key/base_url/model 时回退到环境变量中的火山引擎配置。
+    未传 api_key/base_url/model 时，使用 integration 合并结果（默认同 merge_integration_config({})，即仅环境变量）。
     """
-    key = (api_key or settings.volcengine_api_key or "").strip()
-    base = (base_url or settings.volcengine_base_url or "").strip().rstrip("/")
-    m = (model or settings.volcengine_endpoint_id or "").strip()
+    icfg = integration if integration is not None else merge_integration_config({})
+    key = (api_key or icfg.volcengine_api_key or "").strip()
+    base = (base_url or icfg.volcengine_base_url or "").strip().rstrip("/")
+    m = (model or icfg.volcengine_endpoint_id or "").strip()
     if not key or not base or not m:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="LLM 配置不完整：请检查 API Key、Base URL 与模型名（或环境变量 VOLCENGINE_*）",
+            detail="LLM 配置不完整：请检查 API Key、Base URL 与模型名（设置中心集成配置或环境变量 VOLCENGINE_*）",
         )
 
     system_prompt = ""

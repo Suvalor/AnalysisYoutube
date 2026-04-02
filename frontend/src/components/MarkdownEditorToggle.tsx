@@ -1,5 +1,4 @@
-import { Segmented } from "antd";
-import TextArea from "antd/es/input/TextArea";
+import { Input, Segmented } from "antd";
 import { useMemo, useState } from "react";
 import MarkdownPreview from "@/components/MarkdownPreview";
 
@@ -35,7 +34,7 @@ export default function MarkdownEditorToggle({
         <Segmented value={mode} onChange={(v) => setMode(v as "edit" | "preview")} options={options} />
       </div>
       {mode === "edit" ? (
-        <TextArea
+        <Input.TextArea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}

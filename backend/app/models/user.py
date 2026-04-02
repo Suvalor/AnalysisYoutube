@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
+
+if TYPE_CHECKING:
+    from app.models.organization import Organization
 
 
 class User(Base):
@@ -22,6 +26,14 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1")
+    org_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("organizations.id", ondelete="RESTRICT"),
+        nullable=False,
+        server_default="1",
+        index=True,
+    )
+    organization: Mapped["Organization"] = relationship("Organization", back_populates="users")
     feishu_doc_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     ai_api_base_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     ai_models_json: Mapped[str | None] = mapped_column(Text, nullable=True)

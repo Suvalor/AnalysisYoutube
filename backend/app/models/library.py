@@ -65,6 +65,9 @@ class AssetLibrary(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     file_type: Mapped[str] = mapped_column(String(20), nullable=False)
     file_url: Mapped[str] = mapped_column(String(1024), nullable=False)
+    source: Mapped[str] = mapped_column(String(32), nullable=False, default="MANUAL", server_default="MANUAL")
+    storage_platform: Mapped[str] = mapped_column(String(32), nullable=False, default="aliyun", server_default="aliyun")
+    storage_object_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
     file_size: Mapped[int | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

@@ -1,8 +1,20 @@
 import axios from "axios";
 
+/**
+ * 统一后端根地址：所有请求路径均以 `/api/...` 开头。
+ * 若环境变量写成 `https://host/api`，axios 会拼成 `https://host/api/api/...` 导致 404。
+ */
+function normalizeBackendBaseURL(raw: string | undefined): string {
+  let base = (raw?.trim() || "http://localhost:8000").replace(/\/+$/, "");
+  if (base.endsWith("/api")) {
+    base = base.slice(0, -4).replace(/\/+$/, "");
+  }
+  return base || "http://localhost:8000";
+}
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000",
-  timeout: 10000
+  baseURL: normalizeBackendBaseURL(import.meta.env.VITE_API_BASE_URL),
+  timeout: 10000,
 });
 
 apiClient.interceptors.request.use((config) => {
