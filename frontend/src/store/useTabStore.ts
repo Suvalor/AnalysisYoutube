@@ -14,6 +14,7 @@ export type TabType =
   | "assets"
   | "video-board"
   | "feishu-workspace"
+  | "feishu-viewer"
   | "ai-model-settings"
   | "config-center"
   | "sop-workflow"
@@ -29,6 +30,8 @@ export type TabItem = {
   channelId?: number;
   /** 仅 type 为 agent-edit 时使用 */
   promptId?: number;
+  /** 仅 type 为 feishu-viewer 时使用 */
+  feishuDocId?: number;
 };
 
 type TabState = {

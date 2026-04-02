@@ -4,12 +4,14 @@ import mimetypes
 import secrets
 import tempfile
 from urllib.parse import urlencode
+import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 import httpx
 from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DBSessionDep
+from app.db.session import AsyncSessionLocal
 from app.core.config import settings
 from app.crud.youtube import (
     bulk_upsert_channels_from_api_items,
@@ -34,6 +36,7 @@ from app.schemas.youtube import (
     CommentScrapeResponse,
     QuotaDashboardResponse,
     UserCompetitorChannelItem,
+    SubmitTaskResponse,
     YouTubeAnalyzeRequest,
     YouTubeAnalyzeResponse,
     YouTubeBatchAnalyzeRequest,
@@ -55,6 +58,8 @@ from app.services.field_encryption import encrypt_plaintext, try_decrypt
 from app.services.youtube_channel_enrich import (
     channel_needs_ai_tag_fill,
     enrich_youtube_channel_ai,
+    enrich_youtube_channel_ai_sync,
+    enrich_youtube_channel_info_ai_sync,
     run_channel_detail_ai_analysis,
 )
 from app.services.youtube_service import (
@@ -66,12 +71,14 @@ from app.services.youtube_service import (
     parse_youtube_identifier,
     run_bulk_analyze_pipeline,
     run_refresh_pipeline_for_youtube_channel_ids,
+    split_url_segments,
 )
 from app.services.quota_service import record_api_quota_usage, record_bulk_pipeline_quota
 from app.services.config_manager import resolve_integration_config
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _video_to_read(x: YouTubeVideo) -> YouTubeVideoRead:
@@ -172,74 +179,227 @@ async def analyze_youtube_channel(
     )
 
 
+async def _process_analyze_youtube_batch_task(
+    *,
+    urls: list[str],
+    group_name: str,
+    user_id: int,
+    org_id: int,
+) -> None:
+    """后台任务：批量添加关注（YouTube + AI 都在后台执行）。"""
+    async with AsyncSessionLocal() as session:
+        icfg = await resolve_integration_config(session, org_id=org_id)
+        youtube_api_key = (icfg.youtube_api_key or "").strip()
+        if not youtube_api_key:
+            logger.warning("后台批量添加失败：未配置 YouTube Data API Key org_id=%s", org_id)
+            return
+
+        processed_count = 0
+        for raw_url in urls:
+            channel: YouTubeChannel | None = None
+            try:
+                identifier = parse_youtube_identifier(raw_url)
+                item = await fetch_channel_info(identifier, youtube_api_key=youtube_api_key)
+
+                await record_api_quota_usage(session, "channels")
+
+                snippet = item.get("snippet", {})
+                statistics = item.get("statistics", {})
+                yt_channel_id = item.get("id", "") or ""
+                if not yt_channel_id:
+                    logger.warning("后台批量添加：未解析到频道 ID raw_url=%r", raw_url)
+                    continue
+
+                channel = await upsert_channel(
+                    session=session,
+                    yt_channel_id=yt_channel_id,
+                    title=snippet.get("title", ""),
+                    description=snippet.get("description", ""),
+                    thumbnail_url=(snippet.get("thumbnails", {}).get("high", {}) or {}).get("url"),
+                    subscriber_count=int(statistics.get("subscriberCount", 0)),
+                    total_views=int(statistics.get("viewCount", 0)),
+                    video_count=int(statistics.get("videoCount", 0)),
+                    published_at=parse_datetime(snippet.get("publishedAt")),
+                )
+                await session.commit()
+                await session.refresh(channel)
+
+                # AI 非流式打标签：失败也不应中断该 URL
+                try:
+                    await enrich_youtube_channel_info_ai_sync(session, channel, integration=icfg)
+                except Exception:  # noqa: BLE001
+                    await session.rollback()
+                    logger.exception("后台批量添加：AI 打标签失败 raw_url=%r", raw_url)
+
+                recent_videos_raw, fr_quota = await fetch_recent_videos(
+                    channel_id=yt_channel_id,
+                    limit=10,
+                    youtube_api_key=youtube_api_key,
+                    return_quota=True,
+                )
+
+                _ = await record_bulk_pipeline_quota(
+                    session,
+                    for_handle_calls=0,
+                    channels_list_calls=fr_quota.channels_calls,
+                    playlist_items_calls=fr_quota.playlist_items_calls,
+                    videos_list_calls=fr_quota.videos_list_calls,
+                )
+
+                for video in recent_videos_raw:
+                    video.setdefault("_parsed_published_at", parse_datetime(video.get("snippet", {}).get("publishedAt")))
+
+                _ = await upsert_videos(
+                    session=session,
+                    channel_id=channel.id,
+                    videos=recent_videos_raw,
+                )
+
+                await upsert_channel_history(
+                    session=session,
+                    channel_id=channel.id,
+                    record_date=date.today(),
+                    subscriber_count=channel.subscriber_count,
+                    total_views=channel.total_views,
+                    video_count=channel.video_count,
+                )
+                await ensure_competitor_pool(
+                    session=session,
+                    user_id=user_id,
+                    channel_id=channel.id,
+                    group_name=group_name,
+                )
+
+                # 强制更新时间戳：便于前端展示“后台已完成”的信号
+                channel.updated_at = datetime.now(timezone.utc)
+                await session.commit()
+                processed_count += 1
+            except Exception as exc:  # noqa: BLE001
+                logger.exception("后台批量添加失败 raw_url=%r: %s", raw_url, exc)
+                await session.rollback()
+                continue
+
+        logger.info(
+            "后台批量添加任务完成 org_id=%s submitted_urls=%s processed=%s",
+            org_id,
+            len(urls),
+            processed_count,
+        )
+
+
+async def _process_batch_update_channels_task(
+    *,
+    user_id: int,
+    org_id: int,
+) -> None:
+    """后台任务：一键更新（YouTube + AI 都在后台执行）。"""
+    async with AsyncSessionLocal() as session:
+        icfg = await resolve_integration_config(session, org_id=org_id)
+        youtube_api_key = (icfg.youtube_api_key or "").strip()
+        if not youtube_api_key:
+            logger.warning("后台一键更新失败：未配置 YouTube Data API Key org_id=%s", org_id)
+            return
+
+        channels = await list_distinct_monitored_channels_for_org(session, org_id)
+        if not channels:
+            logger.info("后台一键更新：org_id=%s 无监控频道", org_id)
+            return
+
+        yt_channel_ids = [c.yt_channel_id for c in channels]
+        try:
+            pipeline = await run_refresh_pipeline_for_youtube_channel_ids(
+                yt_channel_ids,
+                youtube_api_key=youtube_api_key,
+            )
+
+            await record_bulk_pipeline_quota(
+                session,
+                for_handle_calls=0,
+                channels_list_calls=pipeline.channels_list_calls,
+                playlist_items_calls=pipeline.playlist_items_calls,
+                videos_list_calls=pipeline.videos_list_calls,
+            )
+
+            yt_to_db = await bulk_upsert_channels_from_api_items(session, pipeline.channel_items)
+            _updated_videos = await bulk_upsert_videos_from_api_items(session, pipeline.video_items, yt_to_db)
+
+            for item in pipeline.channel_items:
+                yt_id = item.get("id")
+                db_id = yt_to_db.get(yt_id or "")
+                if not db_id:
+                    continue
+                statistics = item.get("statistics", {})
+                await upsert_channel_history(
+                    session=session,
+                    channel_id=db_id,
+                    record_date=date.today(),
+                    subscriber_count=int(statistics.get("subscriberCount", 0)),
+                    total_views=int(statistics.get("viewCount", 0)),
+                    video_count=int(statistics.get("videoCount", 0)),
+                )
+
+            await session.commit()
+
+            # 基础数据抓取完成：先把 updated_at 刷到“刚刚更新过”
+            now = datetime.now(timezone.utc)
+            for db_id in yt_to_db.values():
+                ch = await session.get(YouTubeChannel, db_id)
+                if ch is not None:
+                    ch.updated_at = now
+            await session.commit()
+
+            # 再做 AI 补全：单频道失败不应影响其他频道
+            monitored = await list_distinct_monitored_channels_for_org(session, org_id)
+            for ch in monitored:
+                if not channel_needs_ai_tag_fill(ch):
+                    continue
+                try:
+                    await enrich_youtube_channel_info_ai_sync(session, ch, integration=icfg)
+                    ch.updated_at = datetime.now(timezone.utc)
+                    await session.commit()
+                except Exception:  # noqa: BLE001
+                    await session.rollback()
+                    ch.updated_at = datetime.now(timezone.utc)
+                    await session.commit()
+
+            logger.info("后台一键更新任务完成 org_id=%s", org_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("后台一键更新任务异常 org_id=%s: %s", org_id, exc)
+            return
+
+
 @router.post(
     "/analyze/batch",
-    response_model=YouTubeBatchAnalyzeResponse,
-    summary="批量分析并导入 YouTube 频道（省流：无 Search API）",
+    response_model=SubmitTaskResponse,
+    summary="后台批量分析并导入 YouTube 频道（省流：无 Search API）",
+    status_code=202,
 )
 async def analyze_youtube_batch(
     payload: YouTubeBatchAnalyzeRequest,
+    background_tasks: BackgroundTasks,
     db: DBSessionDep,
     current_user: CurrentUserDep,
-) -> YouTubeBatchAnalyzeResponse:
+) -> SubmitTaskResponse:
     icfg = await resolve_integration_config(db, org_id=current_user.org_id)
-    pipeline = await run_bulk_analyze_pipeline(payload.urls, youtube_api_key=icfg.youtube_api_key)
-    if not pipeline.channel_items:
+    urls = split_url_segments(payload.urls)
+    if not urls:
         raise HTTPException(
             status_code=400,
-            detail="; ".join(pipeline.errors) if pipeline.errors else "未能获取任何频道数据",
+            detail="urls 为空或解析失败：请使用分号（;）或换行分隔 YouTube 频道链接",
         )
 
-    quota_used = await record_bulk_pipeline_quota(
-        db,
-        for_handle_calls=pipeline.for_handle_calls,
-        channels_list_calls=pipeline.channels_list_calls,
-        playlist_items_calls=pipeline.playlist_items_calls,
-        videos_list_calls=pipeline.videos_list_calls,
+    if not (icfg.youtube_api_key or "").strip():
+        raise HTTPException(status_code=400, detail="未配置 YouTube Data API Key（检查设置中心或环境变量 YOUTUBE_API_KEY）")
+
+    # 入队后台任务：控制器不再进行 YouTube/LLM 调用，避免 HTTP 超时
+    background_tasks.add_task(
+        _process_analyze_youtube_batch_task,
+        urls=urls,
+        group_name=payload.group_name,
+        user_id=current_user.id,
+        org_id=current_user.org_id,
     )
-
-    yt_to_db = await bulk_upsert_channels_from_api_items(db, pipeline.channel_items)
-    videos_count = await bulk_upsert_videos_from_api_items(
-        db, pipeline.video_items, yt_to_db
-    )
-
-    for item in pipeline.channel_items:
-        yt_id = item.get("id")
-        db_id = yt_to_db.get(yt_id or "")
-        if not db_id:
-            continue
-        statistics = item.get("statistics", {})
-        await upsert_channel_history(
-            session=db,
-            channel_id=db_id,
-            record_date=date.today(),
-            subscriber_count=int(statistics.get("subscriberCount", 0)),
-            total_views=int(statistics.get("viewCount", 0)),
-            video_count=int(statistics.get("videoCount", 0)),
-        )
-        await ensure_competitor_pool(
-            session=db,
-            user_id=current_user.id,
-            channel_id=db_id,
-            group_name=payload.group_name,
-        )
-
-    await db.commit()
-
-    for _yt_id, db_id in yt_to_db.items():
-        row = await db.execute(select(YouTubeChannel).where(YouTubeChannel.id == db_id))
-        ch = row.scalar_one_or_none()
-        if ch is None:
-            continue
-        if await enrich_youtube_channel_ai(db, ch, integration=icfg):
-            await db.commit()
-
-    return YouTubeBatchAnalyzeResponse(
-        channels_count=len(yt_to_db),
-        videos_count=videos_count,
-        quota_used=quota_used,
-        errors=pipeline.errors,
-    )
+    return SubmitTaskResponse(code=200, message="任务已提交至后台处理，请稍后刷新查看。")
 
 
 @router.get("/quota-dashboard", response_model=QuotaDashboardResponse)
@@ -515,6 +675,7 @@ async def analyze_channel_ai(
             db,
             channel=channel,
             user_id=current_user.id,
+            org_id=current_user.org_id,
             model_library_id=body.model_library_id,
             llm_model_name=body.llm_model_name.strip(),
             agent_id=body.agent_id,
@@ -584,73 +745,26 @@ async def delete_channel_from_pool(
     return {"success": True}
 
 
-@router.post("/channels/batch-update")
+@router.post("/channels/batch-update", response_model=SubmitTaskResponse, status_code=202)
 async def batch_update_channels(
+    background_tasks: BackgroundTasks,
     db: DBSessionDep,
     current_user: CurrentUserDep,
-) -> dict:
+) -> SubmitTaskResponse:
     icfg = await resolve_integration_config(db, org_id=current_user.org_id)
     channels = await list_distinct_monitored_channels_for_org(db, current_user.org_id)
     if not channels:
-        return {"estimated_points": 0, "updated_channels": 0, "updated_videos": 0, "quota_used": 0}
+        return SubmitTaskResponse(code=200, message="没有需要更新的频道（已跳过）")
 
-    n = len(channels)
-    # 最坏情况：channels 分块 + 每频道 playlistItems + 视频按 50 分块
-    estimated_points = (n + 49) // 50 + 2 * n
+    if not (icfg.youtube_api_key or "").strip():
+        raise HTTPException(status_code=400, detail="未配置 YouTube Data API Key（检查设置中心或环境变量 YOUTUBE_API_KEY）")
 
-    pipeline = await run_refresh_pipeline_for_youtube_channel_ids(
-        [c.yt_channel_id for c in channels],
-        youtube_api_key=icfg.youtube_api_key,
+    background_tasks.add_task(
+        _process_batch_update_channels_task,
+        user_id=current_user.id,
+        org_id=current_user.org_id,
     )
-
-    quota_used = await record_bulk_pipeline_quota(
-        db,
-        for_handle_calls=0,
-        channels_list_calls=pipeline.channels_list_calls,
-        playlist_items_calls=pipeline.playlist_items_calls,
-        videos_list_calls=pipeline.videos_list_calls,
-    )
-
-    yt_to_db = await bulk_upsert_channels_from_api_items(db, pipeline.channel_items)
-    updated_videos = await bulk_upsert_videos_from_api_items(db, pipeline.video_items, yt_to_db)
-
-    for item in pipeline.channel_items:
-        yt_id = item.get("id")
-        db_id = yt_to_db.get(yt_id or "")
-        if not db_id:
-            continue
-        statistics = item.get("statistics", {})
-        await upsert_channel_history(
-            session=db,
-            channel_id=db_id,
-            record_date=date.today(),
-            subscriber_count=int(statistics.get("subscriberCount", 0)),
-            total_views=int(statistics.get("viewCount", 0)),
-            video_count=int(statistics.get("videoCount", 0)),
-        )
-
-    await db.commit()
-
-    monitored = await list_distinct_monitored_channels_for_org(db, current_user.org_id)
-    ai_enriched = 0
-    ai_failed = 0
-    for ch in monitored:
-        if not channel_needs_ai_tag_fill(ch):
-            continue
-        if await enrich_youtube_channel_ai(db, ch, integration=icfg):
-            await db.commit()
-            ai_enriched += 1
-        else:
-            ai_failed += 1
-
-    return {
-        "estimated_points": estimated_points,
-        "updated_channels": len(yt_to_db),
-        "updated_videos": updated_videos,
-        "quota_used": quota_used,
-        "ai_enriched": ai_enriched,
-        "ai_failed": ai_failed,
-    }
+    return SubmitTaskResponse(code=200, message="一键更新任务已提交至后台处理，请稍后刷新查看。")
 
 
 @router.get(

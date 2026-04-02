@@ -11,6 +11,7 @@ from app.models.youtube import (
     YouTubeChannelHistory,
     YouTubeChannelInsight,
     YouTubeComment,
+    YouTubeVideoAnalysis,
     YouTubeVideo,
     UserCompetitorPool,
 )
@@ -81,6 +82,7 @@ async def upsert_videos(
                 yt_video_id=yt_video_id,
                 channel_id=channel_id,
                 title=snippet.get("title", ""),
+                description=snippet.get("description", "") or "",
                 thumbnail_url=(snippet.get("thumbnails", {}).get("high", {}) or {}).get("url"),
                 published_at=item.get("_parsed_published_at"),
                 duration_sec=int(item.get("_duration_sec", 0)),
@@ -97,6 +99,7 @@ async def upsert_videos(
         else:
             video.channel_id = channel_id
             video.title = snippet.get("title", "")
+            video.description = snippet.get("description", "") or ""
             video.thumbnail_url = (snippet.get("thumbnails", {}).get("high", {}) or {}).get("url")
             video.published_at = item.get("_parsed_published_at")
             video.duration_sec = int(item.get("_duration_sec", 0))
@@ -194,6 +197,7 @@ async def bulk_upsert_videos_from_api_items(
                 "yt_video_id": yt_video_id,
                 "channel_id": db_cid,
                 "title": snippet.get("title", "") or "",
+                "description": snippet.get("description", "") or "",
                 "thumbnail_url": (snippet.get("thumbnails", {}).get("high", {}) or {}).get("url"),
                 "published_at": item.get("_parsed_published_at"),
                 "duration_sec": int(item.get("_duration_sec", 0)),
@@ -216,6 +220,7 @@ async def bulk_upsert_videos_from_api_items(
     stmt = stmt.on_duplicate_key_update(
         channel_id=stmt.inserted.channel_id,
         title=stmt.inserted.title,
+        description=stmt.inserted.description,
         thumbnail_url=stmt.inserted.thumbnail_url,
         published_at=stmt.inserted.published_at,
         duration_sec=stmt.inserted.duration_sec,
@@ -366,6 +371,52 @@ async def get_video_for_user(
     )
     r = await session.execute(stmt)
     return r.scalar_one_or_none()
+
+
+async def get_video_analysis_for_org(
+    session: AsyncSession,
+    *,
+    org_id: int,
+    video_id: int,
+) -> YouTubeVideoAnalysis | None:
+    stmt = (
+        select(YouTubeVideoAnalysis)
+        .where(YouTubeVideoAnalysis.org_id == org_id, YouTubeVideoAnalysis.video_id == video_id)
+    )
+    r = await session.execute(stmt)
+    return r.scalar_one_or_none()
+
+
+async def upsert_video_analysis(
+    session: AsyncSession,
+    *,
+    org_id: int,
+    video_id: int,
+    model_id: str,
+    agent_id: int | None,
+    content: str,
+) -> YouTubeVideoAnalysis:
+    row = await get_video_analysis_for_org(session, org_id=org_id, video_id=video_id)
+    if row is None:
+        row = YouTubeVideoAnalysis(
+            video_id=video_id,
+            org_id=org_id,
+            model_id=model_id,
+            agent_id=agent_id,
+            content=content,
+        )
+        session.add(row)
+    else:
+        row.model_id = model_id
+        row.agent_id = agent_id
+        row.content = content
+    await session.flush()
+    try:
+        await session.refresh(row)
+    except Exception:
+        # refresh 失败不影响写入结果；updated_at 字段可能是旧值
+        pass
+    return row
 
 
 async def delete_user_competitor_channel(session: AsyncSession, *, user_id: int, pool_id: int) -> bool:

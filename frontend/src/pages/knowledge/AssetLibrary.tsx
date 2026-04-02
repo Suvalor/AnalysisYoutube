@@ -76,7 +76,7 @@ function formatBytes(n: number | null | undefined): string {
 
 /** 展示与下载统一走 access_url（后端签名 + 自定义域名），避免私有桶直链 file_url 失效 */
 function mediaSrc(a: AssetItem): string {
-  return (a.access_url || a.file_url || "").trim();
+  return (a.file_url || a.access_url || "").trim();
 }
 
 export default function AssetLibraryPage() {

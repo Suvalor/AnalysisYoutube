@@ -16,8 +16,21 @@ from app.crud.youtube import create_youtube_channel_insight, update_channel_ai_i
 from app.models.library import ModelLibrary, PromptLibrary
 from app.models.youtube import YouTubeChannel, YouTubeComment, YouTubeVideo
 from app.services.field_encryption import try_decrypt
-from app.services.config_manager import ResolvedIntegrationConfig, merge_integration_config
-from app.services.youtube_ai_service import analyze_channel_ai_insight, build_channel_ai_messages
+from app.services.config_manager import (
+    looks_like_volcengine_ark_base_url,
+    merge_integration_config,
+    resolve_integration_config,
+    resolve_model_alias_for_volcengine,
+)
+from app.services.llm_openai_factory import (
+    is_volcengine_coding_plan_openai_api,
+    resolve_openai_chat_model_parameter,
+)
+from app.services.youtube_ai_service import (
+    analyze_channel_ai_insight,
+    analyze_channel_info_sync,
+    build_channel_ai_messages,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +126,8 @@ async def enrich_youtube_channel_ai(
             hot_comments=hot_comments,
         )
         icfg = integration if integration is not None else merge_integration_config({})
-        ai_result = await analyze_channel_ai_insight(messages, integration=icfg)
+        # 非前台显式选择模型时，使用集成配置里的默认 endpoint_id 作为 model 参数，避免 LLM 打标签链路因 model 为空而被拒绝
+        ai_result = await analyze_channel_ai_insight(messages, integration=icfg, model=icfg.volcengine_endpoint_id)
 
         tags = list(ai_result["tags"]) if isinstance(ai_result.get("tags"), list) else []
         await update_channel_ai_insight(
@@ -133,9 +147,81 @@ async def enrich_youtube_channel_ai(
             channel.yt_channel_id,
         )
         return False
-    except Exception:
-        logger.exception("频道 AI 丰富失败 channel_id=%s yt_channel_id=%s", channel.id, channel.yt_channel_id)
-        return False
+
+
+async def enrich_youtube_channel_ai_sync(
+    session: AsyncSession,
+    channel: YouTubeChannel,
+    *,
+    integration: ResolvedIntegrationConfig,
+) -> bool:
+    """
+    后台专用：非流式打标签（必须 stream=False），并具备强降级容错。
+
+    - analyze_channel_info_sync 内部保证：任何异常都不会抛出
+    - 若 AI 失败：tags 为空数组仍可成功入库基础统计数据
+    """
+    top_video_titles, merged_tags, hot_comments = await load_channel_ai_context(session, channel)
+    ai = await analyze_channel_info_sync(
+        channel_title=channel.title,
+        channel_description=channel.description,
+        top_video_titles=top_video_titles,
+        merged_tags=merged_tags,
+        hot_comments=hot_comments,
+        integration=integration,
+    )
+    tags = ai.get("tags") if isinstance(ai.get("tags"), list) else []
+    expertise = str(ai.get("expertise") or "").strip()
+
+    # age_group/summary 在该后台打标签场景中允许降级为空
+    await update_channel_ai_insight(
+        session,
+        channel=channel,
+        ai_tags=list(tags)[:5],
+        ai_audience_age="未标注",
+        ai_summary="",
+        ai_expertise=expertise,
+    )
+    await session.flush()
+    return len(tags) > 0
+
+
+async def enrich_youtube_channel_info_ai_sync(
+    session: AsyncSession,
+    channel: YouTubeChannel,
+    *,
+    integration: ResolvedIntegrationConfig,
+) -> bool:
+    """
+    后台专用：只基于 channel.title + channel.description 做“轻量 JSON 打标签”。
+
+    成本与性能目标：
+    - 不读取数据库的 Top10 视频/Top评论/标签合并上下文
+    - 直接传入空上下文数组给 analyze_channel_info_sync
+    - AI 失败不抛异常，只写入 tags=[] + expertise=""（基础统计不受影响）
+    """
+    ai = await analyze_channel_info_sync(
+        channel_title=channel.title,
+        channel_description=channel.description,
+        top_video_titles=[],
+        merged_tags=[],
+        hot_comments=[],
+        integration=integration,
+    )
+    tags = ai.get("tags") if isinstance(ai.get("tags"), list) else []
+    expertise = str(ai.get("expertise") or "").strip()
+
+    await update_channel_ai_insight(
+        session,
+        channel=channel,
+        ai_tags=list(tags)[:5],
+        ai_audience_age="未标注",
+        ai_summary="",
+        ai_expertise=expertise,
+    )
+    await session.flush()
+    return len(tags) > 0
+
 
 
 async def run_channel_detail_ai_analysis(
@@ -143,6 +229,7 @@ async def run_channel_detail_ai_analysis(
     *,
     channel: YouTubeChannel,
     user_id: int,
+    org_id: int,
     model_library_id: int,
     llm_model_name: str,
     agent_id: int | None,
@@ -167,6 +254,20 @@ async def run_channel_detail_ai_analysis(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="模型名不能为空")
     _ensure_llm_allowed_for_library(ml, name)
 
+    icfg = await resolve_integration_config(session, org_id=org_id)
+    alias_resolved = resolve_model_alias_for_volcengine(name, icfg)
+    upstream_model = resolve_openai_chat_model_parameter(base_url, alias_resolved, icfg)
+    if looks_like_volcengine_ark_base_url(base_url) and not is_volcengine_coding_plan_openai_api(base_url):
+        if not upstream_model.startswith("ep-"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "当前模型库 Base URL 为火山方舟常规推理（OpenAI 兼容）时，上游请求的 model 必须是推理接入点 ID（以 ep- 开头）。"
+                    "Coding Plan（/api/coding/v3）不受此限制。"
+                    "请在集成配置或模型库支持列表中填写 ep- 接入点。"
+                ),
+            )
+
     agent_prepend: str | None = None
     if agent_id is not None:
         pl = await get_by_user(session, PromptLibrary, user_id, agent_id)
@@ -188,7 +289,7 @@ async def run_channel_detail_ai_analysis(
         messages,
         api_key=api_key,
         base_url=base_url,
-        model=name,
+        model=upstream_model,
     )
 
     tags = list(ai_result["tags"]) if isinstance(ai_result.get("tags"), list) else []

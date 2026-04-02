@@ -28,7 +28,8 @@ import CompetitorAnalysis from "@/pages/youtube/CompetitorAnalysis";
 import ChannelList from "@/pages/youtube/ChannelList";
 import GlobalVideoList from "@/pages/youtube/GlobalVideoList";
 import ChannelDetail from "@/pages/youtube/ChannelDetail";
-import FeishuWorkspace from "@/pages/feishu/FeishuWorkspace";
+import FeishuDocList from "@/pages/feishu/FeishuDocList";
+import FeishuDocViewer from "@/pages/feishu/FeishuDocViewer";
 import AiModelSettings from "@/pages/settings/AiModelSettings";
 import ConfigCenter from "@/pages/settings/ConfigCenter";
 import AgentEditorPage from "@/pages/settings/AgentEditorPage";
@@ -109,7 +110,9 @@ function renderTabPanel(tab: TabItem) {
     case "competitor-analysis":
       return <CompetitorAnalysis />;
     case "feishu-workspace":
-      return <FeishuWorkspace />;
+      return <FeishuDocList />;
+    case "feishu-viewer":
+      return <FeishuDocViewer />;
     case "ai-model-settings":
       return <AiModelSettings />;
     case "config-center":
@@ -173,6 +176,17 @@ export default function TabbedShell() {
         path,
         type: "agent-edit",
         promptId: pid,
+      });
+    }
+    const feishuViewMatch = path.match(/^\/feishu\/view\/(\d+)$/);
+    if (feishuViewMatch) {
+      const did = Number(feishuViewMatch[1]);
+      openTab({
+        id: `feishu-view-${did}`,
+        title: "飞书云文档预览",
+        path,
+        type: "feishu-viewer",
+        feishuDocId: did,
       });
     }
   }, [location.pathname, location.search, openTab]);

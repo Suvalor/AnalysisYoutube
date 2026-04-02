@@ -172,14 +172,6 @@ export default function KnowledgeBase() {
           loading={loading}
           pagination={{ pageSize: 8 }}
         />
-        <div className="mt-6">
-          <Link to="/assets" className="text-emerald-300 hover:text-emerald-200 mr-6">
-            前往素材库页面 →
-          </Link>
-          <Link to="/ai-creator" className="text-indigo-300 hover:text-indigo-200">
-            前往 AI 创作工作台 →
-          </Link>
-        </div>
       </div>
     </div>
   );

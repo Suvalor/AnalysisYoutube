@@ -20,6 +20,15 @@ class YouTubeBatchAnalyzeResponse(BaseModel):
     errors: list[str] = Field(default_factory=list, description="解析或部分频道失败时的提示")
 
 
+class SubmitTaskResponse(BaseModel):
+    """
+    后台任务提交响应：接口快速返回，具体 YouTube/LLM 处理在后台执行。
+    """
+
+    code: int = Field(200, description="业务返回码（固定 200）")
+    message: str = Field(..., description="任务提交提示")
+
+
 class YouTubeVideoRead(BaseModel):
     id: int
     yt_video_id: str
@@ -117,4 +126,20 @@ class YouTubeChannelAIAnalyzeResponse(BaseModel):
     model_library_id: int | None = None
     llm_model_name: str | None = None
     agent_id: int | None = None
+
+
+class YouTubeVideoAnalyzeRequest(BaseModel):
+    """一键 AI 深度分析：视频维度持久化写入。"""
+
+    video_id: int = Field(..., ge=1, description="youtube_videos 表主键 id")
+    model_id: str = Field(..., min_length=1, max_length=128, description="LLM model 标识（来自模型库支持的 value）")
+    agent_id: int | None = Field(default=None, description="prompt_libraries 表主键，可选")
+
+
+class YouTubeVideoAnalysisResponse(BaseModel):
+    video_id: int
+    model_id: str
+    agent_id: int | None
+    content: str
+    updated_at: datetime
 

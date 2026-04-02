@@ -62,16 +62,14 @@ export async function analyzeYouTubeApi(payload: { youtube_url: string; group_na
   return res.data as YouTubeAnalyzeResponse;
 }
 
-export type YouTubeBatchAnalyzeResponse = {
-  channels_count: number;
-  videos_count: number;
-  quota_used: number;
-  errors: string[];
+export type SubmitTaskResponse = {
+  code: number;
+  message: string;
 };
 
 export async function analyzeYouTubeBatchApi(payload: { urls: string; group_name?: string }) {
   const res = await apiClient.post("/api/youtube/analyze/batch", payload);
-  return res.data as YouTubeBatchAnalyzeResponse;
+  return res.data as SubmitTaskResponse;
 }
 
 export async function listYouTubeChannelsApi(params?: { sort_by?: string }) {
@@ -145,14 +143,7 @@ export async function getYouTubeQuotaDashboardApi() {
 
 export async function batchUpdateChannelsApi() {
   const res = await apiClient.post("/api/youtube/channels/batch-update");
-  return res.data as {
-    estimated_points: number;
-    updated_channels: number;
-    updated_videos: number;
-    quota_used: number;
-    ai_enriched?: number;
-    ai_failed?: number;
-  };
+  return res.data as SubmitTaskResponse;
 }
 
 export type VideoListItem = YouTubeAnalyzeResponse["videos"][number] & {

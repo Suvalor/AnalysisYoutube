@@ -1,4 +1,4 @@
-import { Button, DatePicker, Input, InputNumber, Pagination, Select, Space, Tag, message } from "antd";
+import { Button, DatePicker, Input, InputNumber, Pagination, Select, Space, Spin, Tag, message } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import {
@@ -14,7 +14,7 @@ import {
   Users,
   Youtube,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   analyzeYouTubeChannelAiApi,
@@ -23,8 +23,11 @@ import {
   type VideoListItem,
 } from "@/services/authApi";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
+import { analyzeYouTubeVideoApi, getYouTubeVideoAnalysisApi } from "@/services/videosApi";
 import { formatNumber } from "@/utils/format";
 import { useTabStore } from "@/store/useTabStore";
+import MarkdownPreview from "@/components/MarkdownPreview";
+import { buildYouTubeWatchUrl } from "@/utils/youtubeLinks";
 
 dayjs.extend(relativeTime);
 
@@ -85,6 +88,24 @@ export default function ChannelDetail({ channelId }: Props) {
     privacy_status: undefined as string | undefined,
     sort_by: "publish_time_desc",
   });
+
+  // 视频维度 AI 分析折叠（同一时间仅允许展开一条）
+  const [videoAnalysisPanelOpenId, setVideoAnalysisPanelOpenId] = useState<number | null>(null);
+  const [videoAnalysisLoadingById, setVideoAnalysisLoadingById] = useState<Record<number, boolean>>({});
+  const [videoAnalysisContentById, setVideoAnalysisContentById] = useState<Record<number, string>>({});
+  const [selectedModelByVideoId, setSelectedModelByVideoId] = useState<Record<number, string>>({});
+  const [selectedAgentByVideoId, setSelectedAgentByVideoId] = useState<Record<number, number | undefined>>({});
+
+  const videoModelOptions = useMemo(() => {
+    const dedup = new Map<string, { value: string; label: string }>();
+    for (const m of libraryModels) {
+      const values = parseSupportedModels(m.supported_models_json);
+      for (const v of values) {
+        dedup.set(v, { value: v, label: `${m.name} / ${v}` });
+      }
+    }
+    return Array.from(dedup.values());
+  }, [libraryModels]);
 
   const loadVideos = async (p: number, ps: number, f: typeof filters) => {
     setLoading(true);
@@ -226,6 +247,46 @@ export default function ChannelDetail({ channelId }: Props) {
       message.error(axiosDetail(e) || "AI 深度分析失败");
     } finally {
       setAiAnalyzing(false);
+    }
+  };
+
+  const openVideoAnalysisPanel = (videoId: number) => {
+    setVideoAnalysisPanelOpenId(videoId);
+  };
+
+  const handleViewVideoAnalysis = async (videoId: number) => {
+    openVideoAnalysisPanel(videoId);
+    try {
+      const res = await getYouTubeVideoAnalysisApi(videoId);
+      setVideoAnalysisContentById((prev) => ({ ...prev, [videoId]: res.content }));
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail ?? "获取视频分析失败");
+    }
+  };
+
+  const handleAnalyzeVideo = async (video: VideoListItem) => {
+    const videoId = video.id;
+    const defaultModelId = videoModelOptions[0]?.value ?? "";
+    const modelId = selectedModelByVideoId[videoId] ?? defaultModelId;
+    if (!modelId) {
+      message.warning("请先在「设置中心 → 模型管理」维护可用模型，并为当前视频选择 Model ID");
+      return;
+    }
+
+    const agentId = selectedAgentByVideoId[videoId] ?? selectedAgentId ?? promptAgents[0]?.id;
+    openVideoAnalysisPanel(videoId);
+    setVideoAnalysisLoadingById((prev) => ({ ...prev, [videoId]: true }));
+    try {
+      const res = await analyzeYouTubeVideoApi({
+        video_id: videoId,
+        model_id: modelId,
+        agent_id: agentId ?? null,
+      });
+      setVideoAnalysisContentById((prev) => ({ ...prev, [videoId]: res.content }));
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail ?? "视频 AI 深度分析失败");
+    } finally {
+      setVideoAnalysisLoadingById((prev) => ({ ...prev, [videoId]: false }));
     }
   };
 
@@ -487,47 +548,144 @@ export default function ChannelDetail({ channelId }: Props) {
         {loading && !videos.length ? (
           <div className="text-slate-500">加载中...</div>
         ) : (
-          videos.map((video) => (
-            <div key={video.id} className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm flex flex-col md:flex-row gap-4">
-              <div className="relative w-full md:w-64 shrink-0">
-                <img src={video.thumbnail_url || ""} alt="" className="w-full h-36 object-cover rounded" />
-                <div className="absolute right-2 bottom-2 text-xs px-2 py-0.5 rounded bg-black/60 text-white">{video.duration_str}</div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-slate-900 truncate">{video.title}</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Tag className="!border-slate-200 !bg-white !text-slate-700">{video.definition.toUpperCase()}</Tag>
-                  <Tag className="!border-slate-200 !bg-white !text-slate-700">{video.privacy_status}</Tag>
-                </div>
-                <div className="text-slate-500 text-sm mt-2">
-                  发布于 {video.published_at ? dayjs(video.published_at).format("YYYY-MM-DD HH:mm") : "-"} ·{" "}
-                  {video.published_at ? dayjs(video.published_at).fromNow() : ""}
-                </div>
-              </div>
-              <div className="flex flex-row md:flex-col justify-between md:w-56 gap-3 shrink-0">
-                <div className="border border-slate-200 rounded-md p-2 text-sm space-y-1 flex-1">
-                  <div className="text-blue-600 flex items-center gap-1.5">
-                    <Eye className="h-4 w-4 shrink-0" aria-hidden />
-                    <span>播放量：{formatNumber(video.view_count)}</span>
+          videos.map((video) => {
+            const watchUrl = buildYouTubeWatchUrl(video.yt_video_id);
+            const openYouTube = (e: MouseEvent) => {
+              e.stopPropagation();
+              if (!watchUrl) {
+                message.warning("该视频缺少有效的 YouTube 视频 ID，无法跳转");
+                return;
+              }
+              window.open(watchUrl, "_blank", "noopener,noreferrer");
+            };
+
+            const modelIdForVideo = selectedModelByVideoId[video.id] ?? videoModelOptions[0]?.value ?? "";
+            const agentIdForVideo = selectedAgentByVideoId[video.id] ?? selectedAgentId ?? promptAgents[0]?.id;
+
+            return (
+              <div key={video.id} className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="relative w-full md:w-64 shrink-0">
+                    {watchUrl ? (
+                      <button
+                        type="button"
+                        onClick={openYouTube}
+                        className="block w-full p-0 border-0 bg-transparent cursor-pointer rounded overflow-hidden"
+                        aria-label="在 YouTube 打开视频"
+                      >
+                        <img src={video.thumbnail_url || ""} alt="" className="w-full h-36 object-cover rounded" />
+                      </button>
+                    ) : (
+                      <img src={video.thumbnail_url || ""} alt="" className="w-full h-36 object-cover rounded opacity-90" />
+                    )}
+                    <div className="absolute right-2 bottom-2 text-xs px-2 py-0.5 rounded bg-black/60 text-white">
+                      {video.duration_str}
+                    </div>
                   </div>
-                  <div className="text-emerald-600 flex items-center gap-1.5">
-                    <ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />
-                    <span>点赞：{formatNumber(video.like_count)}</span>
+                  <div className="flex-1 min-w-0">
+                    {watchUrl ? (
+                      <button
+                        type="button"
+                        onClick={openYouTube}
+                        className="font-semibold text-slate-900 truncate w-full p-0 border-0 bg-transparent cursor-pointer hover:text-blue-700 transition-colors"
+                      >
+                        {video.title}
+                      </button>
+                    ) : (
+                      <div className="font-semibold text-slate-900 truncate">{video.title}</div>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Tag className="!border-slate-200 !bg-white !text-slate-700">{video.definition.toUpperCase()}</Tag>
+                      <Tag className="!border-slate-200 !bg-white !text-slate-700">{video.privacy_status}</Tag>
+                    </div>
+                    <div className="text-slate-500 text-sm mt-2">
+                      发布于 {video.published_at ? dayjs(video.published_at).format("YYYY-MM-DD HH:mm") : "-"} ·{" "}
+                      {video.published_at ? dayjs(video.published_at).fromNow() : ""}
+                    </div>
                   </div>
-                  <div className="text-orange-500 flex items-center gap-1.5">
-                    <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
-                    <span>评论：{formatNumber(video.comment_count)}</span>
+                  <div className="flex flex-row md:flex-col justify-between md:w-56 gap-3 shrink-0">
+                    <div className="border border-slate-200 rounded-md p-2 text-sm space-y-1 flex-1">
+                      <div className="text-blue-600 flex items-center gap-1.5">
+                        <Eye className="h-4 w-4 shrink-0" aria-hidden />
+                        <span>播放量：{formatNumber(video.view_count)}</span>
+                      </div>
+                      <div className="text-emerald-600 flex items-center gap-1.5">
+                        <ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />
+                        <span>点赞：{formatNumber(video.like_count)}</span>
+                      </div>
+                      <div className="text-orange-500 flex items-center gap-1.5">
+                        <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
+                        <span>评论：{formatNumber(video.comment_count)}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-1 text-slate-400 justify-end">
+                      <Star size={18} className="cursor-pointer hover:text-amber-500" />
+                      <Play size={18} className="cursor-pointer hover:text-blue-600" />
+                      <BarChart3 size={18} className="cursor-pointer hover:text-slate-700" />
+                      <MoreHorizontal size={18} className="cursor-pointer" />
+                    </div>
                   </div>
                 </div>
-                <div className="flex gap-1 text-slate-400 justify-end">
-                  <Star size={18} className="cursor-pointer hover:text-amber-500" />
-                  <Play size={18} className="cursor-pointer hover:text-blue-600" />
-                  <BarChart3 size={18} className="cursor-pointer hover:text-slate-700" />
-                  <MoreHorizontal size={18} className="cursor-pointer" />
+
+                <div className="mt-3 border border-slate-200 rounded-lg bg-slate-50/70 p-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      <Select
+                        showSearch
+                        placeholder="选择模型（Model）"
+                        style={{ minWidth: 220 }}
+                        value={modelIdForVideo || undefined}
+                        options={videoModelOptions.map((o) => ({ value: o.value, label: o.label }))}
+                        onChange={(v) => setSelectedModelByVideoId((prev) => ({ ...prev, [video.id]: String(v) }))}
+                      />
+                      <Select
+                        allowClear
+                        placeholder="选择智能体（Agent，可选）"
+                        style={{ minWidth: 220 }}
+                        value={agentIdForVideo ?? undefined}
+                        options={promptAgents.map((p) => ({ value: p.id, label: p.title }))}
+                        onChange={(v) =>
+                          setSelectedAgentByVideoId((prev) => ({ ...prev, [video.id]: v === undefined ? undefined : Number(v) }))
+                        }
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="primary"
+                        size="small"
+                        onClick={() => void handleAnalyzeVideo(video)}
+                        loading={Boolean(videoAnalysisLoadingById[video.id])}
+                      >
+                        一键 AI 深度分析
+                      </Button>
+                      <Button
+                        size="small"
+                        onClick={() => void handleViewVideoAnalysis(video.id)}
+                        disabled={Boolean(videoAnalysisLoadingById[video.id])}
+                      >
+                        查看结果
+                      </Button>
+                    </div>
+                  </div>
+
+                  {videoAnalysisPanelOpenId === video.id ? (
+                    <div className="mt-3">
+                      {videoAnalysisLoadingById[video.id] ? (
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <Spin size="small" />
+                          分析中…
+                        </div>
+                      ) : videoAnalysisContentById[video.id] ? (
+                        <MarkdownPreview>{videoAnalysisContentById[video.id]}</MarkdownPreview>
+                      ) : (
+                        <div className="text-slate-500 text-sm">暂无分析结果。点击「一键 AI 深度分析」生成内容。</div>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

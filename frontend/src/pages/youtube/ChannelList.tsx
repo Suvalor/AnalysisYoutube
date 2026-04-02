@@ -2,6 +2,8 @@ import { Button, Input, Modal, Popover, Select, Spin, Table, Tag, Typography, me
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
 import {
   analyzeYouTubeBatchApi,
   batchUpdateChannelsApi,
@@ -12,6 +14,9 @@ import {
 } from "@/services/authApi";
 import { formatNumber } from "@/utils/format";
 import { useTabStore } from "@/store/useTabStore";
+import Icon from "@ant-design/icons";
+
+dayjs.extend(relativeTime);
 
 type Row = {
   pool_id: number;
@@ -64,16 +69,11 @@ export default function ChannelList() {
       return;
     }
     setAnalyzing(true);
-    message.loading({ content: "正在拉取频道与视频数据，并进行 AI 标签分析，请稍候…", key: "yt-add", duration: 0 });
+    message.loading({ content: "正在提交后台任务，请稍候…", key: "yt-add", duration: 0 });
     try {
-      const res = await analyzeYouTubeBatchApi({ urls: urls.trim() });
-      message.success({
-        content: `成功分析 ${res.channels_count} 个频道，共获取 ${res.videos_count} 个视频。本次消耗 API 额度 ${res.quota_used} 点。`,
-        key: "yt-add",
-      });
+      await analyzeYouTubeBatchApi({ urls: urls.trim() });
+      message.success({ content: "更新任务已提交后台，这可能需要几分钟，请稍后刷新列表查看。", key: "yt-add" });
       setUrls("");
-      await load();
-      void getYouTubeQuotaDashboardApi();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: unknown } } };
       message.error({
@@ -102,17 +102,8 @@ export default function ChannelList() {
           duration: 0,
         });
         try {
-          const res = await batchUpdateChannelsApi();
-          const aiPart =
-            res.ai_enriched != null || res.ai_failed != null
-              ? ` AI 补全成功 ${res.ai_enriched ?? 0} 个${(res.ai_failed ?? 0) > 0 ? `，失败 ${res.ai_failed} 个` : ""}。`
-              : "";
-          message.success({
-            content: `更新完成：频道 ${res.updated_channels}，视频 ${res.updated_videos}。消耗 API ${res.quota_used} 点。${aiPart}`,
-            key: "yt-batch",
-          });
-          await load();
-          void getYouTubeQuotaDashboardApi();
+          await batchUpdateChannelsApi();
+          message.success({ content: "更新任务已提交后台，这可能需要几分钟，请稍后刷新列表查看。", key: "yt-batch" });
         } catch (e: unknown) {
           const err = e as { response?: { data?: { detail?: string } } };
           message.error({ content: err.response?.data?.detail ?? "更新失败", key: "yt-batch" });
@@ -198,6 +189,20 @@ export default function ChannelList() {
       render: (v: number) => formatNumber(v),
     },
     {
+      title: "最后更新时间",
+      key: "updated_at",
+      dataIndex: ["channel", "updated_at"],
+      render: (v: string) => {
+        if (!v) return <span className="text-xs text-slate-400">-</span>;
+        const dt = dayjs(v);
+        return (
+          <span title={dt.format("YYYY-MM-DD HH:mm")} className="text-xs text-slate-700">
+            {dt.fromNow()}
+          </span>
+        );
+      },
+    },
+    {
       title: "操作",
       key: "op",
       render: (_, r) => (
@@ -235,6 +240,9 @@ export default function ChannelList() {
             </Button>
             <Button type="primary" loading={updating} onClick={() => void onBatchUpdate()}>
               一键更新数据
+            </Button>
+            <Button loading={loading} onClick={() => void load()}>
+              刷新列表
             </Button>
           </div>
         </div>
