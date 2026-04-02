@@ -17,7 +17,8 @@ export type TabType =
   | "ai-model-settings"
   | "config-center"
   | "sop-workflow"
-  | "agent-edit";
+  | "agent-edit"
+  | "inspiration-pool";
 
 export type TabItem = {
   id: string;
