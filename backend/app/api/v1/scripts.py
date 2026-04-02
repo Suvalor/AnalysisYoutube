@@ -4,14 +4,13 @@ from typing import AsyncGenerator
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
-import httpx
-from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUserDep
 from app.api.deps import DBSessionDep
 from app.crud.library import list_by_user
 from app.services.config_manager import resolve_integration_config, resolve_model_alias_for_volcengine
+from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig, normalize_openai_base_url
 from app.models.library import ModelLibrary
 from app.services.script_user_ai import (
     DEFAULT_MODEL_OPTIONS,
@@ -91,12 +90,15 @@ async def generate_script(
     creds = user_custom_openai_credentials(current_user)
     icfg = await resolve_integration_config(db, org_id=current_user.org_id)
     if creds:
-        api_key, base_url = creds
-        resolved_model = resolve_model_alias_for_volcengine(payload.model, icfg)
+        api_key, base_url_raw = creds
     else:
         api_key = icfg.volcengine_api_key
-        base_url = icfg.volcengine_base_url.rstrip("/")
-        resolved_model = resolve_model_alias_for_volcengine(payload.model, icfg)
+        base_url_raw = icfg.volcengine_base_url
+    base_url = normalize_openai_base_url(base_url_raw)
+    alias_resolved = resolve_model_alias_for_volcengine(payload.model, icfg)
+    factory = LLMClientFactory()
+    cfg = LLMClientConfig(api_key=api_key, base_url=base_url, model_name=alias_resolved)
+    resolved_model = factory.resolve_model_name(cfg)
     if not resolved_model:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -114,13 +116,6 @@ async def generate_script(
         payload.style.strip(),
     )
 
-    http_client = httpx.AsyncClient(timeout=120.0, trust_env=False)
-    client = AsyncOpenAI(
-        api_key=api_key,
-        base_url=base_url,
-        http_client=http_client,
-    )
-
     system_prompt = (
         "你是一名资深短视频脚本策划与编剧。\n"
         f"【提示词模板】{prompt_text}\n"
@@ -131,29 +126,21 @@ async def generate_script(
 
     async def event_generator() -> AsyncGenerator[str, None]:
         try:
-            stream = await client.chat.completions.create(
-                model=resolved_model,
-                stream=True,
+            async for delta in factory.stream_chat_completions_deltas(
+                cfg=cfg,
                 temperature=0.7,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-            )
-            async for chunk in stream:
-                delta = ""
-                if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
-                    delta = chunk.choices[0].delta.content
-                if delta:
-                    yield _sse({"type": "delta", "content": delta})
+            ):
+                yield _sse({"type": "delta", "content": delta})
             yield _sse({"type": "done"})
         except Exception as exc:  # noqa: BLE001
             msg = str(exc)
             if "404" in msg:
                 msg = f"模型不可用或未开通（model={resolved_model}）: {msg}"
             yield _sse({"type": "error", "message": msg})
-        finally:
-            await http_client.aclose()
 
     return StreamingResponse(
         event_generator(),

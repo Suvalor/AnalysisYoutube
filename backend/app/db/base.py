@@ -19,4 +19,5 @@ from app.models.youtube import (  # noqa: F401,E402
     YouTubeComment,
     YouTubeVideo,
 )
+from app.models.feishu_doc import FeishuDoc  # noqa: F401,E402
 

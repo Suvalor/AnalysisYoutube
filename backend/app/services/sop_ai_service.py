@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-import httpx
-from openai import AsyncOpenAI
 import re
+
+import httpx
 
 from app.models.user import User
 from app.services.config_manager import ResolvedIntegrationConfig, resolve_model_alias_for_volcengine
+from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig, normalize_openai_base_url
 from app.services.script_user_ai import parse_models_from_user_json, user_custom_openai_credentials
 
 
@@ -45,15 +46,19 @@ async def split_outline_markdown_with_ai_stream(
 
     creds = user_custom_openai_credentials(user)
     if creds:
-        api_key, base_url = creds
+        api_key, base_url_raw = creds
         default_model = parse_models_from_user_json(user.ai_models_json)[0]["value"]
-        resolved_model = (model or default_model or "").strip()
+        explicit = (model or default_model or "").strip()
     else:
         if integration is None:
             raise ValueError("未配置自建 LLM 时，必须在请求内解析并传入用户集成配置 integration")
         api_key = integration.volcengine_api_key
-        base_url = integration.volcengine_base_url
-        resolved_model = resolve_model_alias_for_volcengine(model or "", integration)
+        base_url_raw = integration.volcengine_base_url
+        explicit = resolve_model_alias_for_volcengine(model or "", integration)
+    base_url = normalize_openai_base_url(base_url_raw)
+    factory = LLMClientFactory()
+    cfg = LLMClientConfig(api_key=api_key, base_url=base_url, model_name=explicit)
+    resolved_model = factory.resolve_model_name(cfg)
     if not api_key or not base_url or not resolved_model:
         raise ValueError("LLM 配置不完整，无法执行 AI 拆解")
 
@@ -73,27 +78,15 @@ async def split_outline_markdown_with_ai_stream(
     if agent_prompt and agent_prompt.strip():
         system_prompt = f"{system_prompt}\n\n【智能体补充规则】\n{agent_prompt.strip()}"
     user_prompt = f"请拆解以下剧本大纲：\n\n{outline_markdown}"
-
-    http_client = httpx.AsyncClient(timeout=180.0, trust_env=False)
-    client = AsyncOpenAI(api_key=api_key, base_url=base_url, http_client=http_client)
-    try:
-        stream = await client.chat.completions.create(
-            model=resolved_model,
-            stream=True,
-            temperature=0.4,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        )
-        async for chunk in stream:
-            delta = ""
-            if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
-                delta = str(chunk.choices[0].delta.content)
-            if delta:
-                yield delta
-    finally:
-        await http_client.aclose()
+    async for delta in factory.stream_chat_completions_deltas(
+        cfg=cfg,
+        temperature=0.4,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    ):
+        yield delta
 
 
 def _fast_split_markdown(outline_markdown: str) -> str:

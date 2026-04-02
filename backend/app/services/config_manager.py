@@ -147,3 +147,13 @@ def resolve_model_alias_for_volcengine(model_alias: str, cfg: ResolvedIntegratio
         "claude-3-5-sonnet": cfg.volcengine_endpoint_id,
     }
     return alias_map.get(model_alias, model_alias)
+
+
+def looks_like_volcengine_ark_base_url(api_base_url: str) -> bool:
+    """火山引擎方舟 OpenAI 兼容接口：chat.completions 的 model 须为推理接入点 ID（ep- 开头）。"""
+    u = (api_base_url or "").strip().lower()
+    if not u:
+        return False
+    return "volces.com" in u or "volcengineapi.com" in u
+
+

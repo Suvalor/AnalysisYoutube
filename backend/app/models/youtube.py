@@ -105,6 +105,7 @@ class YouTubeVideo(Base):
         ForeignKey("youtube_channels.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     thumbnail_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     duration_sec: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -126,6 +127,32 @@ class YouTubeVideo(Base):
     channel: Mapped["YouTubeChannel"] = relationship("YouTubeChannel", back_populates="videos")
     comments: Mapped[list["YouTubeComment"]] = relationship(
         "YouTubeComment", back_populates="video", cascade="all, delete-orphan"
+    )
+
+
+class YouTubeVideoAnalysis(Base):
+    """视频 AI 深度洞察持久化结果（每个组织/视频一份最新）。"""
+
+    __tablename__ = "video_analyses"
+    __table_args__ = (
+        UniqueConstraint("org_id", "video_id", name="uq_video_analyses_org_video"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    video_id: Mapped[int] = mapped_column(
+        ForeignKey("youtube_videos.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    org_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    model_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    agent_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
 

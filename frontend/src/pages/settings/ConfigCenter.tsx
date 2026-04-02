@@ -1,5 +1,20 @@
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
-import { Button, Card, Form, Input, Modal, Popconfirm, Radio, Space, Spin, Table, Tabs, Tag, message } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Form,
+  Input,
+  Modal,
+  Popconfirm,
+  Radio,
+  Space,
+  Spin,
+  Table,
+  Tabs,
+  Tag,
+  message,
+} from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -32,6 +47,32 @@ import {
 } from "@/services/userApi";
 
 const SECRET_MASK = "********";
+
+/** 与后端 llm_openai_factory.VOLCENGINE_CODING_OPENAI_BASE_URL_CANONICAL 一致 */
+const VOLCENGINE_CODING_BASE_URL_CANONICAL = "https://ark.cn-beijing.volces.com/api/coding/v3";
+
+function normalizeBaseUrlForCompare(raw: string): string {
+  return raw.trim().replace(/\/+$/, "");
+}
+
+/** 保存前校验：火山相关域名下路径是否含 /v3，减少 404 */
+function validateVolcengineLikeBaseUrl(url: string): string | null {
+  const u = url.trim();
+  if (!u) return null;
+  const lower = u.toLowerCase();
+  if (!lower.includes("volces.com") && !lower.includes("volcengineapi.com")) return null;
+  if (lower.includes("/api/coding/")) {
+    const core = normalizeBaseUrlForCompare(u);
+    if (!/\/v3$/i.test(core)) {
+      return "Coding Plan 地址须以 /v3 结尾，例如：https://ark.cn-beijing.volces.com/api/coding/v3";
+    }
+    return null;
+  }
+  if (!lower.includes("/v3")) {
+    return "该火山域名下 OpenAI 兼容接口通常需包含路径 /v3，请对照控制台填写完整 Base URL。";
+  }
+  return null;
+}
 
 /** 与后端 is_secret_placeholder 对齐：勿把占位符当新密钥提交 */
 function looksLikeMaskedSecret(s: string | undefined): boolean {
@@ -109,6 +150,12 @@ export default function ConfigCenter() {
   const [editingTextId, setEditingTextId] = useState<number | null>(null);
 
   const [modelForm] = Form.useForm<ModelFormValues>();
+  const watchedModelBaseUrl = Form.useWatch("api_base_url", modelForm);
+  const isVolcengineCodingPlanUrl = useMemo(() => {
+    const a = normalizeBaseUrlForCompare(watchedModelBaseUrl ?? "");
+    const b = normalizeBaseUrlForCompare(VOLCENGINE_CODING_BASE_URL_CANONICAL);
+    return a.length > 0 && a === b;
+  }, [watchedModelBaseUrl]);
   const [textForm] = Form.useForm<TextFormValues>();
   const [storageForm] = Form.useForm<StorageFormValues>();
   const [youtubeForm] = Form.useForm<YoutubeFormValues>();
@@ -240,9 +287,27 @@ export default function ConfigCenter() {
     setModelOpen(true);
   };
 
+  const applyCodingPlanModelSuggestion = () => {
+    const list = (modelForm.getFieldValue("supported_models") ?? []) as Array<{ label?: string; value?: string }>;
+    const next = [...list];
+    const has = next.some((x) => (x?.value ?? "").trim() === "ark-code-latest");
+    if (has) {
+      message.info("列表中已包含 ark-code-latest，可直接编辑。");
+      return;
+    }
+    next.unshift({ label: "Coding 默认", value: "ark-code-latest" });
+    modelForm.setFieldsValue({ supported_models: next });
+    message.success("已添加建议模型 ID：ark-code-latest（可改名或删除）");
+  };
+
   const submitModel = async () => {
     try {
       const values = await modelForm.validateFields();
+      const urlErr = validateVolcengineLikeBaseUrl(values.api_base_url ?? "");
+      if (urlErr) {
+        message.error(urlErr);
+        return;
+      }
       setSaving(true);
       const payload: {
         name?: string;
@@ -828,11 +893,19 @@ export default function ConfigCenter() {
                                 >
                                   <Input.Password placeholder="留空不修改" autoComplete="new-password" />
                                 </Form.Item>
-                                <Form.Item name="volcengine_endpoint_id" label="Endpoint / 默认模型 ID">
-                                  <Input />
+                                <Form.Item
+                                  name="volcengine_endpoint_id"
+                                  label="Endpoint / 默认模型 ID"
+                                  extra="支持 ark-code-latest 或控制台推理接入点 ID（ep- 开头）。未填且 Base URL 为 Coding Plan 时，服务端可默认 ark-code-latest。"
+                                >
+                                  <Input placeholder="ark-code-latest 或 ep-xxxx" />
                                 </Form.Item>
-                                <Form.Item name="volcengine_base_url" label="Base URL">
-                                  <Input placeholder="https://ark.../v3" />
+                                <Form.Item
+                                  name="volcengine_base_url"
+                                  label="Base URL"
+                                  extra={`建议（Coding Plan）：${VOLCENGINE_CODING_BASE_URL_CANONICAL}；须含 /v3 路径段。`}
+                                >
+                                  <Input placeholder="https://ark.cn-beijing.volces.com/api/coding/v3" />
                                 </Form.Item>
                                 <Form.Item
                                   name="volcengine_model_gemini"
@@ -867,9 +940,23 @@ export default function ConfigCenter() {
           <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入名称" }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="api_base_url" label="URL" rules={[{ required: true, message: "请输入 URL" }]}>
-            <Input />
+          <Form.Item
+            name="api_base_url"
+            label="Base URL"
+            rules={[{ required: true, message: "请输入 Base URL" }]}
+            extra="标准 OpenAI 兼容网关直接填写完整根路径。火山 Coding Plan 建议：将本字段填为控制台提供的地址（通常含 /api/coding/v3）。"
+          >
+            <Input placeholder="例如 https://api.openai.com/v1 或火山控制台地址" />
           </Form.Item>
+          {isVolcengineCodingPlanUrl ? (
+            <Alert
+              type="info"
+              showIcon
+              className="mb-3"
+              message="检测到火山引擎 Coding Plan 接口"
+              description="将按该 Base URL 由服务端适配非标准协议（未指定模型时可使用 ark-code-latest）。你可继续手动修改下方「模型 ID」。"
+            />
+          ) : null}
           <Form.Item
             name="api_key"
             label="Key"
@@ -880,7 +967,18 @@ export default function ConfigCenter() {
               autoComplete="new-password"
             />
           </Form.Item>
-          <Form.Item label="支持的模型列表">
+          <Form.Item
+            label={
+              <span className="flex flex-wrap items-center gap-2">
+                <span>支持的模型列表</span>
+                {isVolcengineCodingPlanUrl ? (
+                  <Button type="link" size="small" className="!p-0" onClick={applyCodingPlanModelSuggestion}>
+                    建议填入 ark-code-latest
+                  </Button>
+                ) : null}
+              </span>
+            }
+          >
             <Form.List name="supported_models">
               {(fields, { add, remove }) => (
                 <div className="space-y-2">
@@ -900,7 +998,10 @@ export default function ConfigCenter() {
                         className="!mb-0"
                         rules={[{ max: 128, message: "模型 ID 过长" }]}
                       >
-                        <Input placeholder="模型 ID（value）" className="w-56" />
+                        <Input
+                          placeholder="模型 ID：ark-code-latest 或 Endpoint ID"
+                          className="w-56"
+                        />
                       </Form.Item>
                       <Button
                         type="text"

@@ -10,7 +10,13 @@ from fastapi import HTTPException, status
 YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3"
 
 CHANNEL_ID_REGEX = re.compile(r"(?:youtube\.com/channel/)(UC[a-zA-Z0-9_-]{22})")
-HANDLE_REGEX = re.compile(r"(?:youtube\.com/)(@[\w\.-]+)")
+# 允许 handle 中包含 '-'，例如 @GiggleGalaxyTV-k9e
+HANDLE_REGEX = re.compile(r"(?:youtube\.com/)(@[\w\.\-]+)")
+
+# 旧版自定义频道 URL（不使用 search.list）：
+# - https://www.youtube.com/c/CreatorName
+# - https://www.youtube.com/user/CreatorName
+CUSTOM_URL_REGEX = re.compile(r"(?:youtube\.com/)(?:c|user)/([a-zA-Z0-9_\.\-]+)")
 
 # 单次请求最多 50 个 ID（YouTube Data API 限制）
 MAX_IDS_PER_REQUEST = 50
@@ -59,6 +65,11 @@ def parse_youtube_identifier(youtube_url: str) -> dict[str, str]:
     handle_match = HANDLE_REGEX.search(youtube_url)
     if handle_match:
         return {"handle": handle_match.group(1)}
+
+    # /c/ /user/ 形式：当成 forHandle 的自定义名处理
+    custom_match = CUSTOM_URL_REGEX.search(youtube_url)
+    if custom_match:
+        return {"handle": custom_match.group(1)}
 
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -211,16 +222,24 @@ async def fetch_recent_videos(
             .get("relatedPlaylists", {})
             .get("uploads")
         )
-        if not uploads:
+        # uploads 应为字符串（上传播放列表 ID），若不是字符串则视为无可用 uploads。
+        if isinstance(uploads, dict):
+            uploads = uploads.get("playlistId") or uploads.get("id") or uploads.get("value")
+        if not isinstance(uploads, str) or not uploads.strip():
             return ([], quota) if return_quota else []
+        uploads = uploads.strip()
 
-        pl_data = await _playlist_items_get(
-            client,
-            playlist_id=uploads,
-            max_results=limit,
-            youtube_api_key=youtube_api_key,
-        )
         quota.playlist_items_calls = 1
+        try:
+            pl_data = await _playlist_items_get(
+                client,
+                playlist_id=uploads,
+                max_results=limit,
+                youtube_api_key=youtube_api_key,
+            )
+        except HTTPException:
+            # 单频道 uploads 无效/不可用时：降级为“无近期视频”，不阻断频道入库流程
+            return ([], quota) if return_quota else []
         pl_items = pl_data.get("items", [])
         video_ids: list[str] = []
         for pl in pl_items:
@@ -405,18 +424,26 @@ async def _pipeline_fetch_channels_and_videos(
             .get("relatedPlaylists", {})
             .get("uploads")
         )
-        if not cid or not uploads:
+        # uploads 应为字符串（上传播放列表 ID）
+        if isinstance(uploads, dict):
+            uploads = uploads.get("playlistId") or uploads.get("id") or uploads.get("value")
+        if not cid or not isinstance(uploads, str) or not uploads.strip():
             if cid:
                 result.errors.append(f"频道 {cid}: 无 uploads 播放列表，跳过视频拉取")
             continue
+        uploads = uploads.strip()
 
-        pl_data = await _playlist_items_get(
-            client,
-            playlist_id=uploads,
-            max_results=50,
-            youtube_api_key=youtube_api_key,
-        )
         result.playlist_items_calls += 1
+        try:
+            pl_data = await _playlist_items_get(
+                client,
+                playlist_id=uploads,
+                max_results=50,
+                youtube_api_key=youtube_api_key,
+            )
+        except HTTPException as exc:
+            result.errors.append(f"频道 {cid}: uploads playlistItems 拉取失败：{exc.detail}")
+            continue
         for pl in pl_data.get("items", []):
             vid = pl.get("snippet", {}).get("resourceId", {}).get("videoId")
             if vid:

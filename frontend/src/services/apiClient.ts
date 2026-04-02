@@ -14,7 +14,9 @@ function normalizeBackendBaseURL(raw: string | undefined): string {
 
 const apiClient = axios.create({
   baseURL: normalizeBackendBaseURL(import.meta.env.VITE_API_BASE_URL),
-  timeout: 10000,
+  // YouTube 批量拉取（尤其 /api/youtube/analyze/batch 与 /channels/batch-update）可能耗时较长，
+  // 需要避免被过短的 axios 超时提前中断（导致前端表现为“接口异常/监听通道关闭”等）。
+  timeout: 120000,
 });
 
 apiClient.interceptors.request.use((config) => {

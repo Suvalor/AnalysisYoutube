@@ -3,10 +3,9 @@ from typing import AsyncGenerator
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
-from openai import AsyncOpenAI
-
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.services.config_manager import resolve_integration_config
+from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig, normalize_openai_base_url
 from app.crud.library import get_by_user
 from app.models.library import PromptLibrary, StyleLibrary
 from app.schemas.library import GenerateScriptStreamRequest
@@ -34,16 +33,19 @@ async def generate_script_stream(
         )
 
     icfg = await resolve_integration_config(db, org_id=current_user.org_id)
-    if not icfg.volcengine_api_key or not icfg.volcengine_base_url or not icfg.volcengine_endpoint_id:
+    base = normalize_openai_base_url(icfg.volcengine_base_url)
+    factory = LLMClientFactory()
+    cfg = LLMClientConfig(
+        api_key=icfg.volcengine_api_key,
+        base_url=base,
+        model_name=icfg.volcengine_endpoint_id or "",
+    )
+    resolved_model = factory.resolve_model_name(cfg)
+    if not icfg.volcengine_api_key or not base or not resolved_model:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="火山引擎配置不完整",
+            detail="火山引擎配置不完整：请检查 API Key、Base URL；Coding 接口可仅填 Key+URL，模型可默认。",
         )
-
-    client = AsyncOpenAI(
-        api_key=icfg.volcengine_api_key,
-        base_url=icfg.volcengine_base_url,
-    )
     system_prompt = (
         "你是一个专业的内容创作者。\n"
         f"【核心任务】: {prompt.content}\n"
@@ -53,21 +55,15 @@ async def generate_script_stream(
 
     async def event_generator() -> AsyncGenerator[str, None]:
         try:
-            stream = await client.chat.completions.create(
-                model=icfg.volcengine_endpoint_id,
-                stream=True,
+            async for delta in factory.stream_chat_completions_deltas(
+                cfg=cfg,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
                 ],
                 temperature=0.7,
-            )
-            async for chunk in stream:
-                delta = ""
-                if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
-                    delta = chunk.choices[0].delta.content
-                if delta:
-                    yield _sse({"type": "delta", "content": delta})
+            ):
+                yield _sse({"type": "delta", "content": delta})
             yield _sse({"type": "done"})
         except Exception as exc:  # noqa: BLE001
             yield _sse({"type": "error", "message": str(exc)})
