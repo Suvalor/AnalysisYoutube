@@ -2,7 +2,7 @@
 视频静态文本水印自动去除模块（抽帧 OCR + FFmpeg delogo）。
 
 安装依赖（Python）：
-pip install ffmpeg-python paddlepaddle paddleocr opencv-python numpy
+pip install ffmpeg-python paddlepaddle paddleocr numpy（opencv-python 通常由 paddleocr 依赖安装）
 
 系统依赖（必须安装）：
 - ffmpeg 命令行工具（用于真正执行视频滤镜处理）
@@ -18,12 +18,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import cv2
 import ffmpeg
-import numpy as np
 
+# cv2/numpy 延迟导入，避免 Docker 内 numpy/opencv ABI 不匹配时阻塞 uvicorn 启动
 
 logger = logging.getLogger(__name__)
+
+
+def _lazy_cv_numpy() -> tuple[Any, Any]:
+    import cv2
+    import numpy as np
+
+    return cv2, np
 
 
 @dataclass
@@ -56,6 +62,7 @@ class VideoWatermarkRemover:
         """
         从 PaddleOCR 返回结果中提取外接矩形列表。
         """
+        cv2, np = _lazy_cv_numpy()
         rects: list[Rect] = []
         if not ocr_result:
             return rects
@@ -168,7 +175,8 @@ class VideoWatermarkRemover:
 
         返回：(是否成功, 失败原因；成功时第二项为空字符串)
         """
-        cap: cv2.VideoCapture | None = None
+        cv2, _ = _lazy_cv_numpy()
+        cap: Any = None
         try:
             in_path = Path(input_video_path)
             out_path = Path(output_video_path)
