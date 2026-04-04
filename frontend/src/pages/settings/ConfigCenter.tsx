@@ -131,6 +131,11 @@ type VolcFormValues = {
   volcengine_endpoint_id: string;
   volcengine_base_url: string;
   volcengine_model_gemini: string;
+  volc_cv_access_key_id: string;
+  volc_cv_secret_access_key: string;
+  volc_cv_region: string;
+  volc_cv_host: string;
+  volc_cv_inpaint_req_key: string;
   watermark_video_ai_max_frames: number;
   watermark_inpaint_prompt: string;
 };
@@ -241,6 +246,11 @@ export default function ConfigCenter() {
       volcengine_endpoint_id: data.volcengine_endpoint_id || "",
       volcengine_base_url: data.volcengine_base_url || "",
       volcengine_model_gemini: data.volcengine_model_gemini || "",
+      volc_cv_access_key_id: data.volc_cv_access_key_id || "",
+      volc_cv_secret_access_key: "",
+      volc_cv_region: data.volc_cv_region || "",
+      volc_cv_host: data.volc_cv_host || "",
+      volc_cv_inpaint_req_key: data.volc_cv_inpaint_req_key || "",
       watermark_video_ai_max_frames: data.watermark_video_ai_max_frames ?? 180,
       watermark_inpaint_prompt: data.watermark_inpaint_prompt || "",
     });
@@ -571,6 +581,10 @@ export default function ConfigCenter() {
         volcengine_endpoint_id: trimOrNull(values.volcengine_endpoint_id),
         volcengine_base_url: trimOrNull(values.volcengine_base_url),
         volcengine_model_gemini: trimOrNull(values.volcengine_model_gemini),
+        volc_cv_access_key_id: trimOrNull(values.volc_cv_access_key_id),
+        volc_cv_region: trimOrNull(values.volc_cv_region),
+        volc_cv_host: trimOrNull(values.volc_cv_host),
+        volc_cv_inpaint_req_key: trimOrNull(values.volc_cv_inpaint_req_key),
       };
       const wm = values.watermark_video_ai_max_frames;
       if (wm != null && !Number.isNaN(Number(wm))) {
@@ -582,6 +596,8 @@ export default function ConfigCenter() {
       payload.watermark_inpaint_prompt = wp.length ? wp : null;
       const vk = (values.volcengine_api_key ?? "").trim();
       if (vk && !looksLikeMaskedSecret(vk)) payload.volcengine_api_key = vk;
+      const vcsk = (values.volc_cv_secret_access_key ?? "").trim();
+      if (vcsk && !looksLikeMaskedSecret(vcsk)) payload.volc_cv_secret_access_key = vcsk;
       const updated = await updateIntegrationSettingsApi(payload);
       applyIntegrationReadToForms(updated);
       message.success("火山引擎配置已保存");
@@ -905,7 +921,7 @@ export default function ConfigCenter() {
                         },
                         {
                           key: "volc",
-                          label: "火山引擎（LLM）",
+                          label: "火山引擎（LLM / 视觉）",
                           children: (
                             <div className="pt-2 max-w-xl">
                               <div className="mb-3">
@@ -946,10 +962,52 @@ export default function ConfigCenter() {
                                 >
                                   <Input />
                                 </Form.Item>
+                                <div className="text-slate-600 text-sm font-medium mt-4 mb-2">
+                                  智能视觉 CV（去水印 / 图像修补）
+                                </div>
+                                <p className="text-slate-500 text-xs mb-2">
+                                  与上方方舟 API Key 不同：此处为 AccessKey（ID）+ SecretAccessKey，用于火山 CV Img2ImgInpainting。
+                                  配置后将优先于 OpenAI 兼容通道；未配置时可仅用「图像修复」模型库。
+                                </p>
+                                <Form.Item name="volc_cv_access_key_id" label="CV AccessKey ID">
+                                  <Input placeholder="AK 留空不修改" autoComplete="off" />
+                                </Form.Item>
+                                <Form.Item
+                                  name="volc_cv_secret_access_key"
+                                  label="CV SecretAccessKey"
+                                  extra={
+                                    integrationMeta?.has_volc_cv_secret_access_key
+                                      ? `已配置（${SECRET_MASK}），留空不修改`
+                                      : undefined
+                                  }
+                                >
+                                  <Input.Password placeholder="SK" autoComplete="new-password" />
+                                </Form.Item>
+                                <Form.Item
+                                  name="volc_cv_region"
+                                  label="Region"
+                                  extra="默认 cn-north-1；与控制台开通区域一致"
+                                >
+                                  <Input placeholder="cn-north-1" />
+                                </Form.Item>
+                                <Form.Item
+                                  name="volc_cv_host"
+                                  label="自定义 Host（可选）"
+                                  extra="一般留空，由 SDK 解析；特殊网络环境可填 visual 域名（不含 https://）"
+                                >
+                                  <Input placeholder="可选" />
+                                </Form.Item>
+                                <Form.Item
+                                  name="volc_cv_inpaint_req_key"
+                                  label="Inpaint req_key"
+                                  extra="默认 i2i_inpainting；与控制台开通能力一致"
+                                >
+                                  <Input placeholder="i2i_inpainting" />
+                                </Form.Item>
                                 <div className="text-slate-600 text-sm font-medium mt-4 mb-2">去水印（AI 修复）组织默认</div>
                                 <p className="text-slate-500 text-xs mb-2">
-                                  需在「模型管理」新增用途为「图像修复」的条目，填写 OpenAI 兼容 Base URL（如 https://api.openai.com/v1）与
-                                  images.edit 所用模型 ID（如 dall-e-2）。以下为提示词与视频逐帧上限。
+                                  可选：在「模型管理」新增用途为「图像修复」的条目，填写 OpenAI 兼容 Base URL 与 images.edit 模型 ID。
+                                  若已配置火山 CV，将优先走火山；否则走该条目。以下为提示词与视频帧数上限。
                                 </p>
                                 <Form.Item
                                   name="watermark_video_ai_max_frames"

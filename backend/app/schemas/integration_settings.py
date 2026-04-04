@@ -29,6 +29,10 @@ class IntegrationSettingsRead(BaseModel):
     volcengine_endpoint_id: str = ""
     volcengine_base_url: str = ""
     volcengine_model_gemini: str = ""
+    volc_cv_access_key_id: str = Field("", description="智能视觉 CV AccessKey（图像修补，与方舟 API Key 不同）")
+    volc_cv_region: str = ""
+    volc_cv_host: str = Field("", description="可选，自定义 API Host（不含 https://）")
+    volc_cv_inpaint_req_key: str = Field("", description="Img2ImgInpainting 的 req_key，默认 i2i_inpainting")
     watermark_video_ai_max_frames: int = Field(180, description="视频逐帧 AI 修复最大帧数，超出则 FFmpeg delogo")
     watermark_inpaint_prompt: str = Field("", description="去水印 images.edit 提示词（组织默认）")
 
@@ -36,11 +40,13 @@ class IntegrationSettingsRead(BaseModel):
     has_aliyun_access_key_secret: bool = False
     has_tencent_cos_secret_key: bool = False
     has_volcengine_api_key: bool = False
+    has_volc_cv_secret_access_key: bool = False
 
     youtube_api_key_display: str | None = Field(None, description="已配置时为 ********，勿作为新密钥提交")
     aliyun_access_key_secret_display: str | None = None
     tencent_cos_secret_key_display: str | None = None
     volcengine_api_key_display: str | None = None
+    volc_cv_secret_access_key_display: str | None = None
 
 
 class IntegrationSettingsUpdate(BaseModel):
@@ -66,6 +72,11 @@ class IntegrationSettingsUpdate(BaseModel):
     volcengine_endpoint_id: str | None = None
     volcengine_base_url: str | None = None
     volcengine_model_gemini: str | None = None
+    volc_cv_access_key_id: str | None = None
+    volc_cv_secret_access_key: str | None = None
+    volc_cv_region: str | None = None
+    volc_cv_host: str | None = None
+    volc_cv_inpaint_req_key: str | None = None
     watermark_video_ai_max_frames: int | None = Field(None, ge=1, le=10000)
     watermark_inpaint_prompt: str | None = None
 

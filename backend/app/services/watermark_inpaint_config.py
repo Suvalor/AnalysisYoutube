@@ -1,8 +1,9 @@
 """
 去水印插件：从「模型管理」与组织集成配置解析运行时 Inpainting 参数。
 
-- 图像修复模型：model_libraries 中 library_kind=image_inpaint，取当前用户最近更新的一条。
-- 提示词与视频逐帧上限：org_settings.payload_json 中的 watermark_inpaint_prompt、watermark_video_ai_max_frames。
+- OpenAI 兼容：model_libraries 中 library_kind=image_inpaint。
+- 火山智能视觉 CV：组织集成 volc_cv_*（AccessKey/SecretKey/Region 等），走 Img2ImgInpainting。
+- 提示词与视频参数：org_settings.payload_json 中的 watermark_inpaint_prompt、watermark_video_ai_max_frames。
 """
 
 from __future__ import annotations
@@ -25,14 +26,36 @@ MODEL_LIBRARY_KIND_IMAGE_INPAINT = "image_inpaint"
 
 
 @dataclass(frozen=True)
-class InpaintRuntimeConfig:
-    """单次去水印请求使用的 AI 修复参数（OpenAI 兼容 POST /v1/images/edits）。"""
+class OpenAIInpaintSlice:
+    """OpenAI 兼容 POST /v1/images/edits 所需参数。"""
 
     api_base_url: str
     api_key: str
     model_id: str
     prompt: str
+
+
+@dataclass(frozen=True)
+class VolcCvInpaintSlice:
+    """火山 CV Img2ImgInpainting：AK/SK 来自组织集成或环境变量合并结果。"""
+
+    access_key_id: str
+    secret_access_key: str
+    region: str
+    host: str
+    req_key: str
+
+
+@dataclass(frozen=True)
+class InpaintRuntimeConfig:
+    """单次去水印请求：可同时具备火山 CV 与 OpenAI 兼容配置，执行时优先火山再 OpenAI。"""
+
     video_max_frames: int
+    openai: OpenAIInpaintSlice | None
+    volc_cv: VolcCvInpaintSlice | None
+
+    def has_any_ai(self) -> bool:
+        return self.openai is not None or self.volc_cv is not None
 
 
 def _first_supported_model_value(raw: str | None) -> str | None:
@@ -60,13 +83,30 @@ async def resolve_inpaint_runtime_config(
     org_id: int | None,
 ) -> InpaintRuntimeConfig | None:
     """
-    无有效「图像修复」模型库条目时返回 None，调用方应记录日志并回退本地算法。
+    解析运行时配置；若火山 CV 与 OpenAI 均未配置则返回 None，调用方回退本地 OpenCV。
     """
     icfg = await resolve_integration_config(session, org_id=org_id)
     prompt = (icfg.watermark_inpaint_prompt or "").strip() or DEFAULT_WATERMARK_INPAINT_PROMPT
-
     max_frames = icfg.watermark_video_ai_max_frames
 
+    volc_cv: VolcCvInpaintSlice | None = None
+    ak = (icfg.volc_cv_access_key_id or "").strip()
+    sk = (icfg.volc_cv_secret_access_key or "").strip()
+    if ak and sk:
+        region = (icfg.volc_cv_region or "").strip() or "cn-north-1"
+        host = (icfg.volc_cv_host or "").strip()
+        req_key = (icfg.volc_cv_inpaint_req_key or "").strip() or "i2i_inpainting"
+        volc_cv = VolcCvInpaintSlice(
+            access_key_id=ak,
+            secret_access_key=sk,
+            region=region,
+            host=host,
+            req_key=req_key,
+        )
+    else:
+        logger.debug("未配置 volc_cv_access_key_id/volc_cv_secret_access_key，跳过火山 CV Inpaint")
+
+    openai_slice: OpenAIInpaintSlice | None = None
     stmt = (
         select(ModelLibrary)
         .where(
@@ -77,25 +117,28 @@ async def resolve_inpaint_runtime_config(
         .limit(1)
     )
     row = (await session.execute(stmt)).scalar_one_or_none()
-    if row is None:
-        logger.info("未找到配置的 AI 图像模型（model_libraries.library_kind=image_inpaint），去水印将使用本地算法")
-        return None
+    if row is not None:
+        api_key = try_decrypt(row.api_key_encrypted)
+        base = (row.api_base_url or "").strip().rstrip("/")
+        if api_key and base:
+            model_id = _first_supported_model_value(row.supported_models_json) or "dall-e-2"
+            openai_slice = OpenAIInpaintSlice(
+                api_base_url=base,
+                api_key=api_key,
+                model_id=model_id,
+                prompt=prompt,
+            )
+        else:
+            logger.warning("图像修复模型库 id=%s 缺少 API Key 或 Base URL，跳过 OpenAI 兼容 Inpaint", row.id)
+    else:
+        logger.info("未找到 model_libraries.library_kind=image_inpaint 条目，跳过 OpenAI 兼容 Inpaint")
 
-    api_key = try_decrypt(row.api_key_encrypted)
-    if not api_key:
-        logger.warning("图像修复模型库 id=%s 未设置有效 API Key，去水印将使用本地算法", row.id)
+    if volc_cv is None and openai_slice is None:
+        logger.info("未配置任何云端 Inpaint（火山 CV 与图像修复模型库均无），去水印将使用本地 OpenCV")
         return None
-
-    base = (row.api_base_url or "").strip().rstrip("/")
-    if not base:
-        return None
-
-    model_id = _first_supported_model_value(row.supported_models_json) or "dall-e-2"
 
     return InpaintRuntimeConfig(
-        api_base_url=base,
-        api_key=api_key,
-        model_id=model_id,
-        prompt=prompt,
         video_max_frames=max_frames,
+        openai=openai_slice,
+        volc_cv=volc_cv,
     )

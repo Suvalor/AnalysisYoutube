@@ -12,6 +12,8 @@ python-dotenv==1.0.1
 PyMySQL==1.1.1
 email-validator==2.2.0
 httpx==0.28.1
+# 火山引擎 OpenAPI（智能视觉 CV：Img2ImgInpainting 等），用于去水印云端修复
+volcengine-python-sdk>=5.0.22,<6
 APScheduler==3.10.4
 openai==1.52.2
 alibabacloud_sts20150401==1.2.0

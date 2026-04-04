@@ -35,6 +35,12 @@ INTEGRATION_PAYLOAD_KEYS: frozenset[str] = frozenset(
         # 去水印插件：组织级默认（可被 model_libraries 中 image_inpaint 条目覆盖密钥与 Base URL）
         "watermark_video_ai_max_frames",
         "watermark_inpaint_prompt",
+        # 火山智能视觉 CV（图像修补），与 volcengine_api_key（方舟/LLM）分离
+        "volc_cv_access_key_id",
+        "volc_cv_secret_access_key",
+        "volc_cv_region",
+        "volc_cv_host",
+        "volc_cv_inpaint_req_key",
     }
 )
 
@@ -44,6 +50,7 @@ SECRET_PAYLOAD_KEYS: frozenset[str] = frozenset(
         "aliyun_access_key_secret",
         "tencent_cos_secret_key",
         "volcengine_api_key",
+        "volc_cv_secret_access_key",
     }
 )
 
@@ -115,6 +122,11 @@ class ResolvedIntegrationConfig:
     volcengine_endpoint_id: str
     volcengine_base_url: str
     volcengine_model_gemini: str
+    volc_cv_access_key_id: str
+    volc_cv_secret_access_key: str
+    volc_cv_region: str
+    volc_cv_host: str
+    volc_cv_inpaint_req_key: str
     watermark_video_ai_max_frames: int
     watermark_inpaint_prompt: str
 
@@ -141,6 +153,11 @@ def merge_integration_config(db_payload: dict[str, str] | None, s: Settings | No
         volcengine_endpoint_id=_pick_str(d, "volcengine_endpoint_id", base.volcengine_endpoint_id),
         volcengine_base_url=_pick_str(d, "volcengine_base_url", base.volcengine_base_url),
         volcengine_model_gemini=_pick_str(d, "volcengine_model_gemini", base.volcengine_model_gemini),
+        volc_cv_access_key_id=_pick_str(d, "volc_cv_access_key_id", base.volc_cv_access_key_id),
+        volc_cv_secret_access_key=_pick_str(d, "volc_cv_secret_access_key", base.volc_cv_secret_access_key),
+        volc_cv_region=_pick_str(d, "volc_cv_region", base.volc_cv_region),
+        volc_cv_host=_pick_str(d, "volc_cv_host", base.volc_cv_host),
+        volc_cv_inpaint_req_key=_pick_str(d, "volc_cv_inpaint_req_key", base.volc_cv_inpaint_req_key),
         watermark_video_ai_max_frames=_pick_int_clamped(
             d, "watermark_video_ai_max_frames", 180, lo=1, hi=10000
         ),
