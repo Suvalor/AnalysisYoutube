@@ -114,7 +114,7 @@ async def archive_doc(
         content=FeishuDocArchiveTriggerResponse(
             status="accepted",
             doc_id=doc_id,
-            message="归档任务已排队，请稍后刷新列表查看状态",
+            message="归档任务已排队（后台校验 PDF 有效后才会标记成功，请留意列表状态）",
         ).model_dump(),
     )
 
