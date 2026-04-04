@@ -159,13 +159,11 @@ class VideoWatermarkRemover:
             return None
         return Rect(x=x, y=y, w=w, h=h)
 
-    def auto_remove_video_watermark(self, input_video_path: str, output_video_path: str) -> bool:
+    def auto_remove_video_watermark(self, input_video_path: str, output_video_path: str) -> tuple[bool, str]:
         """
         自动去除视频中的静态文本水印。
 
-        返回：
-        - True: 成功（包括未检测到静态水印时复制原视频）
-        - False: 处理失败
+        返回：(是否成功, 失败原因；成功时第二项为空字符串)
         """
         cap: cv2.VideoCapture | None = None
         try:
@@ -176,7 +174,7 @@ class VideoWatermarkRemover:
             cap = cv2.VideoCapture(str(in_path))
             if not cap.isOpened():
                 logger.error("视频读取失败，无法打开文件: %s", input_video_path)
-                return False
+                return False, "无法打开视频文件（格式不支持或文件损坏）"
 
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
@@ -191,13 +189,13 @@ class VideoWatermarkRemover:
                     frame_height,
                     input_video_path,
                 )
-                return False
+                return False, "视频元数据异常（无法读取分辨率或帧数）"
 
             sampled_indices = self._sample_frame_indices(total_frames, sample_count=5)
             if not sampled_indices:
                 logger.warning("未能抽取有效关键帧，直接复制原视频: %s", input_video_path)
                 shutil.copy2(input_video_path, output_video_path)
-                return True
+                return True, ""
 
             all_frame_rects: list[list[Rect]] = []
             for idx in sampled_indices:
@@ -206,12 +204,10 @@ class VideoWatermarkRemover:
                 if not ok or frame is None:
                     all_frame_rects.append([])
                     continue
-                # PaddleOCR 支持直接传 numpy 图像
                 ocr_result = self.ocr.ocr(frame, cls=True)
                 rects = self._extract_text_rects(ocr_result)
                 all_frame_rects.append(rects)
 
-            # 至少在 3 帧中稳定出现，才认定为静态水印
             min_hits = min(3, len(sampled_indices))
             static_rect = self._find_static_watermark_rect(
                 all_frame_rects=all_frame_rects,
@@ -223,9 +219,8 @@ class VideoWatermarkRemover:
             if static_rect is None:
                 logger.info("未检测到稳定静态文本水印，复制原视频: %s", input_video_path)
                 shutil.copy2(input_video_path, output_video_path)
-                return True
+                return True, ""
 
-            # FFmpeg delogo：处理视频流，音频流直接 copy
             (
                 ffmpeg.input(str(in_path))
                 .filter(
@@ -240,31 +235,35 @@ class VideoWatermarkRemover:
                 .overwrite_output()
                 .run(capture_stdout=True, capture_stderr=True)
             )
-            return True
+            return True, ""
 
         except ffmpeg.Error as exc:
             stderr = exc.stderr.decode("utf-8", errors="ignore") if exc.stderr else str(exc)
             logger.error("FFmpeg 去水印执行失败: %s", stderr)
-            return False
+            tail = (stderr or "").strip()[-240:]
+            if tail:
+                return False, f"视频处理失败（FFmpeg），请确认已安装 ffmpeg。摘要：{tail}"
+            return False, "视频处理失败（FFmpeg），请确认系统已安装 ffmpeg 命令行工具"
+
         except MemoryError:
             logger.exception("视频去水印失败：内存不足，input=%s", input_video_path)
-            return False
-        except Exception:  # noqa: BLE001
+            return False, "内存不足，请尝试缩短视频或降低分辨率后重试"
+
+        except Exception as exc:  # noqa: BLE001
             logger.exception("视频去水印失败，input=%s output=%s", input_video_path, output_video_path)
-            return False
+            return False, f"处理异常：{type(exc).__name__}"
+
         finally:
             if cap is not None:
                 cap.release()
 
 
-def auto_remove_video_watermark(input_video_path: str, output_video_path: str) -> bool:
-    """
-    对外暴露便捷函数。
-    """
+def auto_remove_video_watermark(input_video_path: str, output_video_path: str) -> tuple[bool, str]:
+    """对外便捷函数，返回 (成功, 失败原因)。"""
     try:
         remover = VideoWatermarkRemover()
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
         logger.exception("初始化 PaddleOCR 失败，请确认已安装 paddlepaddle。")
-        return False
+        return False, f"去水印引擎初始化失败（PaddleOCR）：{type(exc).__name__}"
     return remover.auto_remove_video_watermark(input_video_path, output_video_path)
 
