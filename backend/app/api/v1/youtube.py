@@ -86,13 +86,13 @@ def _video_to_read(x: YouTubeVideo) -> YouTubeVideoRead:
     return base.model_copy(update={"tags": x.tags or []})
 
 
-def _videos_to_read(rows: list[YouTubeVideo]) -> list[YouTubeVideoRead]:
+def _videos_to_read(rows: list[tuple[YouTubeVideo, bool]]) -> list[YouTubeVideoRead]:
     items: list[YouTubeVideoRead] = []
-    for x in rows:
+    for x, has_analysis in rows:
         ch = getattr(x, "channel", None)
         ch_title = ch.title if ch is not None else None
         base = _video_to_read(x)
-        items.append(base.model_copy(update={"channel_title": ch_title}))
+        items.append(base.model_copy(update={"channel_title": ch_title, "has_analysis": has_analysis}))
     return items
 
 
@@ -453,6 +453,7 @@ async def _list_videos_impl(
     rows, total = await query_videos(
         db,
         user_id=current_user.id,
+        org_id=current_user.org_id,
         keyword=keyword,
         start_date=start_dt,
         end_date=end_dt,

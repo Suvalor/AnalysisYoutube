@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, exists, func, select
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -461,6 +461,7 @@ async def query_videos(
     session: AsyncSession,
     *,
     user_id: int,
+    org_id: int,
     keyword: str | None = None,
     start_date=None,
     end_date=None,
@@ -482,9 +483,16 @@ async def query_videos(
     comment_count_sort: str | None = None,
     page: int = 1,
     page_size: int = 20,
-) -> tuple[list[YouTubeVideo], int]:
+) -> tuple[list[tuple[YouTubeVideo, bool]], int]:
+    # 列表一次查询附带「是否已有 AI 分析」：EXISTS 子查询，避免对每条视频再查 video_analyses（N+1）
+    has_analysis_exists = exists(
+        select(YouTubeVideoAnalysis.id).where(
+            YouTubeVideoAnalysis.video_id == YouTubeVideo.id,
+            YouTubeVideoAnalysis.org_id == org_id,
+        )
+    )
     stmt: Select = (
-        select(YouTubeVideo)
+        select(YouTubeVideo, has_analysis_exists)
         .join(YouTubeChannel, YouTubeChannel.id == YouTubeVideo.channel_id)
         .join(UserCompetitorPool, UserCompetitorPool.channel_id == YouTubeChannel.id)
         .where(UserCompetitorPool.user_id == user_id)
@@ -561,7 +569,10 @@ async def query_videos(
     total = int((await session.execute(count_stmt)).scalar_one())
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
     result = await session.execute(stmt)
-    return list(result.scalars().unique().all()), total
+    pairs: list[tuple[YouTubeVideo, bool]] = []
+    for row in result.all():
+        pairs.append((row[0], bool(row[1])))
+    return pairs, total
 
 
 async def bulk_upsert_youtube_comments(

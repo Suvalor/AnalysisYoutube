@@ -1,3 +1,4 @@
+import { CheckCircleOutlined } from "@ant-design/icons";
 import { Button, DatePicker, Input, InputNumber, Modal, Pagination, Select, Spin, Tag, message } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -114,6 +115,8 @@ export default function GlobalVideoList() {
   const [panelOpenVideoId, setPanelOpenVideoId] = useState<number | null>(null);
   const [panelLoading, setPanelLoading] = useState<Record<number, boolean>>({});
   const [panelContentByVideoId, setPanelContentByVideoId] = useState<Record<number, string>>({});
+  /** 分析成功后立即把列表标为「已分析」，与接口 has_analysis 合并 */
+  const [hasAnalysisOverride, setHasAnalysisOverride] = useState<Record<number, boolean>>({});
   const [selectedModelByVideoId, setSelectedModelByVideoId] = useState<Record<number, string>>({});
   const [selectedAgentByVideoId, setSelectedAgentByVideoId] = useState<Record<number, number | undefined>>({});
 
@@ -166,6 +169,7 @@ export default function GlobalVideoList() {
         page_size: ps,
       });
       setVideos(data.items);
+      setHasAnalysisOverride({});
       setTotal(data.total);
       setPage(data.page);
       setPageSize(data.page_size);
@@ -221,6 +225,7 @@ export default function GlobalVideoList() {
     try {
       const res = await getYouTubeVideoAnalysisApi(videoId);
       setPanelContentByVideoId((prev) => ({ ...prev, [videoId]: res.content }));
+      setHasAnalysisOverride((prev) => ({ ...prev, [videoId]: true }));
     } catch (e: any) {
       message.error(e?.response?.data?.detail ?? "获取分析结果失败");
     }
@@ -245,6 +250,7 @@ export default function GlobalVideoList() {
         agent_id: agentId ?? null,
       });
       setPanelContentByVideoId((prev) => ({ ...prev, [videoId]: res.content }));
+      setHasAnalysisOverride((prev) => ({ ...prev, [videoId]: true }));
     } catch (e: any) {
       message.error(e?.response?.data?.detail ?? "视频分析失败");
     } finally {
@@ -359,6 +365,7 @@ export default function GlobalVideoList() {
           <div className="text-slate-500">加载中...</div>
         ) : (
           videos.map((video) => {
+            const hasAnalyzed = hasAnalysisOverride[video.id] ?? Boolean(video.has_analysis);
             const watchUrl = buildYouTubeWatchUrl(video.yt_video_id);
             const openYouTube = (e: MouseEvent) => {
               e.stopPropagation();
@@ -453,21 +460,26 @@ export default function GlobalVideoList() {
                       />
                       <div className="flex gap-2 w-full">
                         <Button
-                          type="primary"
+                          type={hasAnalyzed ? "dashed" : "primary"}
                           size="small"
                           onClick={() => void handleAnalyzeVideo(video)}
                           loading={Boolean(panelLoading[video.id])}
                           className="!flex-1"
                         >
-                          一键 AI 视频分析
+                          {hasAnalyzed ? "重新分析" : "一键 AI 视频分析"}
                         </Button>
-                        <Button
-                          size="small"
-                          onClick={() => void handleViewAnalysis(video.id)}
-                          disabled={Boolean(panelLoading[video.id])}
-                        >
-                          查看结果
-                        </Button>
+                        {hasAnalyzed ? (
+                          <Button
+                            type="primary"
+                            size="small"
+                            icon={<CheckCircleOutlined />}
+                            onClick={() => void handleViewAnalysis(video.id)}
+                            disabled={Boolean(panelLoading[video.id])}
+                            className="shrink-0"
+                          >
+                            查看结果
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -482,7 +494,11 @@ export default function GlobalVideoList() {
                     ) : panelContentByVideoId[video.id] ? (
                       <MarkdownPreview>{panelContentByVideoId[video.id]}</MarkdownPreview>
                     ) : (
-                      <div className="text-slate-500 text-sm">暂无分析结果。点击「一键 AI 视频分析」生成内容。</div>
+                      <div className="text-slate-500 text-sm">
+                        {hasAnalyzed
+                          ? "暂无缓存展示。请点击「查看结果」拉取已保存的分析内容。"
+                          : "暂无分析结果。点击「一键 AI 视频分析」生成内容。"}
+                      </div>
                     )}
                   </div>
                 ) : null}

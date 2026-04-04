@@ -1,3 +1,4 @@
+import { CheckCircleOutlined } from "@ant-design/icons";
 import { Button, DatePicker, Input, InputNumber, Pagination, Select, Space, Spin, Tag, message } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -93,6 +94,8 @@ export default function ChannelDetail({ channelId }: Props) {
   const [videoAnalysisPanelOpenId, setVideoAnalysisPanelOpenId] = useState<number | null>(null);
   const [videoAnalysisLoadingById, setVideoAnalysisLoadingById] = useState<Record<number, boolean>>({});
   const [videoAnalysisContentById, setVideoAnalysisContentById] = useState<Record<number, string>>({});
+  /** 分析成功后立即标为已分析，与列表接口 has_analysis 合并 */
+  const [videoHasAnalysisOverride, setVideoHasAnalysisOverride] = useState<Record<number, boolean>>({});
   const [selectedModelByVideoId, setSelectedModelByVideoId] = useState<Record<number, string>>({});
   const [selectedAgentByVideoId, setSelectedAgentByVideoId] = useState<Record<number, number | undefined>>({});
 
@@ -124,6 +127,7 @@ export default function ChannelDetail({ channelId }: Props) {
         page_size: ps,
       });
       setVideos(data.items);
+      setVideoHasAnalysisOverride({});
       setTotal(data.total);
       setPage(data.page);
       setPageSize(data.page_size);
@@ -259,6 +263,7 @@ export default function ChannelDetail({ channelId }: Props) {
     try {
       const res = await getYouTubeVideoAnalysisApi(videoId);
       setVideoAnalysisContentById((prev) => ({ ...prev, [videoId]: res.content }));
+      setVideoHasAnalysisOverride((prev) => ({ ...prev, [videoId]: true }));
     } catch (e: any) {
       message.error(e?.response?.data?.detail ?? "获取视频分析失败");
     }
@@ -283,6 +288,7 @@ export default function ChannelDetail({ channelId }: Props) {
         agent_id: agentId ?? null,
       });
       setVideoAnalysisContentById((prev) => ({ ...prev, [videoId]: res.content }));
+      setVideoHasAnalysisOverride((prev) => ({ ...prev, [videoId]: true }));
     } catch (e: any) {
       message.error(e?.response?.data?.detail ?? "视频 AI 深度分析失败");
     } finally {
@@ -549,6 +555,7 @@ export default function ChannelDetail({ channelId }: Props) {
           <div className="text-slate-500">加载中...</div>
         ) : (
           videos.map((video) => {
+            const hasAnalyzed = videoHasAnalysisOverride[video.id] ?? Boolean(video.has_analysis);
             const watchUrl = buildYouTubeWatchUrl(video.yt_video_id);
             const openYouTube = (e: MouseEvent) => {
               e.stopPropagation();
@@ -649,22 +656,26 @@ export default function ChannelDetail({ channelId }: Props) {
                         }
                       />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button
-                        type="primary"
+                        type={hasAnalyzed ? "dashed" : "primary"}
                         size="small"
                         onClick={() => void handleAnalyzeVideo(video)}
                         loading={Boolean(videoAnalysisLoadingById[video.id])}
                       >
-                        一键 AI 深度分析
+                        {hasAnalyzed ? "重新分析" : "一键 AI 深度分析"}
                       </Button>
-                      <Button
-                        size="small"
-                        onClick={() => void handleViewVideoAnalysis(video.id)}
-                        disabled={Boolean(videoAnalysisLoadingById[video.id])}
-                      >
-                        查看结果
-                      </Button>
+                      {hasAnalyzed ? (
+                        <Button
+                          type="primary"
+                          size="small"
+                          icon={<CheckCircleOutlined />}
+                          onClick={() => void handleViewVideoAnalysis(video.id)}
+                          disabled={Boolean(videoAnalysisLoadingById[video.id])}
+                        >
+                          查看结果
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
 
@@ -678,7 +689,11 @@ export default function ChannelDetail({ channelId }: Props) {
                       ) : videoAnalysisContentById[video.id] ? (
                         <MarkdownPreview>{videoAnalysisContentById[video.id]}</MarkdownPreview>
                       ) : (
-                        <div className="text-slate-500 text-sm">暂无分析结果。点击「一键 AI 深度分析」生成内容。</div>
+                        <div className="text-slate-500 text-sm">
+                          {hasAnalyzed
+                            ? "暂无缓存展示。请点击「查看结果」拉取已保存的分析内容。"
+                            : "暂无分析结果。点击「一键 AI 深度分析」生成内容。"}
+                        </div>
                       )}
                     </div>
                   ) : null}

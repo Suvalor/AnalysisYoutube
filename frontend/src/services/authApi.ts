@@ -148,6 +148,8 @@ export async function batchUpdateChannelsApi() {
 
 export type VideoListItem = YouTubeAnalyzeResponse["videos"][number] & {
   channel_title?: string | null;
+  /** 列表接口附带：当前组织是否已有持久化视频 AI 分析（仅布尔，正文仍走独立 GET） */
+  has_analysis?: boolean;
 };
 
 export async function listYouTubeVideosApi(params: {
