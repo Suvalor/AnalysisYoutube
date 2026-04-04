@@ -1,8 +1,10 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi.responses import JSONResponse
 
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.crud.feishu_doc import create_feishu_doc, delete_feishu_doc, get_feishu_doc, list_feishu_docs
-from app.schemas.feishu_doc import FeishuDocCreate, FeishuDocListResponse, FeishuDocRead
+from app.schemas.feishu_doc import FeishuDocArchiveTriggerResponse, FeishuDocCreate, FeishuDocListResponse, FeishuDocRead
+from app.services.feishu_doc_archive import run_feishu_doc_archive_task
 
 
 router = APIRouter()
@@ -71,4 +73,48 @@ async def delete_doc(
         raise HTTPException(status_code=404, detail="文档不存在")
     await db.commit()
     return {"success": True}
+
+
+@router.post(
+    "/{doc_id}/archive",
+    response_model=FeishuDocArchiveTriggerResponse,
+    summary="异步离线归档飞书文档（202 Accepted）",
+)
+async def archive_doc(
+    doc_id: int,
+    background_tasks: BackgroundTasks,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+):
+    row = await get_feishu_doc(db, org_id=current_user.org_id, doc_id=doc_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="文档不存在")
+
+    if row.archive_status == "ARCHIVING":
+        raise HTTPException(status_code=409, detail="文档正在归档中，请稍候")
+
+    if row.archive_status == "SUCCESS":
+        return JSONResponse(
+            status_code=200,
+            content=FeishuDocArchiveTriggerResponse(
+                status="already_archived",
+                doc_id=doc_id,
+                message="该文档已成功归档",
+            ).model_dump(),
+        )
+
+    row.archive_status = "ARCHIVING"
+    await db.commit()
+
+    org_id = current_user.org_id
+    background_tasks.add_task(run_feishu_doc_archive_task, doc_id=doc_id, org_id=org_id)
+
+    return JSONResponse(
+        status_code=202,
+        content=FeishuDocArchiveTriggerResponse(
+            status="accepted",
+            doc_id=doc_id,
+            message="归档任务已排队，请稍后刷新列表查看状态",
+        ).model_dump(),
+    )
 

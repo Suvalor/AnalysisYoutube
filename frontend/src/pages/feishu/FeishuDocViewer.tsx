@@ -1,15 +1,52 @@
-import { Alert, Spin } from "antd";
-import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Alert, Segmented, Spin } from "antd";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useParams } from "react-router-dom";
 import { getFeishuDocApi } from "@/services/feishuDocsApi";
 
-export default function FeishuDocViewer() {
+type PreviewSource = "original" | "archive";
+
+type FeishuDocViewerProps = {
+  /** 来自标签页 store（主路径：通配符路由下 useParams 无 :id） */
+  docId?: number;
+};
+
+/**
+ * 解析要请求后端的文档主键 id。
+ * 优先级：Tab 传入 > 路由动态段 :id > 当前 path /feishu/view/<数字>
+ */
+function resolveDocId(docIdFromTab: number | undefined, params: { id?: string }, pathname: string): number {
+  if (typeof docIdFromTab === "number" && Number.isFinite(docIdFromTab) && docIdFromTab > 0) {
+    return docIdFromTab;
+  }
+  const fromParam = params.id != null && params.id !== "" ? Number(params.id) : NaN;
+  if (Number.isFinite(fromParam) && fromParam > 0) {
+    return fromParam;
+  }
+  const m = pathname.match(/^\/feishu\/view\/(\d+)$/);
+  if (m) {
+    const n = Number(m[1]);
+    if (Number.isFinite(n) && n > 0) {
+      return n;
+    }
+  }
+  return NaN;
+}
+
+export default function FeishuDocViewer({ docId: docIdFromTab }: FeishuDocViewerProps) {
   const params = useParams();
-  const docId = Number(params.id);
+  const location = useLocation();
+  const docId = useMemo(
+    () => resolveDocId(docIdFromTab, params, location.pathname),
+    [docIdFromTab, params, location.pathname]
+  );
+
   const [loading, setLoading] = useState(true);
   const [url, setUrl] = useState<string | null>(null);
   const [title, setTitle] = useState<string>("");
+  const [archiveStatus, setArchiveStatus] = useState<string>("UNARCHIVED");
+  const [archiveFileUrl, setArchiveFileUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [previewSource, setPreviewSource] = useState<PreviewSource>("original");
 
   useEffect(() => {
     let mounted = true;
@@ -24,9 +61,15 @@ export default function FeishuDocViewer() {
         if (!mounted) return;
         setTitle(doc.title);
         setUrl(doc.url);
-      } catch (e: any) {
+        setArchiveStatus(doc.archive_status ?? "UNARCHIVED");
+        setArchiveFileUrl(doc.archive_file_url ?? null);
+        if ((doc.archive_status ?? "") === "SUCCESS" && doc.archive_file_url) {
+          setPreviewSource("original");
+        }
+      } catch (e: unknown) {
         if (!mounted) return;
-        setError(e?.response?.data?.detail ?? "加载文档失败");
+        const err = e as { response?: { data?: { detail?: string } } };
+        setError(err?.response?.data?.detail ?? "加载文档失败");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -35,6 +78,14 @@ export default function FeishuDocViewer() {
       mounted = false;
     };
   }, [docId]);
+
+  const showArchiveToggle = archiveStatus === "SUCCESS" && Boolean(archiveFileUrl?.trim());
+  const iframeSrc = useMemo(() => {
+    if (showArchiveToggle && previewSource === "archive") {
+      return archiveFileUrl!.trim();
+    }
+    return url;
+  }, [showArchiveToggle, previewSource, archiveFileUrl, url]);
 
   if (loading) {
     return (
@@ -52,7 +103,7 @@ export default function FeishuDocViewer() {
     );
   }
 
-  if (!url) {
+  if (!iframeSrc) {
     return (
       <div className="p-4">
         <Alert type="warning" showIcon message="文档链接为空" />
@@ -62,13 +113,28 @@ export default function FeishuDocViewer() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="px-4 py-2 border-b border-slate-200 bg-white text-sm text-slate-700 truncate">
-        {title || "飞书云文档"}
+      <div className="px-4 py-2 border-b border-slate-200 bg-white text-sm text-slate-700 flex flex-wrap items-center gap-3 min-h-[44px]">
+        <span className="truncate flex-1 min-w-0">{title || "飞书云文档"}</span>
+        {showArchiveToggle ? (
+          <Segmented<PreviewSource>
+            size="small"
+            value={previewSource}
+            onChange={setPreviewSource}
+            options={[
+              { label: "原链接预览", value: "original" },
+              { label: "离线备份预览", value: "archive" },
+            ]}
+          />
+        ) : null}
       </div>
       <div className="flex-1 bg-slate-50">
-        <iframe src={url} className="w-full h-[calc(100vh-120px)] border-0" allow="fullscreen" />
+        <iframe
+          title={showArchiveToggle && previewSource === "archive" ? "离线归档预览" : "飞书原链预览"}
+          src={iframeSrc}
+          className="w-full h-[calc(100vh-120px)] border-0"
+          allow="fullscreen"
+        />
       </div>
     </div>
   );
 }
-

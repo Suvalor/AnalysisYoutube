@@ -112,7 +112,7 @@ function renderTabPanel(tab: TabItem) {
     case "feishu-workspace":
       return <FeishuDocList />;
     case "feishu-viewer":
-      return <FeishuDocViewer />;
+      return <FeishuDocViewer docId={tab.feishuDocId} />;
     case "ai-model-settings":
       return <AiModelSettings />;
     case "config-center":
