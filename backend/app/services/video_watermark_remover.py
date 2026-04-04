@@ -44,6 +44,9 @@ class VideoWatermarkRemover:
     """
 
     def __init__(self) -> None:
+        from app.services.paddle_ocr_runtime_shim import ensure_analysis_config_compat
+
+        ensure_analysis_config_compat()
         from paddleocr import PaddleOCR
 
         self.ocr = PaddleOCR(use_angle_cls=True, lang="ch")
@@ -261,8 +264,8 @@ class VideoWatermarkRemover:
 def _init_engine_error_message(exc: Exception) -> str:
     if isinstance(exc, ModuleNotFoundError) and getattr(exc, "name", None):
         return (
-            f"缺少 Python 模块「{exc.name}」。去水印需安装：pip install paddlepaddle paddleocr "
-            "（CPU 版见 https://www.paddlepaddle.org.cn/install/quick ）"
+            f"缺少 Python 模块「{exc.name}」。请在后端 venv 执行：pip install -r requirements.txt "
+            "（推荐 paddlepaddle==2.5.2 与 paddleocr 2.7.x）"
         )
     return f"去水印引擎初始化失败（PaddleOCR）：{type(exc).__name__}: {exc}"
 
