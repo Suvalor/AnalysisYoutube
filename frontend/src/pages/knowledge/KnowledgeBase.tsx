@@ -1,13 +1,21 @@
-import { Button, Input, Popconfirm, Segmented, Select, Space, Table, message } from "antd";
+import { Button, Input, Modal, Popconfirm, Segmented, Select, Space, Table, Tag, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { deleteScriptApi, listScriptsApi, restoreScriptApi, type ScriptItem } from "@/services/libraryApi";
+import { useNavigate } from "react-router-dom";
+import {
+  createManualKnowledgeScriptApi,
+  deleteScriptApi,
+  listScriptsApi,
+  restoreScriptApi,
+  type ScriptItem,
+} from "@/services/libraryApi";
 
 type ScriptStatus = "saved" | "configured" | "unconfigured";
 
 function getScriptStatus(row: ScriptItem): ScriptStatus {
+  // 手动录入不依赖提示词/风格，在列表中与「已配置」同级展示，便于直接进入 SOP
+  if (row.origin_type === "MANUAL") return "configured";
   if (row.prompt_id && row.style_id) return "configured";
   return "unconfigured";
 }
@@ -25,6 +33,11 @@ export default function KnowledgeBase() {
   const [titleKeyword, setTitleKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ScriptStatus>("all");
   const [viewMode, setViewMode] = useState<"active" | "recycle">("active");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [formTitle, setFormTitle] = useState("");
+  const [formPlot, setFormPlot] = useState("");
+  const [formEmotion, setFormEmotion] = useState("");
 
   const reloadScripts = useCallback(async () => {
     setLoading(true);
@@ -43,7 +56,21 @@ export default function KnowledgeBase() {
   }, [reloadScripts]);
 
   const columns: ColumnsType<ScriptItem> = [
-    { title: "标题", dataIndex: "title", key: "title" },
+    {
+      title: "标题",
+      dataIndex: "title",
+      key: "title",
+      render: (v: string, row) => (
+        <Space size={8} wrap>
+          {row.origin_type === "MANUAL" ? (
+            <Tag color="blue" className="m-0">
+              手动
+            </Tag>
+          ) : null}
+          <span>{v}</span>
+        </Space>
+      ),
+    },
     {
       title: "状态",
       key: "status",
@@ -129,12 +156,48 @@ export default function KnowledgeBase() {
     });
   }, [rows, titleKeyword, statusFilter, viewMode]);
 
+  const resetCreateForm = () => {
+    setFormTitle("");
+    setFormPlot("");
+    setFormEmotion("");
+  };
+
+  const submitManualCreate = async () => {
+    const title = formTitle.trim();
+    const plot = formPlot.trim();
+    if (!title) {
+      message.warning("请填写标题/项目名");
+      return;
+    }
+    if (!plot) {
+      message.warning("请填写核心内容/剧情");
+      return;
+    }
+    setCreateSubmitting(true);
+    try {
+      await createManualKnowledgeScriptApi({
+        title,
+        plot,
+        emotion: formEmotion.trim() || undefined,
+      });
+      message.success("已保存到知识库");
+      resetCreateForm();
+      setCreateOpen(false);
+      await reloadScripts();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      message.error(err?.response?.data?.detail ?? "保存失败");
+    } finally {
+      setCreateSubmitting(false);
+    }
+  };
+
   return (
     <div className="p-6 md:p-10">
       <div className="max-w-6xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-xl font-semibold mb-2 text-slate-900">知识库管理</h2>
         <p className="text-slate-600 mb-4">在此查看已保存剧本，并从任意剧本继续进入 SOP 下一步。</p>
-        <div className="mb-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Segmented
             value={viewMode}
             onChange={(v) => setViewMode(v as "active" | "recycle")}
@@ -143,6 +206,11 @@ export default function KnowledgeBase() {
               { label: "回收站", value: "recycle" },
             ]}
           />
+          {viewMode === "active" ? (
+            <Button type="primary" onClick={() => setCreateOpen(true)}>
+              新建知识
+            </Button>
+          ) : null}
         </div>
         <div className="mb-4 flex flex-col md:flex-row gap-3">
           <Input
@@ -172,6 +240,56 @@ export default function KnowledgeBase() {
           loading={loading}
           pagination={{ pageSize: 8 }}
         />
+
+        <Modal
+          title="新建知识"
+          open={createOpen}
+          onCancel={() => {
+            if (!createSubmitting) {
+              setCreateOpen(false);
+              resetCreateForm();
+            }
+          }}
+          okText="保存"
+          cancelText="取消"
+          confirmLoading={createSubmitting}
+          onOk={() => void submitManualCreate()}
+          destroyOnClose
+          width={640}
+        >
+          <div className="space-y-4 pt-2">
+            <div>
+              <div className="text-xs text-slate-600 mb-1">标题 / 项目名</div>
+              <Input
+                value={formTitle}
+                onChange={(e) => setFormTitle(e.target.value)}
+                placeholder="例如：第一集 · 开场冲突"
+                maxLength={255}
+                showCount
+              />
+            </div>
+            <div>
+              <div className="text-xs text-slate-600 mb-1">核心情绪 / 描述（将写入正文首行，格式：### 项目: 【标题】 **情绪**）</div>
+              <Input
+                value={formEmotion}
+                onChange={(e) => setFormEmotion(e.target.value)}
+                placeholder="可空；例如：紧张、压抑、反转期待"
+                maxLength={500}
+              />
+            </div>
+            <div>
+              <div className="text-xs text-slate-600 mb-1">核心内容 / 剧情</div>
+              <Input.TextArea
+                value={formPlot}
+                onChange={(e) => setFormPlot(e.target.value)}
+                placeholder="粘贴外部 AI 或文档中的剧情正文"
+                rows={12}
+                showCount
+                maxLength={200000}
+              />
+            </div>
+          </div>
+        </Modal>
       </div>
     </div>
   );

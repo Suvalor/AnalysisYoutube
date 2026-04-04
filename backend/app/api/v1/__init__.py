@@ -6,6 +6,7 @@ from app.api.v1 import auth
 from app.api.v1 import inspiration
 from app.api.v1 import integration_settings
 from app.api.v1 import jimeng
+from app.api.v1 import knowledge_base
 from app.api.v1 import materials
 from app.api.v1 import model_library
 from app.api.v1 import feishu_docs
@@ -32,6 +33,7 @@ api_router_v1.include_router(model_library.router, prefix="/libraries/models", t
 api_router_v1.include_router(asset_library.router, prefix="/libraries/assets", tags=["asset-library"])
 api_router_v1.include_router(asset_library.router, prefix="/assets", tags=["assets"])
 api_router_v1.include_router(script_library.router, prefix="/libraries/scripts", tags=["script-library"])
+api_router_v1.include_router(knowledge_base.router, prefix="/knowledge-base", tags=["knowledge-base"])
 api_router_v1.include_router(ai.router, prefix="/ai", tags=["ai"])
 api_router_v1.include_router(scripts.router, prefix="/v1/scripts", tags=["scripts"])
 api_router_v1.include_router(sop.router, prefix="/sop", tags=["sop"])

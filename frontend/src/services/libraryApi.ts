@@ -36,6 +36,8 @@ export type ScriptItem = {
   content: string;
   prompt_id: number | null;
   style_id: number | null;
+  /** AI_WORKSHOP | MANUAL；旧数据缺省时前端按 AI_WORKSHOP 处理 */
+  origin_type?: string;
   created_at: string;
   updated_at: string;
 };
@@ -174,6 +176,12 @@ export async function createScriptApi(payload: {
   style_id?: number | null;
 }) {
   const res = await apiClient.post("/api/libraries/scripts", payload);
+  return res.data as ScriptItem;
+}
+
+/** 知识库手动新建（与 AI 脚本工坊 createScriptApi 分离） */
+export async function createManualKnowledgeScriptApi(payload: { title: string; plot: string; emotion?: string }) {
+  const res = await apiClient.post("/api/knowledge-base/manual-create", payload);
   return res.data as ScriptItem;
 }
 
