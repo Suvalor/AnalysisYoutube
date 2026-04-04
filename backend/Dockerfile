@@ -3,19 +3,47 @@
 ARG BASE_IMAGE=docker.m.daocloud.io/library/python:3.11-slim
 FROM ${BASE_IMAGE}
 
+# apt：官方 deb.debian.org 经 CDN 常出现 502/超时（与代码无关）。默认换清华 Debian 源，可用构建参数关闭或改镜像。
+# 海外环境可：docker compose build --build-arg APT_USE_MIRROR=0
+ARG APT_USE_MIRROR=1
+ARG APT_DEBIAN_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian
+ARG APT_SECURITY_MIRROR=https://mirrors.tuna.tsinghua.edu.cn/debian-security
+
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
 # 安装 OpenCV/FFmpeg 运行时依赖（修复 libGL.so.1 缺失）
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgl1 \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
-    ffmpeg \
+RUN set -eux; \
+    if [ "$APT_USE_MIRROR" = "1" ]; then \
+      if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+        sed -i "s|http://deb.debian.org/debian|${APT_DEBIAN_MIRROR}|g" /etc/apt/sources.list.d/debian.sources; \
+        sed -i "s|https://deb.debian.org/debian|${APT_DEBIAN_MIRROR}|g" /etc/apt/sources.list.d/debian.sources; \
+        sed -i "s|http://security.debian.org/debian-security|${APT_SECURITY_MIRROR}|g" /etc/apt/sources.list.d/debian.sources; \
+        sed -i "s|https://security.debian.org/debian-security|${APT_SECURITY_MIRROR}|g" /etc/apt/sources.list.d/debian.sources; \
+      elif [ -f /etc/apt/sources.list ]; then \
+        sed -i "s|http://deb.debian.org/debian|${APT_DEBIAN_MIRROR}|g" /etc/apt/sources.list; \
+        sed -i "s|https://deb.debian.org/debian|${APT_DEBIAN_MIRROR}|g" /etc/apt/sources.list; \
+        sed -i "s|http://security.debian.org/debian-security|${APT_SECURITY_MIRROR}|g" /etc/apt/sources.list; \
+        sed -i "s|https://security.debian.org/debian-security|${APT_SECURITY_MIRROR}|g" /etc/apt/sources.list; \
+      fi; \
+    fi; \
+    UPD_OK=0; \
+    for n in 1 2 3 4 5; do \
+      if apt-get update; then UPD_OK=1; break; fi; \
+      echo "apt-get update 失败，第 ${n} 次重试（15s 后）…"; \
+      sleep 15; \
+    done; \
+    [ "$UPD_OK" = 1 ] || exit 1; \
+    apt-get install -y --no-install-recommends \
+      libgl1 \
+      libglib2.0-0 \
+      libsm6 \
+      libxext6 \
+      libxrender1 \
+      ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装依赖（使用清华 PyPI 镜像，降低 pip 下载超时概率）

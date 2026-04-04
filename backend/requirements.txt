@@ -18,13 +18,12 @@ alibabacloud_sts20150401==1.2.0
 alibabacloud_tea_openapi==0.4.1
 oss2==2.19.1
 cos-python-sdk-v5>=1.9.0,<2
-# 去水印：paddleocr 2.7.x + paddlepaddle 2.6.2（清华源在 linux/aarch64 上无 2.5.2 wheel，Docker on Apple Silicon 构建会失败）
-# 若仍遇 AnalysisConfig.set_optimization_level 报错，由 paddle_ocr_runtime_shim 在运行时补全
-# 其他平台亦可改用官网索引：https://www.paddlepaddle.org.cn/install/quick
-# numpy 2.x 常与 paddleocr 自带的 opencv-python wheel 冲突（ImportError: numpy.core.multiarray），故限制在 1.x
-numpy>=1.26.0,<2.0.0
+# 去水印：固定 numpy 1.26.4、paddleocr==2.7.3（禁止 numpy 2.x）。paddle_ocr_runtime_shim 负责 set_optimization_level 兼容与 lib 预检。
+# 说明：paddlepaddle==2.5.2 在 PyPI/清华等源上对 Python 3.11 与常见 linux 平台已无 wheel；与社区实践一致改用 2.6.2。
+# 若必须从官网装 2.5.2，请按 https://www.paddlepaddle.org.cn/install/quick 选择对应系统命令，并仍保持 numpy==1.26.4。
+numpy==1.26.4
 paddlepaddle==2.6.2
-paddleocr>=2.7.0,<2.8.0
+paddleocr==2.7.3
 ffmpeg-python
 python-multipart
 Markdown==3.7

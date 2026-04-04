@@ -24,6 +24,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      # 与 Dockerfile 一致：apt 默认走清华 Debian 源，避免 deb.debian.org 502；海外可设 APT_USE_MIRROR=0
+      args:
+        APT_USE_MIRROR: "1"
     container_name: creator_backend
     restart: unless-stopped
     depends_on:

@@ -158,6 +158,10 @@ class AssetUploadResponse(BaseModel):
     file_size: int | None = None
     created_at: datetime
     remove_watermark: bool = False
+    process_info: str = Field(
+        default="",
+        description="处理说明：未启用去水印、去水印已完成、或因环境等原因跳过去水印等",
+    )
     access_url: str = Field(default="", description="与 file_url 同逻辑生成的可访问链接")
 
 
