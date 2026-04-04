@@ -96,6 +96,7 @@ class ScriptLibrary(Base):
         nullable=True,
         index=True,
     )
+    is_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0", index=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0", index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

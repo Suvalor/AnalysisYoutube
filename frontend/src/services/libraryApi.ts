@@ -38,6 +38,8 @@ export type ScriptItem = {
   style_id: number | null;
   /** AI_WORKSHOP | MANUAL；旧数据缺省时前端按 AI_WORKSHOP 处理 */
   origin_type?: string;
+  /** 知识库置顶 */
+  is_pinned?: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -185,9 +187,26 @@ export async function createManualKnowledgeScriptApi(payload: { title: string; p
   return res.data as ScriptItem;
 }
 
-export async function listScriptsApi(includeDeleted = false) {
-  const res = await apiClient.get("/api/libraries/scripts", { params: { include_deleted: includeDeleted } });
+export type ListScriptsParams = {
+  includeDeleted?: boolean;
+  sort_by?: "updated_at" | "created_at";
+};
+
+/** 支持布尔简写（仅回收站）或完整参数 */
+export async function listScriptsApi(params: boolean | ListScriptsParams = false) {
+  const opts: ListScriptsParams = typeof params === "boolean" ? { includeDeleted: params } : params ?? {};
+  const include_deleted = opts.includeDeleted ?? false;
+  const sort_by = opts.sort_by ?? "updated_at";
+  const res = await apiClient.get("/api/libraries/scripts", {
+    params: { include_deleted, sort_by },
+  });
   return res.data as ScriptItem[];
+}
+
+/** 知识库置顶切换 */
+export async function pinKnowledgeScriptApi(id: number, isPinned: boolean) {
+  const res = await apiClient.post("/api/knowledge/pin", { id, is_pinned: isPinned });
+  return res.data as ScriptItem;
 }
 
 export async function getScriptApi(scriptId: number) {

@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Query
-from sqlalchemy import select
+from sqlalchemy import desc, select
 
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.crud.library import create_with_user, ensure_owned_or_404, update_with_user
@@ -17,14 +18,16 @@ async def _list_scripts_by_deleted(
     user_id: int,
     *,
     is_deleted: bool,
+    sort_by: Literal["updated_at", "created_at"] = "updated_at",
 ) -> list[ScriptLibrary]:
+    time_col = ScriptLibrary.updated_at if sort_by == "updated_at" else ScriptLibrary.created_at
     q = (
         select(ScriptLibrary)
         .where(
             ScriptLibrary.user_id == user_id,
             ScriptLibrary.is_deleted.is_(is_deleted),
         )
-        .order_by(ScriptLibrary.id.desc())
+        .order_by(desc(ScriptLibrary.is_pinned), desc(time_col), desc(ScriptLibrary.id))
     )
     res = await db.execute(q)
     return list(res.scalars().all())
@@ -45,8 +48,17 @@ async def list_scripts(
     db: DBSessionDep,
     current_user: CurrentUserDep,
     include_deleted: bool = Query(False, description="是否返回回收站数据"),
+    sort_by: Literal["updated_at", "created_at"] = Query(
+        "updated_at",
+        description="时间排序字段：置顶组内与非置顶组内均按该字段倒序",
+    ),
 ) -> list[ScriptRead]:
-    rows = await _list_scripts_by_deleted(db, current_user.id, is_deleted=include_deleted)
+    rows = await _list_scripts_by_deleted(
+        db,
+        current_user.id,
+        is_deleted=include_deleted,
+        sort_by=sort_by,
+    )
     return [ScriptRead.model_validate(x) for x in rows]
 
 
