@@ -32,6 +32,9 @@ INTEGRATION_PAYLOAD_KEYS: frozenset[str] = frozenset(
         "volcengine_endpoint_id",
         "volcengine_base_url",
         "volcengine_model_gemini",
+        # 去水印插件：组织级默认（可被 model_libraries 中 image_inpaint 条目覆盖密钥与 Base URL）
+        "watermark_video_ai_max_frames",
+        "watermark_inpaint_prompt",
     }
 )
 
@@ -74,6 +77,22 @@ def _pick_str(db: dict[str, str], key: str, fallback: str) -> str:
     return (fallback or "").strip()
 
 
+DEFAULT_WATERMARK_INPAINT_PROMPT = (
+    "Remove overlaid text or watermark and naturally inpaint the background. "
+    "Keep areas outside the mask unchanged in style."
+)
+
+
+def _pick_int_clamped(db: dict[str, str], key: str, default: int, *, lo: int, hi: int) -> int:
+    raw = (db.get(key) or "").strip()
+    if not raw:
+        return default
+    try:
+        return max(lo, min(hi, int(raw)))
+    except ValueError:
+        return default
+
+
 @dataclass
 class ResolvedIntegrationConfig:
     """合并后的有效配置，供对象存储、YouTube API、火山兼容调用等使用。"""
@@ -96,6 +115,8 @@ class ResolvedIntegrationConfig:
     volcengine_endpoint_id: str
     volcengine_base_url: str
     volcengine_model_gemini: str
+    watermark_video_ai_max_frames: int
+    watermark_inpaint_prompt: str
 
 
 def merge_integration_config(db_payload: dict[str, str] | None, s: Settings | None = None) -> ResolvedIntegrationConfig:
@@ -120,6 +141,10 @@ def merge_integration_config(db_payload: dict[str, str] | None, s: Settings | No
         volcengine_endpoint_id=_pick_str(d, "volcengine_endpoint_id", base.volcengine_endpoint_id),
         volcengine_base_url=_pick_str(d, "volcengine_base_url", base.volcengine_base_url),
         volcengine_model_gemini=_pick_str(d, "volcengine_model_gemini", base.volcengine_model_gemini),
+        watermark_video_ai_max_frames=_pick_int_clamped(
+            d, "watermark_video_ai_max_frames", 180, lo=1, hi=10000
+        ),
+        watermark_inpaint_prompt=_pick_str(d, "watermark_inpaint_prompt", DEFAULT_WATERMARK_INPAINT_PROMPT),
     )
 
 

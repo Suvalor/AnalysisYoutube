@@ -29,6 +29,8 @@ class IntegrationSettingsRead(BaseModel):
     volcengine_endpoint_id: str = ""
     volcengine_base_url: str = ""
     volcengine_model_gemini: str = ""
+    watermark_video_ai_max_frames: int = Field(180, description="视频逐帧 AI 修复最大帧数，超出则 FFmpeg delogo")
+    watermark_inpaint_prompt: str = Field("", description="去水印 images.edit 提示词（组织默认）")
 
     has_youtube_api_key: bool = False
     has_aliyun_access_key_secret: bool = False
@@ -64,6 +66,8 @@ class IntegrationSettingsUpdate(BaseModel):
     volcengine_endpoint_id: str | None = None
     volcengine_base_url: str | None = None
     volcengine_model_gemini: str | None = None
+    watermark_video_ai_max_frames: int | None = Field(None, ge=1, le=10000)
+    watermark_inpaint_prompt: str | None = None
 
 
 class IntegrationTestResult(BaseModel):

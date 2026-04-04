@@ -61,6 +61,8 @@ async def _to_read(session, org_id: int, stored: dict[str, str]) -> IntegrationS
         volcengine_endpoint_id=merged.volcengine_endpoint_id,
         volcengine_base_url=merged.volcengine_base_url,
         volcengine_model_gemini=merged.volcengine_model_gemini,
+        watermark_video_ai_max_frames=merged.watermark_video_ai_max_frames,
+        watermark_inpaint_prompt=merged.watermark_inpaint_prompt,
         has_youtube_api_key=bool(merged.youtube_api_key),
         has_aliyun_access_key_secret=bool(merged.aliyun_access_key_secret),
         has_tencent_cos_secret_key=bool(merged.tencent_cos_secret_key),

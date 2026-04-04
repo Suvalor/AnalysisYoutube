@@ -28,6 +28,7 @@ from app.services.material_service import (
     remove_temp_dir,
     save_upload_to_temp,
 )
+from app.services.watermark_inpaint_config import resolve_inpaint_runtime_config
 from app.services.object_storage import build_material_object_key, get_write_backend, material_access_url
 
 router = APIRouter()
@@ -177,7 +178,16 @@ async def upload_asset(
         final_path = temp_path
         process_info = "未启用去水印"
         if remove_watermark:
-            final_path, process_info = process_watermark_removal_best_effort(temp_path, file_type)
+            inpaint_cfg = await resolve_inpaint_runtime_config(
+                db,
+                user_id=current_user.id,
+                org_id=current_user.org_id,
+            )
+            final_path, process_info = process_watermark_removal_best_effort(
+                temp_path,
+                file_type,
+                inpaint_config=inpaint_cfg,
+            )
 
         icfg = await resolve_integration_config(db, org_id=current_user.org_id)
         backend = get_write_backend(icfg)

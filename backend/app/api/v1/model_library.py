@@ -46,6 +46,7 @@ def _to_read(row: ModelLibrary) -> ModelRead:
     return ModelRead(
         id=row.id,
         user_id=row.user_id,
+        library_kind=getattr(row, "library_kind", None) or "chat",
         name=row.name,
         api_base_url=row.api_base_url,
         supported_models_json=row.supported_models_json,
@@ -69,12 +70,16 @@ async def get_model(model_id: int, db: DBSessionDep, current_user: CurrentUserDe
 
 @router.post("", response_model=ModelRead)
 async def create_model(payload: ModelCreate, db: DBSessionDep, current_user: CurrentUserDep) -> ModelRead:
+    kind = (payload.library_kind or "chat").strip()
+    if kind not in {"chat", "image_inpaint"}:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="library_kind 仅支持 chat 或 image_inpaint")
     row = await create_with_user(
         db,
         ModelLibrary,
         current_user.id,
         {
             "name": payload.name.strip(),
+            "library_kind": kind,
             "api_base_url": payload.api_base_url.strip(),
             "api_key_encrypted": encrypt_plaintext(payload.api_key.strip()) if payload.api_key and payload.api_key.strip() else None,
             "supported_models_json": _normalize_supported_models_json(payload.supported_models_json),
@@ -100,6 +105,14 @@ async def update_model(
         patch["api_base_url"] = str(incoming["api_base_url"]).strip()
     if "supported_models_json" in incoming:
         patch["supported_models_json"] = _normalize_supported_models_json(incoming["supported_models_json"])
+    if "library_kind" in incoming and incoming["library_kind"] is not None:
+        k = str(incoming["library_kind"]).strip()
+        if k not in {"chat", "image_inpaint"}:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="library_kind 仅支持 chat 或 image_inpaint",
+            )
+        patch["library_kind"] = k
     if "api_key" in incoming:
         raw_key = incoming["api_key"]
         if raw_key is not None and str(raw_key).strip():

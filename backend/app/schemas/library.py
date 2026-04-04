@@ -58,6 +58,11 @@ class ModelCreate(BaseModel):
     api_base_url: str = Field(..., min_length=1, max_length=512)
     api_key: str | None = Field(None, min_length=1, max_length=2048)
     supported_models_json: str | list[str | dict[str, str]] | None = None
+    library_kind: str = Field(
+        default="chat",
+        max_length=32,
+        description="chat=对话与脚本工坊；image_inpaint=去水印等 OpenAI 兼容 images.edit",
+    )
 
 
 class ModelUpdate(BaseModel):
@@ -65,11 +70,13 @@ class ModelUpdate(BaseModel):
     api_base_url: str | None = Field(None, min_length=1, max_length=512)
     api_key: str | None = Field(None, min_length=1, max_length=2048)
     supported_models_json: str | list[str | dict[str, str]] | None = None
+    library_kind: str | None = Field(None, max_length=32)
 
 
 class ModelRead(BaseModel):
     id: int
     user_id: int
+    library_kind: str = Field(default="chat", description="chat | image_inpaint")
     name: str
     api_base_url: str
     supported_models_json: str | None

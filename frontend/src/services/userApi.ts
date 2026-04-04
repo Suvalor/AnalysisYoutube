@@ -41,6 +41,8 @@ export type IntegrationSettingsRead = {
   volcengine_endpoint_id: string;
   volcengine_base_url: string;
   volcengine_model_gemini: string;
+  watermark_video_ai_max_frames: number;
+  watermark_inpaint_prompt: string;
   has_youtube_api_key: boolean;
   has_aliyun_access_key_secret: boolean;
   has_tencent_cos_secret_key: boolean;
@@ -72,6 +74,8 @@ export type IntegrationSettingsUpdatePayload = Partial<{
   volcengine_endpoint_id: string | null;
   volcengine_base_url: string | null;
   volcengine_model_gemini: string | null;
+  watermark_video_ai_max_frames?: number | null;
+  watermark_inpaint_prompt?: string | null;
 }>;
 
 export async function getIntegrationSettingsApi() {

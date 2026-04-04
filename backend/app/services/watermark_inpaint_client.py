@@ -1,30 +1,24 @@
 """
-基于 OpenAI Images Edit（DALL·E 2）的局部重绘，用于去水印插件。
+OpenAI 兼容 Images Edit（multipart）调用，供去水印插件使用。
 
-说明：
-- 项目内「火山」集成仅为 chat.completions 文本接口；既梦为异步文生图任务提交，均无标准 mask inpainting。
-- 本模块为可选能力：配置 WATERMARK_OPENAI_API_KEY 后，在去水印流程中优先尝试；
-  失败或未配置时由调用方回退 OpenCV / FFmpeg。
-
-API 文档参考：https://platform.openai.com/docs/api-reference/images/createEdit
+不依赖 openai SDK，便于对接自建网关或与 chat 共用 Base URL 前缀。
 """
 
 from __future__ import annotations
 
 import base64
 import io
+import json
 import logging
 from typing import Any
 
+import httpx
 import numpy as np
+from PIL import Image
 
-from app.core.config import settings
+from app.services.watermark_inpaint_config import InpaintRuntimeConfig
 
 logger = logging.getLogger(__name__)
-
-
-def is_openai_inpaint_configured() -> bool:
-    return bool((settings.watermark_openai_api_key or "").strip())
 
 
 def blend_patch_with_gaussian_feather(
@@ -78,7 +72,6 @@ def _letterbox_to_square(
     mask: np.ndarray,
     side: int,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
-    """将 ROI 保持比例缩放后置于正方形画布中心，供 DALL·E Edit 尺寸约束。"""
     import cv2
 
     h, w = bgr.shape[:2]
@@ -104,20 +97,25 @@ def _letterbox_to_square(
     return canvas_b, canvas_m, meta
 
 
-def inpaint_bgr_with_openai_or_none(image_bgr: np.ndarray, mask_u8: np.ndarray) -> np.ndarray | None:
-    """
-    对 BGR 图与单通道 mask（255=待修复）调用 OpenAI images.edit；失败返回 None。
+def _images_edit_url(api_base_url: str) -> str:
+    b = (api_base_url or "").strip().rstrip("/")
+    if b.lower().endswith("/v1"):
+        return f"{b}/images/edits"
+    return f"{b}/v1/images/edits"
 
-    仅处理 mask 非零区域的外接框（含少量边距），再 letterbox 到 256/512/1024。
+
+def inpaint_bgr_with_runtime_config_or_none(
+    image_bgr: np.ndarray,
+    mask_u8: np.ndarray,
+    config: InpaintRuntimeConfig,
+) -> np.ndarray | None:
+    """
+    使用数据库解析得到的配置调用 OpenAI 兼容 images.edit；失败返回 None。
     """
     import cv2
-    from openai import OpenAI
-    from PIL import Image
 
-    if not is_openai_inpaint_configured():
-        return None
     if image_bgr.shape[:2] != mask_u8.shape[:2]:
-        logger.warning("OpenAI inpaint：图像与 mask 尺寸不一致，跳过")
+        logger.warning("Inpaint：图像与 mask 尺寸不一致")
         return None
 
     bbox = _mask_bbox(mask_u8)
@@ -150,40 +148,56 @@ def inpaint_bgr_with_openai_or_none(image_bgr: np.ndarray, mask_u8: np.ndarray) 
     buf_mask = io.BytesIO()
     pil_mask.save(buf_mask, format="PNG")
 
-    api_key = (settings.watermark_openai_api_key or "").strip()
-    base_url = (settings.watermark_openai_base_url or "").strip() or None
-    prompt = (settings.watermark_inpaint_prompt or "").strip() or "Remove watermark naturally."
+    url = _images_edit_url(config.api_base_url)
+    files = {
+        "image": ("image.png", buf_img.getvalue(), "image/png"),
+        "mask": ("mask.png", buf_mask.getvalue(), "image/png"),
+    }
+    data = {
+        "model": config.model_id,
+        "prompt": config.prompt,
+        "n": "1",
+        "size": f"{side}x{side}",
+        "response_format": "b64_json",
+    }
 
     try:
-        client = OpenAI(api_key=api_key, base_url=base_url)
-        result = client.images.edit(
-            model="dall-e-2",
-            image=io.BytesIO(buf_img.getvalue()),
-            mask=io.BytesIO(buf_mask.getvalue()),
-            prompt=prompt,
-            n=1,
-            size=f"{side}x{side}",
-            response_format="b64_json",
-        )
+        with httpx.Client(timeout=180.0, trust_env=False) as client:
+            resp = client.post(
+                url,
+                headers={"Authorization": f"Bearer {config.api_key}"},
+                files=files,
+                data=data,
+            )
     except Exception:
-        logger.warning("OpenAI images.edit 调用失败，将回退传统修复", exc_info=True)
+        logger.warning("images.edit 网络请求失败，将回退本地修复", exc_info=True)
         return None
 
-    if not result.data:
-        logger.warning("OpenAI images.edit 返回空 data")
+    if resp.status_code >= 400:
+        logger.warning("images.edit HTTP %s：%s", resp.status_code, (resp.text or "")[:500])
         return None
-    b64 = getattr(result.data[0], "b64_json", None)
+
+    try:
+        payload = resp.json()
+    except json.JSONDecodeError:
+        return None
+
+    b64 = None
+    arr = payload.get("data")
+    if isinstance(arr, list) and arr:
+        first = arr[0]
+        if isinstance(first, dict):
+            b64 = first.get("b64_json") or first.get("b64")
     if not b64:
-        logger.warning("OpenAI images.edit 未返回 b64_json")
         return None
 
     try:
         raw = base64.b64decode(b64)
         pil_r = Image.open(io.BytesIO(raw)).convert("RGB")
-        arr = np.array(pil_r)
-        out_canvas = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+        out_arr = np.array(pil_r)
+        out_canvas = cv2.cvtColor(out_arr, cv2.COLOR_RGB2BGR)
     except Exception:
-        logger.warning("解码 OpenAI 返回图像失败", exc_info=True)
+        logger.warning("解码 images.edit 返回失败", exc_info=True)
         return None
 
     y0, x0, nw, nh = meta["y0"], meta["x0"], meta["nw"], meta["nh"]
@@ -198,9 +212,10 @@ def inpaint_bgr_with_openai_or_none(image_bgr: np.ndarray, mask_u8: np.ndarray) 
     if cm.any():
         blended = roi.copy()
         blended[cm] = restored[cm]
-        # 边缘轻模糊减少硬边
         k = 3
-        border = cv2.dilate(cm.astype(np.uint8) * 255, np.ones((k, k), np.uint8), iterations=1) - (cm.astype(np.uint8) * 255)
+        border = cv2.dilate(cm.astype(np.uint8) * 255, np.ones((k, k), np.uint8), iterations=1) - (
+            cm.astype(np.uint8) * 255
+        )
         if border.any():
             soft = cv2.GaussianBlur(blended, (5, 5), 0)
             bmask = border.astype(bool)

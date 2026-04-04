@@ -14,7 +14,10 @@ import logging
 import shutil
 import threading
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.services.watermark_inpaint_config import InpaintRuntimeConfig
 
 # cv2/numpy 延迟导入：避免与 numpy 版本不兼容时在「import app」阶段拖垮整个 FastAPI 进程
 
@@ -84,7 +87,13 @@ class WatermarkRemover:
             boxes.append(poly)
         return boxes
 
-    def auto_remove_text_watermark(self, input_path: str, output_path: str) -> tuple[bool, str]:
+    def auto_remove_text_watermark(
+        self,
+        input_path: str,
+        output_path: str,
+        *,
+        inpaint_config: InpaintRuntimeConfig | None = None,
+    ) -> tuple[bool, str]:
         """
         自动去除图片中的文本水印。
 
@@ -121,10 +130,12 @@ class WatermarkRemover:
             kernel = np.ones((5, 5), np.uint8)
             mask = cv2.dilate(mask, kernel, iterations=1)
 
-            # 第五步：优先 OpenAI images.edit（DALL·E 2）局部重绘；失败或未配置则 OpenCV TELEA
-            from app.services.ai_openai_inpaint import inpaint_bgr_with_openai_or_none
+            # 第五步：若模型库配置了 image_inpaint，则调用 OpenAI 兼容 images.edit；否则或失败则用 OpenCV TELEA
+            inpainted = None
+            if inpaint_config is not None:
+                from app.services.watermark_inpaint_client import inpaint_bgr_with_runtime_config_or_none
 
-            inpainted = inpaint_bgr_with_openai_or_none(image, mask)
+                inpainted = inpaint_bgr_with_runtime_config_or_none(image, mask, inpaint_config)
             if inpainted is None:
                 inpainted = cv2.inpaint(image, mask, inpaintRadius=3, flags=cv2.INPAINT_TELEA)
 
@@ -179,12 +190,17 @@ def get_text_watermark_remover() -> WatermarkRemover:
             raise
 
 
-def auto_remove_text_watermark(input_path: str, output_path: str) -> tuple[bool, str]:
+def auto_remove_text_watermark(
+    input_path: str,
+    output_path: str,
+    *,
+    inpaint_config: InpaintRuntimeConfig | None = None,
+) -> tuple[bool, str]:
     """对外便捷函数，返回 (成功, 失败原因)。"""
     try:
         remover = get_text_watermark_remover()
     except Exception as exc:  # noqa: BLE001
         logger.exception("获取图片去水印引擎单例失败。")
         return False, _init_engine_error_message(exc)
-    return remover.auto_remove_text_watermark(input_path, output_path)
+    return remover.auto_remove_text_watermark(input_path, output_path, inpaint_config=inpaint_config)
 

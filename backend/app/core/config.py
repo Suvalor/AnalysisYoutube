@@ -47,16 +47,6 @@ class Settings(BaseSettings):
     jimeng_auth_token: str = Field("", alias="JIMENG_AUTH_TOKEN")
     jimeng_submit_path: str = Field("/v1/tasks", alias="JIMENG_SUBMIT_PATH")
     jimeng_status_path_template: str = Field("/v1/tasks/{task_id}", alias="JIMENG_STATUS_PATH_TEMPLATE")
-    # 去水印「AI 修复」：OpenAI Images Edit（DALL·E 2），与火山文本 LLM、既梦文生图任务相互独立
-    watermark_openai_api_key: str = Field("", alias="WATERMARK_OPENAI_API_KEY")
-    watermark_openai_base_url: str = Field("", alias="WATERMARK_OPENAI_BASE_URL")
-    watermark_inpaint_prompt: str = Field(
-        "Remove overlaid text or watermark and naturally inpaint the background. "
-        "Keep all areas outside the mask unchanged in style.",
-        alias="WATERMARK_INPAINT_PROMPT",
-    )
-    # 视频逐帧 AI 修复上限，超出则整段回退为 FFmpeg delogo，避免超长视频刷爆接口与费用
-    watermark_video_ai_max_frames: int = Field(180, alias="WATERMARK_VIDEO_AI_MAX_FRAMES", ge=1, le=10000)
     google_oauth_client_id: str = Field("", alias="GOOGLE_OAUTH_CLIENT_ID")
     google_oauth_client_secret: str = Field("", alias="GOOGLE_OAUTH_CLIENT_SECRET")
     google_oauth_redirect_uri: str = Field("", alias="GOOGLE_OAUTH_REDIRECT_URI")
