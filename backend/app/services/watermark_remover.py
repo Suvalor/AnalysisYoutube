@@ -121,8 +121,12 @@ class WatermarkRemover:
             kernel = np.ones((5, 5), np.uint8)
             mask = cv2.dilate(mask, kernel, iterations=1)
 
-            # 第五步：图像修复（TELEA 算法）
-            inpainted = cv2.inpaint(image, mask, inpaintRadius=3, flags=cv2.INPAINT_TELEA)
+            # 第五步：优先 OpenAI images.edit（DALL·E 2）局部重绘；失败或未配置则 OpenCV TELEA
+            from app.services.ai_openai_inpaint import inpaint_bgr_with_openai_or_none
+
+            inpainted = inpaint_bgr_with_openai_or_none(image, mask)
+            if inpainted is None:
+                inpainted = cv2.inpaint(image, mask, inpaintRadius=3, flags=cv2.INPAINT_TELEA)
 
             # 第六步：保存输出
             ok = cv2.imwrite(output_path, inpainted)
