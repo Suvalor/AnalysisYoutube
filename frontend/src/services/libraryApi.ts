@@ -180,7 +180,7 @@ export async function createScriptApi(payload: {
 }
 
 /** 知识库手动新建（与 AI 脚本工坊 createScriptApi 分离） */
-export async function createManualKnowledgeScriptApi(payload: { title: string; plot: string; emotion?: string }) {
+export async function createManualKnowledgeScriptApi(payload: { title: string; plot: string }) {
   const res = await apiClient.post("/api/knowledge-base/manual-create", payload);
   return res.data as ScriptItem;
 }

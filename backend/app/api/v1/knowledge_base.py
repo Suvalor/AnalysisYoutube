@@ -4,26 +4,15 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.models.library import ScriptLibrary
 from app.schemas.library import ManualKnowledgeScriptCreate, ScriptRead
+from app.services.markdown_sanitize import sanitize_manual_knowledge_markdown
 
 
 router = APIRouter()
-
-
-def _compose_manual_content(*, title: str, plot: str, emotion: str) -> str:
-    """与业务展示习惯一致：首行 ### 项目 + 可选核心情绪，正文为剧情。"""
-    t = title.strip()
-    p = plot.strip()
-    e = emotion.strip()
-    if e:
-        header = f"### 项目: 【{t}】 **{e}**"
-    else:
-        header = f"### 项目: 【{t}】"
-    return f"{header}\n\n{p}"
 
 
 @router.post("/manual-create", response_model=ScriptRead, summary="知识库手动新建剧本")
@@ -32,11 +21,19 @@ async def manual_create_script(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> ScriptRead:
-    composed = _compose_manual_content(title=body.title, plot=body.plot, emotion=body.emotion)
+    """
+    与 AI 脚本工坊保存逻辑对齐：title 独立字段，content 为 Markdown 正文（工坊侧为模型流式输出原文）。
+    正文经消毒后再写入，避免危险 HTML/链接协议进入库内。
+    """
+    try:
+        plot_safe = sanitize_manual_knowledge_markdown(body.plot)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
     row = ScriptLibrary(
         user_id=current_user.id,
         title=body.title.strip(),
-        content=composed,
+        content=plot_safe,
         prompt_id=None,
         style_id=None,
         origin_type="MANUAL",
