@@ -265,7 +265,7 @@ def _init_engine_error_message(exc: Exception) -> str:
     if isinstance(exc, ModuleNotFoundError) and getattr(exc, "name", None):
         return (
             f"缺少 Python 模块「{exc.name}」。请在后端 venv 执行：pip install -r requirements.txt "
-            "（推荐 paddlepaddle==2.5.2 与 paddleocr 2.7.x）"
+            "（推荐 paddlepaddle==2.6.2 与 paddleocr 2.7.x）"
         )
     return f"去水印引擎初始化失败（PaddleOCR）：{type(exc).__name__}: {exc}"
 
