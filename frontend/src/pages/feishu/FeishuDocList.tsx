@@ -1,11 +1,17 @@
-import { Button, Input, Modal, Popconfirm, Table, message } from "antd";
+import { Button, Input, Modal, Popconfirm, Table, Tag, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTabStore } from "@/store/useTabStore";
-import { createFeishuDocApi, deleteFeishuDocApi, listFeishuDocsApi, type FeishuDocItem } from "@/services/feishuDocsApi";
+import {
+  createFeishuDocApi,
+  deleteFeishuDocApi,
+  listFeishuDocsApi,
+  triggerFeishuDocArchiveApi,
+  type FeishuDocItem,
+} from "@/services/feishuDocsApi";
 
 dayjs.extend(relativeTime);
 
@@ -24,6 +30,7 @@ export default function FeishuDocList() {
   const [creating, setCreating] = useState(false);
   const [formTitle, setFormTitle] = useState("");
   const [formUrl, setFormUrl] = useState("");
+  const [archiveSubmittingId, setArchiveSubmittingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -42,22 +49,70 @@ export default function FeishuDocList() {
     void load();
   }, [load]);
 
-  const openViewer = (row: FeishuDocItem) => {
-    const path = `/feishu/view/${row.id}`;
-    openTab({ id: `feishu-view-${row.id}`, title: row.title || `飞书文档 #${row.id}`, path, type: "feishu-viewer", feishuDocId: row.id });
-    navigate(path);
-  };
+  useEffect(() => {
+    const archiving = items.some((x) => (x.archive_status ?? "UNARCHIVED") === "ARCHIVING");
+    if (!archiving) return;
+    const timer = window.setInterval(() => void load(), 4000);
+    return () => window.clearInterval(timer);
+  }, [items, load]);
+
+  const openViewer = useCallback(
+    (row: FeishuDocItem) => {
+      const path = `/feishu/view/${row.id}`;
+      openTab({
+        id: `feishu-view-${row.id}`,
+        title: row.title || `飞书文档 #${row.id}`,
+        path,
+        type: "feishu-viewer",
+        feishuDocId: row.id,
+      });
+      navigate(path);
+    },
+    [navigate, openTab]
+  );
+
+  const handleArchive = useCallback(
+    async (id: number) => {
+      setArchiveSubmittingId(id);
+      try {
+        const res = await triggerFeishuDocArchiveApi(id);
+        message.success(res.message ?? (res.status === "already_archived" ? "该文档已归档" : "已提交离线归档任务"));
+        void load();
+      } catch (e: unknown) {
+        const err = e as { response?: { status?: number; data?: { detail?: string } } };
+        const detail = err?.response?.data?.detail;
+        if (err?.response?.status === 409) {
+          message.warning(typeof detail === "string" ? detail : "文档正在归档中");
+        } else {
+          message.error(typeof detail === "string" ? detail : "提交归档失败");
+        }
+      } finally {
+        setArchiveSubmittingId(null);
+      }
+    },
+    [load]
+  );
 
   const columns: ColumnsType<FeishuDocItem> = useMemo(
     () => [
       {
         title: "文档名称",
         dataIndex: "title",
-        render: (v: string, r) => (
-          <button type="button" className="text-blue-600 hover:text-blue-500" onClick={() => openViewer(r)}>
-            {v}
-          </button>
-        ),
+        render: (v: string, r) => {
+          const st = r.archive_status ?? "UNARCHIVED";
+          return (
+            <div className="flex items-center gap-2 flex-wrap">
+              {st === "SUCCESS" ? (
+                <Tag color="success" className="m-0">
+                  已归档
+                </Tag>
+              ) : null}
+              <button type="button" className="text-blue-600 hover:text-blue-500" onClick={() => openViewer(r)}>
+                {v}
+              </button>
+            </div>
+          );
+        },
       },
       {
         title: "添加时间",
@@ -72,31 +127,44 @@ export default function FeishuDocList() {
       {
         title: "操作",
         key: "op",
-        width: 220,
-        render: (_, r) => (
-          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-            <Button size="small" onClick={() => openViewer(r)}>
-              查看
-            </Button>
-            <Popconfirm
-              title="确认删除该文档？"
-              okText="删除"
-              cancelText="取消"
-              onConfirm={async () => {
-                await deleteFeishuDocApi(r.id);
-                message.success("已删除");
-                void load();
-              }}
-            >
-              <Button danger size="small">
-                删除
+        width: 300,
+        render: (_, r) => {
+          const st = r.archive_status ?? "UNARCHIVED";
+          const canArchive = st === "UNARCHIVED" || st === "FAILED";
+          return (
+            <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
+              <Button size="small" onClick={() => openViewer(r)}>
+                查看
               </Button>
-            </Popconfirm>
-          </div>
-        ),
+              {st === "ARCHIVING" ? (
+                <Button size="small" loading disabled>
+                  归档中...
+                </Button>
+              ) : canArchive ? (
+                <Button size="small" onClick={() => void handleArchive(r.id)} loading={archiveSubmittingId === r.id}>
+                  离线保存
+                </Button>
+              ) : null}
+              <Popconfirm
+                title="确认删除该文档？"
+                okText="删除"
+                cancelText="取消"
+                onConfirm={async () => {
+                  await deleteFeishuDocApi(r.id);
+                  message.success("已删除");
+                  void load();
+                }}
+              >
+                <Button danger size="small">
+                  删除
+                </Button>
+              </Popconfirm>
+            </div>
+          );
+        },
       },
     ],
-    [load]
+    [archiveSubmittingId, handleArchive, load, openViewer]
   );
 
   const handleCreate = async () => {

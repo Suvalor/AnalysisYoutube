@@ -6,6 +6,9 @@ export type FeishuDocItem = {
   url: string;
   org_id: number;
   created_at: string;
+  archive_status?: string;
+  archive_file_url?: string | null;
+  archive_type?: string | null;
 };
 
 export type FeishuDocListResponse = {
@@ -37,5 +40,17 @@ export async function deleteFeishuDocApi(id: number) {
 export async function getFeishuDocApi(id: number) {
   const res = await apiClient.get(`/api/feishu_docs/${id}`);
   return res.data as FeishuDocItem;
+}
+
+export type FeishuArchiveTriggerResult = {
+  status: string;
+  doc_id: number;
+  message?: string | null;
+};
+
+/** 触发离线归档；成功时 HTTP 202 或 200（已归档） */
+export async function triggerFeishuDocArchiveApi(id: number) {
+  const res = await apiClient.post(`/api/feishu_docs/${id}/archive`);
+  return res.data as FeishuArchiveTriggerResult;
 }
 

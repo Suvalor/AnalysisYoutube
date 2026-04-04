@@ -14,8 +14,19 @@ class FeishuDocRead(BaseModel):
     url: str
     org_id: int
     created_at: datetime
+    archive_status: str = "UNARCHIVED"
+    archive_file_url: str | None = None
+    archive_type: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class FeishuDocArchiveTriggerResponse(BaseModel):
+    """触发归档或幂等响应。"""
+
+    status: str = Field(..., description="accepted | already_archived")
+    doc_id: int
+    message: str | None = None
 
 
 class FeishuDocListResponse(BaseModel):
