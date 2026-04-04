@@ -13,7 +13,9 @@ pip install ffmpeg-python paddlepaddle paddleocr numpy（opencv-python 通常由
 from __future__ import annotations
 
 import logging
+import os
 import shutil
+import tempfile
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -237,20 +239,108 @@ class VideoWatermarkRemover:
                 shutil.copy2(input_video_path, output_video_path)
                 return True, ""
 
-            (
-                ffmpeg.input(str(in_path))
-                .filter(
-                    "delogo",
-                    x=static_rect.x,
-                    y=static_rect.y,
-                    w=static_rect.w,
-                    h=static_rect.h,
-                    show=0,
+            sx, sy, sw, sh = static_rect.x, static_rect.y, static_rect.w, static_rect.h
+
+            def _delogo_ffmpeg() -> None:
+                (
+                    ffmpeg.input(str(in_path))
+                    .filter("delogo", x=sx, y=sy, w=sw, h=sh, show=0)
+                    .output(str(out_path), **{"c:a": "copy"})
+                    .overwrite_output()
+                    .run(capture_stdout=True, capture_stderr=True)
                 )
-                .output(str(out_path), **{"c:a": "copy"})
-                .overwrite_output()
-                .run(capture_stdout=True, capture_stderr=True)
+
+            from app.core.config import settings
+            from app.services.ai_openai_inpaint import (
+                blend_patch_with_gaussian_feather,
+                inpaint_bgr_with_openai_or_none,
+                is_openai_inpaint_configured,
             )
+
+            use_ai = (
+                is_openai_inpaint_configured()
+                and total_frames > 0
+                and total_frames <= settings.watermark_video_ai_max_frames
+            )
+            if not use_ai:
+                if is_openai_inpaint_configured() and total_frames > settings.watermark_video_ai_max_frames:
+                    logger.info(
+                        "视频帧数 %s 超过 WATERMARK_VIDEO_AI_MAX_FRAMES=%s，使用 FFmpeg delogo",
+                        total_frames,
+                        settings.watermark_video_ai_max_frames,
+                    )
+                _delogo_ffmpeg()
+                return True, ""
+
+            cap.release()
+            cap = None  # 避免 finally 二次 release
+            import numpy as np
+
+            cap2 = cv2.VideoCapture(str(in_path))
+            tmp_p: Path | None = None
+            try:
+                if not cap2.isOpened():
+                    logger.warning("无法重新打开视频进行 AI 逐帧修复，回退 delogo")
+                    _delogo_ffmpeg()
+                    return True, ""
+
+                tmp_fd, tmp_name = tempfile.mkstemp(suffix=".mp4")
+                os.close(tmp_fd)
+                tmp_p = Path(tmp_name)
+                feather = max(6, min(sw, sh) // 20)
+
+                fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+                writer = cv2.VideoWriter(str(tmp_p), fourcc, fps, (frame_width, frame_height))
+                if not writer.isOpened():
+                    logger.warning("OpenCV VideoWriter 不可用，回退 FFmpeg delogo")
+                    _delogo_ffmpeg()
+                    return True, ""
+
+                try:
+                    while True:
+                        ok_f, fr = cap2.read()
+                        if not ok_f:
+                            break
+                        if (
+                            sh <= 0
+                            or sw <= 0
+                            or sy + sh > fr.shape[0]
+                            or sx + sw > fr.shape[1]
+                            or sy < 0
+                            or sx < 0
+                        ):
+                            writer.write(fr)
+                            continue
+                        patch = fr[sy : sy + sh, sx : sx + sw].copy()
+                        pm = np.full((sh, sw), 255, dtype=np.uint8)
+                        repaired = inpaint_bgr_with_openai_or_none(patch, pm)
+                        if repaired is None:
+                            repaired = cv2.inpaint(patch, pm, 3, cv2.INPAINT_TELEA)
+                        elif repaired.shape[0] != sh or repaired.shape[1] != sw:
+                            repaired = cv2.resize(repaired, (sw, sh))
+                        blend_patch_with_gaussian_feather(fr, sx, sy, repaired, feather)
+                        writer.write(fr)
+                finally:
+                    writer.release()
+
+                try:
+                    v_in = ffmpeg.input(str(tmp_p))
+                    orig_in = ffmpeg.input(str(in_path))
+                    ffmpeg.output(
+                        v_in.video,
+                        orig_in.audio,
+                        str(out_path),
+                        vcodec="libx264",
+                        acodec="copy",
+                    ).overwrite_output().run(capture_stdout=True, capture_stderr=True)
+                except Exception:
+                    logger.warning("FFmpeg 合并音轨失败或源无音频，输出无音频视频", exc_info=True)
+                    shutil.copy2(tmp_p, out_path)
+            finally:
+                cap2.release()
+                if tmp_p is not None:
+                    tmp_p.unlink(missing_ok=True)
+
             return True, ""
 
         except ffmpeg.Error as exc:
