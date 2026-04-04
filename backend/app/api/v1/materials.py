@@ -18,7 +18,7 @@ from app.schemas.materials import (
 )
 from app.services.material_service import (
     infer_file_type,
-    process_watermark_removal,
+    process_watermark_removal_best_effort,
     remove_temp_dir,
     save_upload_to_temp,
 )
@@ -128,8 +128,9 @@ async def upload_material(
     try:
         tmp_dir, temp_path = save_upload_to_temp(file.filename or "upload.bin", raw_bytes)
         final_path = temp_path
+        process_info = "未启用去水印"
         if remove_watermark:
-            final_path = process_watermark_removal(temp_path, file_type)
+            final_path, process_info = process_watermark_removal_best_effort(temp_path, file_type)
 
         icfg = await resolve_integration_config(db, org_id=current_user.org_id)
         backend = get_write_backend(icfg)
@@ -165,6 +166,7 @@ async def upload_material(
             file_size=row.file_size,
             created_at=row.created_at,
             remove_watermark=remove_watermark,
+            process_info=process_info,
             access_url=access_url,
         )
     finally:

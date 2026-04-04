@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -50,9 +51,13 @@ class VideoWatermarkRemover:
     """
 
     def __init__(self) -> None:
-        from app.services.paddle_ocr_runtime_shim import ensure_analysis_config_compat
+        from app.services.paddle_ocr_runtime_shim import (
+            ensure_analysis_config_compat,
+            preload_paddle_cpp_libs,
+        )
 
         ensure_analysis_config_compat()
+        preload_paddle_cpp_libs()
         from paddleocr import PaddleOCR
 
         self.ocr = PaddleOCR(use_angle_cls=True, lang="ch")
@@ -269,11 +274,33 @@ class VideoWatermarkRemover:
                 cap.release()
 
 
+_video_remover_lock = threading.Lock()
+_video_remover_singleton: VideoWatermarkRemover | None = None
+_video_remover_init_error: BaseException | None = None
+
+
+def get_video_watermark_remover() -> VideoWatermarkRemover:
+    """延迟单例：仅在首次需要视频去水印时初始化 PaddleOCR。"""
+    global _video_remover_singleton, _video_remover_init_error
+    with _video_remover_lock:
+        if _video_remover_singleton is not None:
+            return _video_remover_singleton
+        if _video_remover_init_error is not None:
+            raise _video_remover_init_error
+        try:
+            _video_remover_singleton = VideoWatermarkRemover()
+            return _video_remover_singleton
+        except BaseException as exc:
+            _video_remover_init_error = exc
+            logger.exception("视频去水印 OCR 引擎初始化失败，本进程内后续请求将快速失败")
+            raise
+
+
 def _init_engine_error_message(exc: Exception) -> str:
     if isinstance(exc, ModuleNotFoundError) and getattr(exc, "name", None):
         return (
             f"缺少 Python 模块「{exc.name}」。请在后端 venv 执行：pip install -r requirements.txt "
-            "（推荐 paddlepaddle==2.6.2 与 paddleocr 2.7.x）"
+            "（推荐 numpy==1.26.4、paddlepaddle==2.6.2、paddleocr==2.7.3）"
         )
     return f"去水印引擎初始化失败（PaddleOCR）：{type(exc).__name__}: {exc}"
 
@@ -281,9 +308,9 @@ def _init_engine_error_message(exc: Exception) -> str:
 def auto_remove_video_watermark(input_video_path: str, output_video_path: str) -> tuple[bool, str]:
     """对外便捷函数，返回 (成功, 失败原因)。"""
     try:
-        remover = VideoWatermarkRemover()
+        remover = get_video_watermark_remover()
     except Exception as exc:  # noqa: BLE001
-        logger.exception("初始化 PaddleOCR 失败，请确认已安装 paddlepaddle。")
+        logger.exception("获取视频去水印引擎单例失败。")
         return False, _init_engine_error_message(exc)
     return remover.auto_remove_video_watermark(input_video_path, output_video_path)
 

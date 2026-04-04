@@ -313,6 +313,8 @@ export type MaterialUploadResult = {
   file_size?: number | null;
   created_at: string;
   remove_watermark?: boolean;
+  /** 后端返回：未启用去水印 / 去水印已完成 / 跳过原因等 */
+  process_info?: string;
 };
 
 /** 按素材记录的存储平台生成访问 URL（签名或公开回退），不依赖前端全局开关 */
@@ -347,6 +349,8 @@ export type AssetUploadResult = {
   file_size?: number | null;
   created_at: string;
   remove_watermark?: boolean;
+  /** 后端返回：未启用去水印 / 去水印已完成 / 跳过原因等 */
+  process_info?: string;
 };
 
 export async function uploadAssetWithProcessApi(payload: {
@@ -399,6 +403,7 @@ export async function uploadAssetWithProcessApi(payload: {
     file_size: row.file_size ?? file.size,
     created_at: row.created_at,
     remove_watermark: false,
+    process_info: "未启用去水印",
   };
 }
 
