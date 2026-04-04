@@ -41,16 +41,22 @@ export type IntegrationSettingsRead = {
   volcengine_endpoint_id: string;
   volcengine_base_url: string;
   volcengine_model_gemini: string;
+  volc_cv_access_key_id: string;
+  volc_cv_region: string;
+  volc_cv_host: string;
+  volc_cv_inpaint_req_key: string;
   watermark_video_ai_max_frames: number;
   watermark_inpaint_prompt: string;
   has_youtube_api_key: boolean;
   has_aliyun_access_key_secret: boolean;
   has_tencent_cos_secret_key: boolean;
   has_volcengine_api_key: boolean;
+  has_volc_cv_secret_access_key: boolean;
   youtube_api_key_display: string | null;
   aliyun_access_key_secret_display: string | null;
   tencent_cos_secret_key_display: string | null;
   volcengine_api_key_display: string | null;
+  volc_cv_secret_access_key_display: string | null;
 };
 
 export type IntegrationTestResult = { ok: boolean; message: string };
@@ -74,6 +80,11 @@ export type IntegrationSettingsUpdatePayload = Partial<{
   volcengine_endpoint_id: string | null;
   volcengine_base_url: string | null;
   volcengine_model_gemini: string | null;
+  volc_cv_access_key_id: string | null;
+  volc_cv_secret_access_key: string | null;
+  volc_cv_region: string | null;
+  volc_cv_host: string | null;
+  volc_cv_inpaint_req_key: string | null;
   watermark_video_ai_max_frames?: number | null;
   watermark_inpaint_prompt?: string | null;
 }>;

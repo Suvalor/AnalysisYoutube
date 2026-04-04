@@ -1,7 +1,7 @@
 """
-OpenAI 兼容 Images Edit（multipart）调用，供去水印插件使用。
+去水印云端图像修复：优先火山智能视觉 CV（Img2ImgInpainting），其次 OpenAI 兼容 images.edit。
 
-不依赖 openai SDK，便于对接自建网关或与 chat 共用 Base URL 前缀。
+不依赖 openai SDK；火山侧使用 volcengine-python-sdk 完成签名。
 """
 
 from __future__ import annotations
@@ -16,9 +16,20 @@ import httpx
 import numpy as np
 from PIL import Image
 
-from app.services.watermark_inpaint_config import InpaintRuntimeConfig
+from app.services.ai.volc_inpaint_provider import VolcInpaintProvider
+from app.services.watermark_inpaint_config import (
+    InpaintRuntimeConfig,
+    OpenAIInpaintSlice,
+    VolcCvInpaintSlice,
+)
 
 logger = logging.getLogger(__name__)
+
+# 日志标记：曾尝试云端 Inpaint 后回退 OpenCV 时，业务方可据此检索
+AI_FAILED_FALLBACK_TO_OPENCV = "AI_FAILED_FALLBACK_TO_OPENCV"
+
+# 火山视觉常见请求体大小/边长限制（保守值）
+_VOLC_MAX_SIDE_PX = 4096
 
 
 def blend_patch_with_gaussian_feather(
@@ -104,19 +115,65 @@ def _images_edit_url(api_base_url: str) -> str:
     return f"{b}/v1/images/edits"
 
 
-def inpaint_bgr_with_runtime_config_or_none(
+def _volc_inpaint_full_bgr_or_none(
     image_bgr: np.ndarray,
     mask_u8: np.ndarray,
-    config: InpaintRuntimeConfig,
+    volc_slice: VolcCvInpaintSlice,
 ) -> np.ndarray | None:
-    """
-    使用数据库解析得到的配置调用 OpenAI 兼容 images.edit；失败返回 None。
-    """
+    """整图 + 整幅 Mask 调用火山 CV；必要时缩小请求，结果放大回原分辨率。"""
     import cv2
 
-    if image_bgr.shape[:2] != mask_u8.shape[:2]:
-        logger.warning("Inpaint：图像与 mask 尺寸不一致")
+    orig_h, orig_w = image_bgr.shape[:2]
+    work_b = image_bgr
+    work_m = mask_u8
+    side = max(orig_h, orig_w)
+    if side > _VOLC_MAX_SIDE_PX:
+        scale = _VOLC_MAX_SIDE_PX / float(side)
+        nw = max(1, int(round(orig_w * scale)))
+        nh = max(1, int(round(orig_h * scale)))
+        work_b = cv2.resize(image_bgr, (nw, nh), interpolation=cv2.INTER_AREA)
+        work_m = cv2.resize(mask_u8, (nw, nh), interpolation=cv2.INTER_NEAREST)
+        logger.info(
+            "火山 CV Inpaint：原图长边 %s 超过 %s，请求前缩放为 %sx%s",
+            side,
+            _VOLC_MAX_SIDE_PX,
+            nw,
+            nh,
+        )
+
+    ok_i, buf_i = cv2.imencode(".png", work_b)
+    ok_m, buf_m = cv2.imencode(".png", work_m)
+    if not ok_i or not ok_m:
+        logger.warning("火山 CV Inpaint：PNG 编码失败")
         return None
+
+    provider = VolcInpaintProvider(volc_slice)
+    try:
+        out_bytes = provider.process(buf_i.tobytes(), buf_m.tobytes())
+    except Exception:
+        logger.warning("火山 CV Inpaint 调用异常（将尝试其他通道或本地修复）", exc_info=True)
+        return None
+
+    raw = np.frombuffer(out_bytes, dtype=np.uint8)
+    out = cv2.imdecode(raw, cv2.IMREAD_COLOR)
+    if out is None:
+        logger.warning("火山 CV Inpaint：无法解码返回图像")
+        return None
+
+    if out.shape[:2] != work_b.shape[:2]:
+        out = cv2.resize(out, (work_b.shape[1], work_b.shape[0]), interpolation=cv2.INTER_LINEAR)
+
+    if out.shape[0] != orig_h or out.shape[1] != orig_w:
+        out = cv2.resize(out, (orig_w, orig_h), interpolation=cv2.INTER_CUBIC)
+    return out
+
+
+def _openai_inpaint_bgr_or_none(
+    image_bgr: np.ndarray,
+    mask_u8: np.ndarray,
+    slice_cfg: OpenAIInpaintSlice,
+) -> np.ndarray | None:
+    import cv2
 
     bbox = _mask_bbox(mask_u8)
     if bbox is None:
@@ -148,14 +205,14 @@ def inpaint_bgr_with_runtime_config_or_none(
     buf_mask = io.BytesIO()
     pil_mask.save(buf_mask, format="PNG")
 
-    url = _images_edit_url(config.api_base_url)
+    url = _images_edit_url(slice_cfg.api_base_url)
     files = {
         "image": ("image.png", buf_img.getvalue(), "image/png"),
         "mask": ("mask.png", buf_mask.getvalue(), "image/png"),
     }
     data = {
-        "model": config.model_id,
-        "prompt": config.prompt,
+        "model": slice_cfg.model_id,
+        "prompt": slice_cfg.prompt,
         "n": "1",
         "size": f"{side}x{side}",
         "response_format": "b64_json",
@@ -165,7 +222,7 @@ def inpaint_bgr_with_runtime_config_or_none(
         with httpx.Client(timeout=180.0, trust_env=False) as client:
             resp = client.post(
                 url,
-                headers={"Authorization": f"Bearer {config.api_key}"},
+                headers={"Authorization": f"Bearer {slice_cfg.api_key}"},
                 files=files,
                 data=data,
             )
@@ -173,6 +230,9 @@ def inpaint_bgr_with_runtime_config_or_none(
         logger.warning("images.edit 网络请求失败，将回退本地修复", exc_info=True)
         return None
 
+    if resp.status_code == 429:
+        logger.warning("images.edit 限流 HTTP 429：%s", (resp.text or "")[:500])
+        return None
     if resp.status_code >= 400:
         logger.warning("images.edit HTTP %s：%s", resp.status_code, (resp.text or "")[:500])
         return None
@@ -200,8 +260,8 @@ def inpaint_bgr_with_runtime_config_or_none(
         logger.warning("解码 images.edit 返回失败", exc_info=True)
         return None
 
-    y0, x0, nw, nh = meta["y0"], meta["x0"], meta["nw"], meta["nh"]
-    inner = out_canvas[y0 : y0 + nh, x0 : x0 + nw]
+    y0l, x0l, nw, nh = meta["y0"], meta["x0"], meta["nw"], meta["nh"]
+    inner = out_canvas[y0l : y0l + nh, x0l : x0l + nw]
     if inner.size == 0:
         return None
     restored = cv2.resize(inner, (cw, ch), interpolation=cv2.INTER_AREA)
@@ -224,3 +284,30 @@ def inpaint_bgr_with_runtime_config_or_none(
     else:
         roi[:] = restored
     return out_full
+
+
+def inpaint_bgr_with_runtime_config_or_none(
+    image_bgr: np.ndarray,
+    mask_u8: np.ndarray,
+    config: InpaintRuntimeConfig,
+) -> np.ndarray | None:
+    """
+    按配置依次尝试：火山 CV Inpaint → OpenAI 兼容 images.edit；均失败返回 None。
+    """
+    if image_bgr.shape[:2] != mask_u8.shape[:2]:
+        logger.warning("Inpaint：图像与 mask 尺寸不一致")
+        return None
+
+    bbox = _mask_bbox(mask_u8)
+    if bbox is None:
+        return image_bgr.copy()
+
+    if config.volc_cv is not None:
+        volc_out = _volc_inpaint_full_bgr_or_none(image_bgr, mask_u8, config.volc_cv)
+        if volc_out is not None:
+            return volc_out
+
+    if config.openai is not None:
+        return _openai_inpaint_bgr_or_none(image_bgr, mask_u8, config.openai)
+
+    return None

@@ -260,12 +260,14 @@ class VideoWatermarkRemover:
                 )
 
             from app.services.watermark_inpaint_client import (
+                AI_FAILED_FALLBACK_TO_OPENCV,
                 blend_patch_with_gaussian_feather,
                 inpaint_bgr_with_runtime_config_or_none,
             )
 
             use_ai = (
                 inpaint_config is not None
+                and inpaint_config.has_any_ai()
                 and total_frames > 0
                 and total_frames <= inpaint_config.video_max_frames
             )
@@ -296,6 +298,37 @@ class VideoWatermarkRemover:
                 tmp_p = Path(tmp_name)
                 feather = max(6, min(sw, sh) // 20)
 
+                # 静态水印：仅在关键帧做一次云端/本地 Inpaint，全片复用修补块以控制成本
+                key_idx = sampled_indices[len(sampled_indices) // 2]
+                repaired_master: np.ndarray | None = None
+                cap2.set(cv2.CAP_PROP_POS_FRAMES, key_idx)
+                ok_kf, kfr = cap2.read()
+                if (
+                    ok_kf
+                    and kfr is not None
+                    and sh > 0
+                    and sw > 0
+                    and sy + sh <= kfr.shape[0]
+                    and sx + sw <= kfr.shape[1]
+                    and sy >= 0
+                    and sx >= 0
+                ):
+                    kpatch = kfr[sy : sy + sh, sx : sx + sw].copy()
+                    pm_key = np.full((sh, sw), 255, dtype=np.uint8)
+                    repaired_master = inpaint_bgr_with_runtime_config_or_none(
+                        kpatch, pm_key, inpaint_config
+                    )
+                    if repaired_master is None:
+                        logger.warning(
+                            "%s: 视频关键帧云端 Inpaint 未成功，该水印区域改用 OpenCV TELEA 并复用到全部帧",
+                            AI_FAILED_FALLBACK_TO_OPENCV,
+                        )
+                        repaired_master = cv2.inpaint(kpatch, pm_key, 3, cv2.INPAINT_TELEA)
+                else:
+                    logger.warning("无法读取关键帧或水印区域越界，后续逐帧使用 OpenCV TELEA 修补")
+
+                cap2.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
                 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                 writer = cv2.VideoWriter(str(tmp_p), fourcc, fps, (frame_width, frame_height))
                 if not writer.isOpened():
@@ -318,14 +351,16 @@ class VideoWatermarkRemover:
                         ):
                             writer.write(fr)
                             continue
-                        patch = fr[sy : sy + sh, sx : sx + sw].copy()
-                        pm = np.full((sh, sw), 255, dtype=np.uint8)
-                        repaired = inpaint_bgr_with_runtime_config_or_none(patch, pm, inpaint_config)
-                        if repaired is None:
+                        if repaired_master is not None:
+                            p = repaired_master
+                            if p.shape[0] != sh or p.shape[1] != sw:
+                                p = cv2.resize(p, (sw, sh))
+                            blend_patch_with_gaussian_feather(fr, sx, sy, p, feather)
+                        else:
+                            patch = fr[sy : sy + sh, sx : sx + sw].copy()
+                            pm = np.full((sh, sw), 255, dtype=np.uint8)
                             repaired = cv2.inpaint(patch, pm, 3, cv2.INPAINT_TELEA)
-                        elif repaired.shape[0] != sh or repaired.shape[1] != sw:
-                            repaired = cv2.resize(repaired, (sw, sh))
-                        blend_patch_with_gaussian_feather(fr, sx, sy, repaired, feather)
+                            blend_patch_with_gaussian_feather(fr, sx, sy, repaired, feather)
                         writer.write(fr)
                 finally:
                     writer.release()

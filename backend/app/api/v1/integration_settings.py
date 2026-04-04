@@ -61,16 +61,22 @@ async def _to_read(session, org_id: int, stored: dict[str, str]) -> IntegrationS
         volcengine_endpoint_id=merged.volcengine_endpoint_id,
         volcengine_base_url=merged.volcengine_base_url,
         volcengine_model_gemini=merged.volcengine_model_gemini,
+        volc_cv_access_key_id=merged.volc_cv_access_key_id,
+        volc_cv_region=merged.volc_cv_region,
+        volc_cv_host=merged.volc_cv_host,
+        volc_cv_inpaint_req_key=merged.volc_cv_inpaint_req_key,
         watermark_video_ai_max_frames=merged.watermark_video_ai_max_frames,
         watermark_inpaint_prompt=merged.watermark_inpaint_prompt,
         has_youtube_api_key=bool(merged.youtube_api_key),
         has_aliyun_access_key_secret=bool(merged.aliyun_access_key_secret),
         has_tencent_cos_secret_key=bool(merged.tencent_cos_secret_key),
         has_volcengine_api_key=bool(merged.volcengine_api_key),
+        has_volc_cv_secret_access_key=bool(merged.volc_cv_secret_access_key),
         youtube_api_key_display=_secret_display(bool(merged.youtube_api_key)),
         aliyun_access_key_secret_display=_secret_display(bool(merged.aliyun_access_key_secret)),
         tencent_cos_secret_key_display=_secret_display(bool(merged.tencent_cos_secret_key)),
         volcengine_api_key_display=_secret_display(bool(merged.volcengine_api_key)),
+        volc_cv_secret_access_key_display=_secret_display(bool(merged.volc_cv_secret_access_key)),
     )
 
 

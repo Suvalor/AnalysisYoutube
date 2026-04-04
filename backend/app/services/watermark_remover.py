@@ -130,13 +130,21 @@ class WatermarkRemover:
             kernel = np.ones((5, 5), np.uint8)
             mask = cv2.dilate(mask, kernel, iterations=1)
 
-            # 第五步：若模型库配置了 image_inpaint，则调用 OpenAI 兼容 images.edit；否则或失败则用 OpenCV TELEA
+            # 第五步：若集成/模型库配置了云端 Inpaint，则优先火山 CV 再 OpenAI 兼容；失败则 OpenCV TELEA
             inpainted = None
-            if inpaint_config is not None:
-                from app.services.watermark_inpaint_client import inpaint_bgr_with_runtime_config_or_none
+            if inpaint_config is not None and inpaint_config.has_any_ai():
+                from app.services.watermark_inpaint_client import (
+                    AI_FAILED_FALLBACK_TO_OPENCV,
+                    inpaint_bgr_with_runtime_config_or_none,
+                )
 
                 inpainted = inpaint_bgr_with_runtime_config_or_none(image, mask, inpaint_config)
             if inpainted is None:
+                if inpaint_config is not None and inpaint_config.has_any_ai():
+                    logger.warning(
+                        "%s: 云端 Inpaint 未返回有效结果，使用 OpenCV TELEA",
+                        AI_FAILED_FALLBACK_TO_OPENCV,
+                    )
                 inpainted = cv2.inpaint(image, mask, inpaintRadius=3, flags=cv2.INPAINT_TELEA)
 
             # 第六步：保存输出
