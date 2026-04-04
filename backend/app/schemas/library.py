@@ -190,10 +190,19 @@ class ScriptRead(BaseModel):
     content: str
     prompt_id: int | None
     style_id: int | None
+    origin_type: str = Field(default="AI_WORKSHOP", description="AI_WORKSHOP | MANUAL")
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ManualKnowledgeScriptCreate(BaseModel):
+    """知识库手动新建：与 AI 工坊入参分离，仅走专用接口。"""
+
+    title: str = Field(..., min_length=1, max_length=255, description="标题/项目名")
+    plot: str = Field(..., min_length=1, description="核心内容/剧情")
+    emotion: str = Field(default="", max_length=500, description="核心情绪/描述，可空")
 
 
 class GenerateScriptStreamRequest(BaseModel):

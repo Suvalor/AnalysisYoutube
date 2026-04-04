@@ -82,6 +82,10 @@ class ScriptLibrary(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(LONGTEXT, nullable=False)
+    # AI_WORKSHOP：AI 脚本工坊保存；MANUAL：知识库手动新建
+    origin_type: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="AI_WORKSHOP", server_default="AI_WORKSHOP"
+    )
     prompt_id: Mapped[int | None] = mapped_column(
         ForeignKey("prompt_libraries.id", ondelete="SET NULL"),
         nullable=True,
