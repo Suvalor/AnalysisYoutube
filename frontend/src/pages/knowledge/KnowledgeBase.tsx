@@ -1,6 +1,7 @@
 import { Button, Input, Modal, Popconfirm, Segmented, Select, Space, Table, Tag, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
+import { Pin } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MarkdownEditorToggle from "@/components/MarkdownEditorToggle";
@@ -8,6 +9,7 @@ import {
   createManualKnowledgeScriptApi,
   deleteScriptApi,
   listScriptsApi,
+  pinKnowledgeScriptApi,
   restoreScriptApi,
   type ScriptItem,
 } from "@/services/libraryApi";
@@ -38,30 +40,74 @@ export default function KnowledgeBase() {
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [formTitle, setFormTitle] = useState("");
   const [formPlot, setFormPlot] = useState("");
+  const [timeSort, setTimeSort] = useState<"updated_at" | "created_at">("updated_at");
+  const [pinningId, setPinningId] = useState<number | null>(null);
 
   const reloadScripts = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await listScriptsApi(viewMode === "recycle");
+      const data = await listScriptsApi({
+        includeDeleted: viewMode === "recycle",
+        sort_by: timeSort,
+      });
       setRows(data);
     } catch (e: any) {
       message.error(e?.response?.data?.detail ?? e?.message ?? "加载剧本列表失败");
     } finally {
       setLoading(false);
     }
-  }, [viewMode]);
+  }, [viewMode, timeSort]);
 
   useEffect(() => {
     void reloadScripts();
   }, [reloadScripts]);
 
-  const columns: ColumnsType<ScriptItem> = [
+  const togglePin = useCallback(
+    async (row: ScriptItem) => {
+      if (viewMode !== "active") return;
+      const next = !row.is_pinned;
+      setPinningId(row.id);
+      try {
+        await pinKnowledgeScriptApi(row.id, next);
+        message.success(next ? "已置顶" : "已取消置顶");
+        await reloadScripts();
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { detail?: string } } };
+        message.error(err?.response?.data?.detail ?? "置顶操作失败");
+      } finally {
+        setPinningId(null);
+      }
+    },
+    [reloadScripts, viewMode]
+  );
+
+  const columns: ColumnsType<ScriptItem> = useMemo(
+    () => [
     {
       title: "标题",
       dataIndex: "title",
       key: "title",
       render: (v: string, row) => (
-        <Space size={8} wrap>
+        <Space size={8} wrap className="items-center">
+          {viewMode === "active" ? (
+            <button
+              type="button"
+              title={row.is_pinned ? "取消置顶" : "置顶"}
+              aria-label={row.is_pinned ? "取消置顶" : "置顶"}
+              disabled={pinningId === row.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                void togglePin(row);
+              }}
+              className={`p-1 rounded-md border border-transparent transition-colors shrink-0 ${
+                row.is_pinned
+                  ? "text-amber-600 bg-amber-100/80 border-amber-200 hover:bg-amber-100"
+                  : "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+              }`}
+            >
+              <Pin size={18} className={row.is_pinned ? "fill-amber-500" : ""} strokeWidth={row.is_pinned ? 2.5 : 2} />
+            </button>
+          ) : null}
           {row.origin_type === "MANUAL" ? (
             <Tag color="blue" className="m-0">
               手动
@@ -78,9 +124,9 @@ export default function KnowledgeBase() {
       render: (_, row) => getScriptStatusLabel(getScriptStatus(row)),
     },
     {
-      title: "更新时间",
-      dataIndex: "updated_at",
-      key: "updated_at",
+      title: timeSort === "updated_at" ? "更新时间" : "创建时间",
+      dataIndex: timeSort === "updated_at" ? "updated_at" : "created_at",
+      key: timeSort,
       render: (v: string) => dayjs(v).format("YYYY-MM-DD HH:mm"),
       width: 180,
     },
@@ -144,7 +190,9 @@ export default function KnowledgeBase() {
         </Space>
       ),
     },
-  ];
+    ],
+    [navigate, pinningId, reloadScripts, timeSort, togglePin, viewMode]
+  );
 
   const filteredRows = useMemo(() => {
     const kw = titleKeyword.trim().toLowerCase();
@@ -207,13 +255,22 @@ export default function KnowledgeBase() {
             </Button>
           ) : null}
         </div>
-        <div className="mb-4 flex flex-col md:flex-row gap-3">
+        <div className="mb-4 flex flex-col md:flex-row gap-3 flex-wrap">
           <Input
             placeholder="按标题搜索"
             value={titleKeyword}
             onChange={(e) => setTitleKeyword(e.target.value)}
             allowClear
             className="md:max-w-sm"
+          />
+          <Select
+            value={timeSort}
+            onChange={(v) => setTimeSort(v as "updated_at" | "created_at")}
+            options={[
+              { value: "updated_at", label: "按最近更新" },
+              { value: "created_at", label: "按创建时间" },
+            ]}
+            className="md:w-44"
           />
           {viewMode === "active" ? (
             <Select
@@ -233,6 +290,7 @@ export default function KnowledgeBase() {
           columns={columns}
           dataSource={filteredRows}
           loading={loading}
+          rowClassName={(record) => (record.is_pinned ? "bg-amber-50/80" : "")}
           pagination={{ pageSize: 8 }}
         />
 

@@ -191,10 +191,18 @@ class ScriptRead(BaseModel):
     prompt_id: int | None
     style_id: int | None
     origin_type: str = Field(default="AI_WORKSHOP", description="AI_WORKSHOP | MANUAL")
+    is_pinned: bool = Field(default=False, description="知识库置顶")
     created_at: datetime
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class KnowledgePinRequest(BaseModel):
+    """知识库置顶切换。"""
+
+    id: int = Field(..., ge=1, description="剧本 script_libraries.id")
+    is_pinned: bool = Field(..., description="是否置顶")
 
 
 class ManualKnowledgeScriptCreate(BaseModel):
