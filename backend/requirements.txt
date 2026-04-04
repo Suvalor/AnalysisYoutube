@@ -18,10 +18,10 @@ alibabacloud_sts20150401==1.2.0
 alibabacloud_tea_openapi==0.4.1
 oss2==2.19.1
 cos-python-sdk-v5>=1.9.0,<2
-# 去水印（/api/assets/upload remove_watermark）：需 paddlepaddle + paddleocr；若 pip 装不上请按官网选系统/CPU/GPU
-# https://www.paddlepaddle.org.cn/install/quick
-paddlepaddle>=2.6.0,<3.0.0
-paddleocr
+# 去水印：Paddle 与 PaddleOCR 主版本需匹配。2.6+/3.x 常与旧版 paddleocr 调用 set_optimization_level 冲突，故锁定稳定组合。
+# Apple Silicon / 特殊环境若 pip 失败，见 https://www.paddlepaddle.org.cn/install/quick
+paddlepaddle==2.5.2
+paddleocr>=2.7.0,<2.8.0
 opencv-python
 numpy
 ffmpeg-python
