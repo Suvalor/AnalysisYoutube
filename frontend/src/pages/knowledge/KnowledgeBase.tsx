@@ -3,6 +3,7 @@ import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import MarkdownEditorToggle from "@/components/MarkdownEditorToggle";
 import {
   createManualKnowledgeScriptApi,
   deleteScriptApi,
@@ -37,7 +38,6 @@ export default function KnowledgeBase() {
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [formTitle, setFormTitle] = useState("");
   const [formPlot, setFormPlot] = useState("");
-  const [formEmotion, setFormEmotion] = useState("");
 
   const reloadScripts = useCallback(async () => {
     setLoading(true);
@@ -159,7 +159,6 @@ export default function KnowledgeBase() {
   const resetCreateForm = () => {
     setFormTitle("");
     setFormPlot("");
-    setFormEmotion("");
   };
 
   const submitManualCreate = async () => {
@@ -175,11 +174,7 @@ export default function KnowledgeBase() {
     }
     setCreateSubmitting(true);
     try {
-      await createManualKnowledgeScriptApi({
-        title,
-        plot,
-        emotion: formEmotion.trim() || undefined,
-      });
+      await createManualKnowledgeScriptApi({ title, plot });
       message.success("已保存到知识库");
       resetCreateForm();
       setCreateOpen(false);
@@ -255,7 +250,7 @@ export default function KnowledgeBase() {
           confirmLoading={createSubmitting}
           onOk={() => void submitManualCreate()}
           destroyOnClose
-          width={640}
+          width={960}
         >
           <div className="space-y-4 pt-2">
             <div>
@@ -269,24 +264,14 @@ export default function KnowledgeBase() {
               />
             </div>
             <div>
-              <div className="text-xs text-slate-600 mb-1">核心情绪 / 描述（将写入正文首行，格式：### 项目: 【标题】 **情绪**）</div>
-              <Input
-                value={formEmotion}
-                onChange={(e) => setFormEmotion(e.target.value)}
-                placeholder="可空；例如：紧张、压抑、反转期待"
-                maxLength={500}
-              />
-            </div>
-            <div>
-              <div className="text-xs text-slate-600 mb-1">核心内容 / 剧情</div>
-              <Input.TextArea
+              <div className="text-xs text-slate-600 mb-1">核心内容 / 剧情（Markdown，与 AI 脚本工坊落库格式一致）</div>
+              <MarkdownEditorToggle
                 value={formPlot}
-                onChange={(e) => setFormPlot(e.target.value)}
-                placeholder="粘贴外部 AI 或文档中的剧情正文"
-                rows={12}
-                showCount
-                maxLength={200000}
+                onChange={setFormPlot}
+                minRows={12}
+                placeholder="支持 ### 标题、**加粗**、表格、围栏代码块等；可切换「预览」或「分栏」查看渲染效果"
               />
+              <div className="text-right text-xs text-slate-400 mt-1">{formPlot.length} / 500000</div>
             </div>
           </div>
         </Modal>

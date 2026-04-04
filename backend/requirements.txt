@@ -23,3 +23,5 @@ opencv-python
 numpy
 ffmpeg-python
 python-multipart
+Markdown==3.7
+nh3==0.2.18
