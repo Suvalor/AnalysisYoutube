@@ -5,12 +5,15 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from fastapi import HTTPException, status
 
 # 注意：禁止在此文件顶层 import paddle / watermark_*，避免未请求去水印时也加载 OCR 栈。
 
+if TYPE_CHECKING:
+    from app.services.watermark_inpaint_config import InpaintRuntimeConfig
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +21,12 @@ logger = logging.getLogger(__name__)
 _PROCESS_INFO_SKIP_ENGINE = "素材上传成功，但去水印处理因环境组件初始化失败而跳过"
 
 
-def process_watermark_removal_best_effort(temp_filepath: str, file_type: str) -> tuple[str, str]:
+def process_watermark_removal_best_effort(
+    temp_filepath: str,
+    file_type: str,
+    *,
+    inpaint_config: InpaintRuntimeConfig | None = None,
+) -> tuple[str, str]:
     """
     去水印（插件、尽力而为）。
 
@@ -40,9 +48,17 @@ def process_watermark_removal_best_effort(temp_filepath: str, file_type: str) ->
 
     try:
         if file_type == "image":
-            ok, reason = auto_remove_text_watermark(str(input_path), str(output_path))
+            ok, reason = auto_remove_text_watermark(
+                str(input_path),
+                str(output_path),
+                inpaint_config=inpaint_config,
+            )
         elif file_type == "video":
-            ok, reason = auto_remove_video_watermark(str(input_path), str(output_path))
+            ok, reason = auto_remove_video_watermark(
+                str(input_path),
+                str(output_path),
+                inpaint_config=inpaint_config,
+            )
         else:
             logger.info("当前文件类型不支持去水印，跳过插件逻辑，file_type=%s", file_type)
             return temp_filepath, "素材上传成功；当前类型不支持去水印，已上传原文件"

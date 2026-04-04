@@ -9,4 +9,3 @@ docker compose exec backend alembic upgrade head
 
 # 3. 打包及启动
 docker compose up --build -d  
-```

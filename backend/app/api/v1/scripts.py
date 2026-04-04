@@ -75,6 +75,7 @@ async def list_script_models(
     models = parse_models_from_user_json(current_user.ai_models_json)
     if models == DEFAULT_MODEL_OPTIONS:
         rows = await list_by_user(db, ModelLibrary, current_user.id)
+        rows = [r for r in rows if (getattr(r, "library_kind", None) or "chat") == "chat"]
         lib_models = _parse_models_from_library_rows(rows)
         if lib_models:
             models = lib_models

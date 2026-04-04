@@ -5,9 +5,11 @@ import {
   Card,
   Form,
   Input,
+  InputNumber,
   Modal,
   Popconfirm,
   Radio,
+  Select,
   Space,
   Spin,
   Table,
@@ -93,6 +95,7 @@ type ActiveTabKey = "models" | "prompts" | "styles" | "integration";
 
 type ModelFormValues = {
   name: string;
+  library_kind?: string;
   api_base_url: string;
   api_key?: string;
   supported_models?: Array<{ label: string; value: string }>;
@@ -128,6 +131,8 @@ type VolcFormValues = {
   volcengine_endpoint_id: string;
   volcengine_base_url: string;
   volcengine_model_gemini: string;
+  watermark_video_ai_max_frames: number;
+  watermark_inpaint_prompt: string;
 };
 
 export default function ConfigCenter() {
@@ -236,6 +241,8 @@ export default function ConfigCenter() {
       volcengine_endpoint_id: data.volcengine_endpoint_id || "",
       volcengine_base_url: data.volcengine_base_url || "",
       volcengine_model_gemini: data.volcengine_model_gemini || "",
+      watermark_video_ai_max_frames: data.watermark_video_ai_max_frames ?? 180,
+      watermark_inpaint_prompt: data.watermark_inpaint_prompt || "",
     });
   }, [storageForm, youtubeForm, volcForm]);
 
@@ -271,7 +278,7 @@ export default function ConfigCenter() {
     setModelMode("create");
     setEditingModel(null);
     modelForm.resetFields();
-    modelForm.setFieldsValue({ supported_models: [] });
+    modelForm.setFieldsValue({ supported_models: [], library_kind: "chat" });
     setModelOpen(true);
   };
 
@@ -280,6 +287,7 @@ export default function ConfigCenter() {
     setEditingModel(row);
     modelForm.setFieldsValue({
       name: row.name,
+      library_kind: row.library_kind ?? "chat",
       api_base_url: row.api_base_url,
       supported_models: parseSupportedModels(row.supported_models_json),
       api_key: "",
@@ -303,10 +311,13 @@ export default function ConfigCenter() {
   const submitModel = async () => {
     try {
       const values = await modelForm.validateFields();
-      const urlErr = validateVolcengineLikeBaseUrl(values.api_base_url ?? "");
-      if (urlErr) {
-        message.error(urlErr);
-        return;
+      const libKind = (values.library_kind ?? "chat").trim();
+      if (libKind !== "image_inpaint") {
+        const urlErr = validateVolcengineLikeBaseUrl(values.api_base_url ?? "");
+        if (urlErr) {
+          message.error(urlErr);
+          return;
+        }
       }
       setSaving(true);
       const payload: {
@@ -314,9 +325,11 @@ export default function ConfigCenter() {
         api_base_url?: string;
         api_key?: string;
         supported_models_json?: string | null;
+        library_kind?: string;
       } = {
         name: values.name.trim(),
         api_base_url: values.api_base_url.trim(),
+        library_kind: libKind,
       };
       const supportedModels = (values.supported_models ?? []).map((x) => ({
         label: String(x?.label ?? "").trim(),
@@ -401,6 +414,17 @@ export default function ConfigCenter() {
   const modelColumns: ColumnsType<ModelItem> = useMemo(
     () => [
       { title: "名称", dataIndex: "name", key: "name" },
+      {
+        title: "用途",
+        key: "library_kind",
+        width: 120,
+        render: (_: unknown, row: ModelItem) =>
+          row.library_kind === "image_inpaint" ? (
+            <Tag color="purple">图像修复</Tag>
+          ) : (
+            <Tag>对话</Tag>
+          ),
+      },
       { title: "URL", dataIndex: "api_base_url", key: "api_base_url" },
       {
         title: "Key",
@@ -548,6 +572,14 @@ export default function ConfigCenter() {
         volcengine_base_url: trimOrNull(values.volcengine_base_url),
         volcengine_model_gemini: trimOrNull(values.volcengine_model_gemini),
       };
+      const wm = values.watermark_video_ai_max_frames;
+      if (wm != null && !Number.isNaN(Number(wm))) {
+        payload.watermark_video_ai_max_frames = Math.max(1, Math.min(10000, Number(wm)));
+      } else {
+        payload.watermark_video_ai_max_frames = null;
+      }
+      const wp = (values.watermark_inpaint_prompt ?? "").trim();
+      payload.watermark_inpaint_prompt = wp.length ? wp : null;
       const vk = (values.volcengine_api_key ?? "").trim();
       if (vk && !looksLikeMaskedSecret(vk)) payload.volcengine_api_key = vk;
       const updated = await updateIntegrationSettingsApi(payload);
@@ -914,6 +946,24 @@ export default function ConfigCenter() {
                                 >
                                   <Input />
                                 </Form.Item>
+                                <div className="text-slate-600 text-sm font-medium mt-4 mb-2">去水印（AI 修复）组织默认</div>
+                                <p className="text-slate-500 text-xs mb-2">
+                                  需在「模型管理」新增用途为「图像修复」的条目，填写 OpenAI 兼容 Base URL（如 https://api.openai.com/v1）与
+                                  images.edit 所用模型 ID（如 dall-e-2）。以下为提示词与视频逐帧上限。
+                                </p>
+                                <Form.Item
+                                  name="watermark_video_ai_max_frames"
+                                  label="视频逐帧 AI 最大帧数"
+                                  extra="超出则整段视频改用 FFmpeg delogo；避免长视频刷爆接口。"
+                                >
+                                  <InputNumber min={1} max={10000} className="w-full" />
+                                </Form.Item>
+                                <Form.Item
+                                  name="watermark_inpaint_prompt"
+                                  label="Inpaint 提示词（英文推荐）"
+                                >
+                                  <Input.TextArea rows={3} placeholder="描述如何自然填补水印区域" />
+                                </Form.Item>
                               </Form>
                             </div>
                           ),
@@ -936,9 +986,22 @@ export default function ConfigCenter() {
         confirmLoading={saving}
         destroyOnHidden
       >
-        <Form form={modelForm} layout="vertical">
+        <Form form={modelForm} layout="vertical" initialValues={{ library_kind: "chat" }}>
           <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入名称" }]}>
             <Input />
+          </Form.Item>
+          <Form.Item
+            name="library_kind"
+            label="用途"
+            rules={[{ required: true, message: "请选择用途" }]}
+            extra="图像修复：用于去水印插件（OpenAI 兼容 POST /v1/images/edit）；与火山对话接口不同，需单独配置可访问该路径的网关。"
+          >
+            <Select
+              options={[
+                { value: "chat", label: "对话 / 脚本工坊（默认）" },
+                { value: "image_inpaint", label: "图像修复（去水印 Inpainting）" },
+              ]}
+            />
           </Form.Item>
           <Form.Item
             name="api_base_url"

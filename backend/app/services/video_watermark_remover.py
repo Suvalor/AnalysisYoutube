@@ -19,7 +19,10 @@ import tempfile
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.services.watermark_inpaint_config import InpaintRuntimeConfig
 
 import ffmpeg
 
@@ -176,7 +179,13 @@ class VideoWatermarkRemover:
             return None
         return Rect(x=x, y=y, w=w, h=h)
 
-    def auto_remove_video_watermark(self, input_video_path: str, output_video_path: str) -> tuple[bool, str]:
+    def auto_remove_video_watermark(
+        self,
+        input_video_path: str,
+        output_video_path: str,
+        *,
+        inpaint_config: InpaintRuntimeConfig | None = None,
+    ) -> tuple[bool, str]:
         """
         自动去除视频中的静态文本水印。
 
@@ -250,24 +259,22 @@ class VideoWatermarkRemover:
                     .run(capture_stdout=True, capture_stderr=True)
                 )
 
-            from app.core.config import settings
-            from app.services.ai_openai_inpaint import (
+            from app.services.watermark_inpaint_client import (
                 blend_patch_with_gaussian_feather,
-                inpaint_bgr_with_openai_or_none,
-                is_openai_inpaint_configured,
+                inpaint_bgr_with_runtime_config_or_none,
             )
 
             use_ai = (
-                is_openai_inpaint_configured()
+                inpaint_config is not None
                 and total_frames > 0
-                and total_frames <= settings.watermark_video_ai_max_frames
+                and total_frames <= inpaint_config.video_max_frames
             )
             if not use_ai:
-                if is_openai_inpaint_configured() and total_frames > settings.watermark_video_ai_max_frames:
+                if inpaint_config is not None and total_frames > inpaint_config.video_max_frames:
                     logger.info(
-                        "视频帧数 %s 超过 WATERMARK_VIDEO_AI_MAX_FRAMES=%s，使用 FFmpeg delogo",
+                        "视频帧数 %s 超过组织配置的 watermark_video_ai_max_frames=%s，使用 FFmpeg delogo",
                         total_frames,
-                        settings.watermark_video_ai_max_frames,
+                        inpaint_config.video_max_frames,
                     )
                 _delogo_ffmpeg()
                 return True, ""
@@ -313,7 +320,7 @@ class VideoWatermarkRemover:
                             continue
                         patch = fr[sy : sy + sh, sx : sx + sw].copy()
                         pm = np.full((sh, sw), 255, dtype=np.uint8)
-                        repaired = inpaint_bgr_with_openai_or_none(patch, pm)
+                        repaired = inpaint_bgr_with_runtime_config_or_none(patch, pm, inpaint_config)
                         if repaired is None:
                             repaired = cv2.inpaint(patch, pm, 3, cv2.INPAINT_TELEA)
                         elif repaired.shape[0] != sh or repaired.shape[1] != sw:
@@ -395,12 +402,21 @@ def _init_engine_error_message(exc: Exception) -> str:
     return f"去水印引擎初始化失败（PaddleOCR）：{type(exc).__name__}: {exc}"
 
 
-def auto_remove_video_watermark(input_video_path: str, output_video_path: str) -> tuple[bool, str]:
+def auto_remove_video_watermark(
+    input_video_path: str,
+    output_video_path: str,
+    *,
+    inpaint_config: InpaintRuntimeConfig | None = None,
+) -> tuple[bool, str]:
     """对外便捷函数，返回 (成功, 失败原因)。"""
     try:
         remover = get_video_watermark_remover()
     except Exception as exc:  # noqa: BLE001
         logger.exception("获取视频去水印引擎单例失败。")
         return False, _init_engine_error_message(exc)
-    return remover.auto_remove_video_watermark(input_video_path, output_video_path)
+    return remover.auto_remove_video_watermark(
+        input_video_path,
+        output_video_path,
+        inpaint_config=inpaint_config,
+    )
 
