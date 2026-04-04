@@ -2,10 +2,10 @@
 商业级自动文本去水印服务模块（PaddleOCR + OpenCV）。
 
 安装依赖（CPU 版本示例）：
-pip install paddlepaddle paddleocr opencv-python numpy
+pip install paddlepaddle paddleocr numpy（opencv-python 通常由 paddleocr 依赖安装）
 
 如果你的服务器有 NVIDIA GPU，请按 PaddlePaddle 官网安装对应 CUDA 版本，
-再安装 paddleocr / opencv-python / numpy。
+再安装 paddleocr 与对应 CUDA 版 paddlepaddle。
 """
 
 from __future__ import annotations
@@ -15,9 +15,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-import cv2
-import numpy as np
-
+# cv2/numpy 延迟导入：避免与 numpy 版本不兼容时在「import app」阶段拖垮整个 FastAPI 进程
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +44,15 @@ class WatermarkRemover:
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
-    def _extract_text_boxes(ocr_result: Any) -> list[np.ndarray]:
+    def _extract_text_boxes(ocr_result: Any) -> list[Any]:
         """
         兼容 PaddleOCR 常见返回结构，提取四点坐标框。
         返回值为 polygon 列表，每个元素 shape=(N, 1, 2)，dtype=int32。
         """
-        boxes: list[np.ndarray] = []
+        import cv2
+        import numpy as np
+
+        boxes: list[Any] = []
         if not ocr_result:
             return boxes
 
@@ -84,6 +85,9 @@ class WatermarkRemover:
 
         返回：(是否成功, 失败时的简短原因，成功时第二项为空字符串)
         """
+        import cv2
+        import numpy as np
+
         try:
             self._ensure_parent_dir(output_path)
 
