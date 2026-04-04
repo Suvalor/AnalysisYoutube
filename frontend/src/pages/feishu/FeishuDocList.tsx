@@ -76,7 +76,11 @@ export default function FeishuDocList() {
       setArchiveSubmittingId(id);
       try {
         const res = await triggerFeishuDocArchiveApi(id);
-        message.success(res.message ?? (res.status === "already_archived" ? "该文档已归档" : "已提交离线归档任务"));
+        if (res.status === "already_archived") {
+          message.success(res.message ?? "该文档已归档");
+        } else {
+          message.info(res.message ?? "归档任务已提交，后台将校验 PDF，请留意列表状态");
+        }
         void load();
       } catch (e: unknown) {
         const err = e as { response?: { status?: number; data?: { detail?: string } } };
@@ -98,21 +102,11 @@ export default function FeishuDocList() {
       {
         title: "文档名称",
         dataIndex: "title",
-        render: (v: string, r) => {
-          const st = r.archive_status ?? "UNARCHIVED";
-          return (
-            <div className="flex items-center gap-2 flex-wrap">
-              {st === "SUCCESS" ? (
-                <Tag color="success" className="m-0">
-                  已归档
-                </Tag>
-              ) : null}
-              <button type="button" className="text-blue-600 hover:text-blue-500" onClick={() => openViewer(r)}>
-                {v}
-              </button>
-            </div>
-          );
-        },
+        render: (v: string, r) => (
+          <button type="button" className="text-blue-600 hover:text-blue-500" onClick={() => openViewer(r)}>
+            {v}
+          </button>
+        ),
       },
       {
         title: "添加时间",
@@ -125,9 +119,27 @@ export default function FeishuDocList() {
         },
       },
       {
+        title: "归档状态",
+        key: "archive_state",
+        width: 120,
+        render: (_, r) => {
+          const st = r.archive_status ?? "UNARCHIVED";
+          if (st === "SUCCESS") {
+            return <Tag color="success">成功</Tag>;
+          }
+          if (st === "ARCHIVING") {
+            return <Tag color="processing">保存中</Tag>;
+          }
+          if (st === "FAILED") {
+            return <Tag color="error">保存失败</Tag>;
+          }
+          return <Tag>未归档</Tag>;
+        },
+      },
+      {
         title: "操作",
         key: "op",
-        width: 300,
+        width: 340,
         render: (_, r) => {
           const st = r.archive_status ?? "UNARCHIVED";
           const canArchive = st === "UNARCHIVED" || st === "FAILED";
@@ -142,7 +154,7 @@ export default function FeishuDocList() {
                 </Button>
               ) : canArchive ? (
                 <Button size="small" onClick={() => void handleArchive(r.id)} loading={archiveSubmittingId === r.id}>
-                  离线保存
+                  {st === "FAILED" ? "重新保存" : "离线保存"}
                 </Button>
               ) : null}
               <Popconfirm
