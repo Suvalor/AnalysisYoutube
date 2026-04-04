@@ -25,17 +25,18 @@ def process_watermark_removal(temp_filepath: str, file_type: str) -> str:
     output_path = input_path.with_name(f"{input_path.stem}_clean{input_path.suffix}")
 
     if file_type == "image":
-        ok = auto_remove_text_watermark(str(input_path), str(output_path))
+        ok, reason = auto_remove_text_watermark(str(input_path), str(output_path))
     elif file_type == "video":
-        ok = auto_remove_video_watermark(str(input_path), str(output_path))
+        ok, reason = auto_remove_video_watermark(str(input_path), str(output_path))
     else:
         logger.info("当前文件类型不支持去水印，跳过处理，file_type=%s", file_type)
         return temp_filepath
 
     if not ok:
+        logger.error("去水印未通过 file_type=%s input=%s reason=%s", file_type, temp_filepath, reason)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="去水印处理失败",
+            detail=f"去水印处理失败：{reason}" if reason else "去水印处理失败",
         )
     return str(output_path)
 

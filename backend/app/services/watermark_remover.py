@@ -75,21 +75,11 @@ class WatermarkRemover:
             boxes.append(poly)
         return boxes
 
-    def auto_remove_text_watermark(self, input_path: str, output_path: str) -> bool:
+    def auto_remove_text_watermark(self, input_path: str, output_path: str) -> tuple[bool, str]:
         """
         自动去除图片中的文本水印。
 
-        处理流程：
-        1) 读取图片
-        2) OCR 检测文本区域
-        3) 生成文本区域二值 Mask
-        4) 对 Mask 膨胀，覆盖文字边缘光晕
-        5) Inpainting 修复
-        6) 保存输出
-
-        返回：
-        - True: 成功（包括未检测到文本时直接复制原图）
-        - False: 失败
+        返回：(是否成功, 失败时的简短原因，成功时第二项为空字符串)
         """
         try:
             self._ensure_parent_dir(output_path)
@@ -97,18 +87,18 @@ class WatermarkRemover:
             # 第一步：读取输入图像
             image = cv2.imread(input_path)
             if image is None:
-                logger.error("读取图片失败，路径无效或文件损坏: %s", input_path)
-                return False
+                msg = "无法读取图片（路径无效、文件损坏或 OpenCV 不支持的格式）"
+                logger.error("读取图片失败: %s", input_path)
+                return False, msg
 
             # 第二步：OCR 检测文本框
-            # PaddleOCR 对单张图片输入路径，返回文本框 + 文本 + 置信度
             ocr_result = self.ocr.ocr(input_path, cls=True)
             boxes = self._extract_text_boxes(ocr_result)
 
             # 如果未检测到任何文字，直接复制原图到输出目录，避免无意义处理
             if not boxes:
                 shutil.copy2(input_path, output_path)
-                return True
+                return True, ""
 
             # 第三步：构建与原图同尺寸的单通道黑色 Mask
             mask = np.zeros(image.shape[:2], dtype=np.uint8)
@@ -125,26 +115,25 @@ class WatermarkRemover:
             # 第六步：保存输出
             ok = cv2.imwrite(output_path, inpainted)
             if not ok:
+                msg = "无法写入处理后的图片（请检查磁盘权限或路径）"
                 logger.error("写出处理结果失败: %s", output_path)
-                return False
-            return True
+                return False, msg
+            return True, ""
 
         except MemoryError:
             logger.exception("去水印处理失败：内存不足（MemoryError），input=%s", input_path)
-            return False
-        except Exception:  # noqa: BLE001
+            return False, "内存不足，请尝试缩小图片分辨率后重试"
+        except Exception as exc:  # noqa: BLE001
             logger.exception("去水印处理失败，input=%s, output=%s", input_path, output_path)
-            return False
+            return False, f"处理异常：{type(exc).__name__}"
 
 
-def auto_remove_text_watermark(input_path: str, output_path: str) -> bool:
-    """
-    对外暴露的便捷函数。
-    """
+def auto_remove_text_watermark(input_path: str, output_path: str) -> tuple[bool, str]:
+    """对外便捷函数，返回 (成功, 失败原因)。"""
     try:
         remover = WatermarkRemover()
-    except Exception:  # noqa: BLE001
-        logger.exception("初始化 PaddleOCR 失败，请确认已安装 paddlepaddle。")
-        return False
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("初始化 PaddleOCR 失败，请确认已安装 paddlepaddle / paddleocr。")
+        return False, f"去水印引擎初始化失败（PaddleOCR）：{type(exc).__name__}"
     return remover.auto_remove_text_watermark(input_path, output_path)
 
