@@ -258,12 +258,21 @@ class VideoWatermarkRemover:
                 cap.release()
 
 
+def _init_engine_error_message(exc: Exception) -> str:
+    if isinstance(exc, ModuleNotFoundError) and getattr(exc, "name", None):
+        return (
+            f"缺少 Python 模块「{exc.name}」。去水印需安装：pip install paddlepaddle paddleocr "
+            "（CPU 版见 https://www.paddlepaddle.org.cn/install/quick ）"
+        )
+    return f"去水印引擎初始化失败（PaddleOCR）：{type(exc).__name__}: {exc}"
+
+
 def auto_remove_video_watermark(input_video_path: str, output_video_path: str) -> tuple[bool, str]:
     """对外便捷函数，返回 (成功, 失败原因)。"""
     try:
         remover = VideoWatermarkRemover()
     except Exception as exc:  # noqa: BLE001
         logger.exception("初始化 PaddleOCR 失败，请确认已安装 paddlepaddle。")
-        return False, f"去水印引擎初始化失败（PaddleOCR）：{type(exc).__name__}"
+        return False, _init_engine_error_message(exc)
     return remover.auto_remove_video_watermark(input_video_path, output_video_path)
 
