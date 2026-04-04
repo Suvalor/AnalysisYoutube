@@ -45,6 +45,10 @@ class YouTubeVideoRead(BaseModel):
     like_count: int
     comment_count: int
     channel_title: str | None = Field(default=None, description="所属频道标题（跨频道列表时填充）")
+    has_analysis: bool = Field(
+        default=False,
+        description="当前组织在 video_analyses 中是否已有该视频的 AI 分析记录（列表仅布尔，不含正文）",
+    )
 
     model_config = {"from_attributes": True}
 
