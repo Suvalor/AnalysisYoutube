@@ -112,6 +112,11 @@ export async function updateSopSegmentApi(
   return res.data as SopSegment;
 }
 
+export async function deleteSopSegmentApi(segmentId: number) {
+  const res = await apiClient.delete(`/api/sop/segments/${segmentId}`);
+  return res.data as { message: string };
+}
+
 export async function listSopShotsApi(segmentId?: number) {
   const res = await apiClient.get("/api/sop/shots", { params: segmentId ? { segment_id: segmentId } : {} });
   return res.data as SopShot[];

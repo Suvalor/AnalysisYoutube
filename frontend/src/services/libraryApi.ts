@@ -360,6 +360,7 @@ export type AssetUploadResult = {
 export async function uploadAssetWithProcessApi(payload: {
   file: File;
   remove_watermark: boolean;
+  watermark_model_id?: number;
   /** 素材库页勿传；SOP 内上传传 SOP */
   source?: "MANUAL" | "SOP" | "INSPIRATION";
 }): Promise<AssetUploadResult> {
@@ -370,6 +371,9 @@ export async function uploadAssetWithProcessApi(payload: {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("remove_watermark", "true");
+    if (payload.watermark_model_id && payload.watermark_model_id > 0) {
+      formData.append("watermark_model_id", String(payload.watermark_model_id));
+    }
     formData.append("source", source);
     const res = await apiClient.post("/api/assets/upload", formData, {
       headers: { "Content-Type": "multipart/form-data" },

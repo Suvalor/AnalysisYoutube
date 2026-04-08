@@ -43,7 +43,6 @@ RUN set -eux; \
       libsm6 \
       libxext6 \
       libxrender1 \
-      ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装依赖（使用清华 PyPI 镜像，降低 pip 下载超时概率）

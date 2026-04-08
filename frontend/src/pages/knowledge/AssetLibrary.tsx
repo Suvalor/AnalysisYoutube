@@ -28,10 +28,13 @@ import dayjs from "dayjs";
 import { useEffect, useMemo, useState } from "react";
 import {
   deleteAssetApi,
+  listModelsApi,
   listAssetsApi,
   uploadAssetWithProcessApi,
   type AssetItem,
+  type ModelItem,
 } from "@/services/libraryApi";
+import useModelPreference from "@/hooks/useModelPreference";
 
 const { Text } = Typography;
 
@@ -89,6 +92,9 @@ export default function AssetLibraryPage() {
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [removeWatermark, setRemoveWatermark] = useState(false);
+  const [watermarkModels, setWatermarkModels] = useState<ModelItem[]>([]);
+  const [loadingWatermarkModels, setLoadingWatermarkModels] = useState(false);
+  const [selectedWatermarkModelId, setSelectedWatermarkModelId] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [keyword, setKeyword] = useState("");
@@ -98,6 +104,8 @@ export default function AssetLibraryPage() {
   const [thumbErrorIds, setThumbErrorIds] = useState<Record<number, boolean>>({});
 
   const sortApi = useMemo(() => sortPresetToApi(sortPreset), [sortPreset]);
+  const { value: watermarkPrefModelId, setValue: setWatermarkPrefModelId } =
+    useModelPreference("watermark_removal");
   /** 与 page 无关的强制刷新（例如上传成功但仍在第 1 页） */
   const [reloadToken, setReloadToken] = useState(0);
 
@@ -150,6 +158,38 @@ export default function AssetLibraryPage() {
   ]);
 
   useEffect(() => {
+    if (!uploadModalOpen || !removeWatermark) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingWatermarkModels(true);
+      try {
+        const rows = await listModelsApi();
+        if (cancelled) return;
+        const available = rows.filter((m) => m.library_kind === "image_inpaint" && m.has_api_key);
+        setWatermarkModels(available);
+        const fallback = available[0]?.id ? String(available[0].id) : "";
+        const hit =
+          watermarkPrefModelId &&
+          available.some((m) => String(m.id) === watermarkPrefModelId)
+            ? watermarkPrefModelId
+            : fallback;
+        setSelectedWatermarkModelId(hit);
+        if (hit) setWatermarkPrefModelId(hit);
+      } catch {
+        if (!cancelled) {
+          setWatermarkModels([]);
+          message.error("加载去水印模型失败");
+        }
+      } finally {
+        if (!cancelled) setLoadingWatermarkModels(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [removeWatermark, uploadModalOpen, setWatermarkPrefModelId, watermarkPrefModelId]);
+
+  useEffect(() => {
     setPage(1);
   }, [typeFilter, dateRange, searchText, sortPreset]);
 
@@ -165,9 +205,14 @@ export default function AssetLibraryPage() {
     }
     try {
       setUploading(true);
+      if (removeWatermark && !selectedWatermarkModelId) {
+        message.warning("请先选择去水印模型");
+        return;
+      }
       const uploadRes = await uploadAssetWithProcessApi({
         file: selectedFile,
         remove_watermark: removeWatermark,
+        watermark_model_id: removeWatermark ? Number(selectedWatermarkModelId) : undefined,
       });
       if (!uploadRes.access_url && !uploadRes.file_url) {
         message.error("上传未返回可访问地址");
@@ -428,6 +473,7 @@ export default function AssetLibraryPage() {
           setUploadModalOpen(false);
           setSelectedFile(null);
           setRemoveWatermark(false);
+          setSelectedWatermarkModelId("");
         }}
         onOk={() => void onConfirmUpload()}
         confirmLoading={uploading}
@@ -462,6 +508,20 @@ export default function AssetLibraryPage() {
           <Checkbox checked={removeWatermark} onChange={(e) => setRemoveWatermark(e.target.checked)}>
             一键去水印（AI 智能处理）
           </Checkbox>
+          {removeWatermark ? (
+            <Select
+              showSearch
+              placeholder={loadingWatermarkModels ? "正在加载模型..." : "请选择去水印模型"}
+              loading={loadingWatermarkModels}
+              value={selectedWatermarkModelId || undefined}
+              onChange={(v) => {
+                setSelectedWatermarkModelId(v);
+                setWatermarkPrefModelId(v);
+              }}
+              options={watermarkModels.map((m) => ({ value: String(m.id), label: m.name }))}
+              notFoundContent={loadingWatermarkModels ? "加载中..." : "暂无可用图像去水印模型"}
+            />
+          ) : null}
           {uploading ? <Text style={{ color: "#94a3b8" }}>上传处理中，请稍候...</Text> : null}
         </div>
       </Modal>

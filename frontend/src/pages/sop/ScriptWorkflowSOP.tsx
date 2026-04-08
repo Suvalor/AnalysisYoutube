@@ -22,6 +22,7 @@ import {
   createSopAssetApi,
   createSopScriptApi,
   createSopSegmentApi,
+  deleteSopSegmentApi,
   getSopScriptApi,
   listSopAssetsApi,
   listSopSegmentsApi,
@@ -373,6 +374,13 @@ export default function ScriptWorkflowSOP() {
             content: seg.content,
             status: "draft",
           });
+        }
+      }
+      // 以当前编辑器为准：删除后端中多余的旧片段，避免历史残留。
+      if (existing.length > parsed.length) {
+        const redundant = existing.slice(parsed.length);
+        for (const row of redundant) {
+          await deleteSopSegmentApi(row.id);
         }
       }
       const latest = await listSopSegmentsApi(sid);

@@ -8,8 +8,12 @@ req_key、Region、Host 等由调用方配置注入（来自组织集成设置�
 from __future__ import annotations
 
 import base64
+import io
 import logging
 from typing import TYPE_CHECKING, Any
+
+import numpy as np
+from PIL import Image
 
 from app.services.ai.base_inpaint_provider import BaseInpaintProvider
 
@@ -77,29 +81,26 @@ class VolcInpaintProvider(BaseInpaintProvider):
         return None
 
     def process(self, image_bytes: bytes, mask_bytes: bytes) -> bytes:
-        import cv2
-        import numpy as np
         from volcenginesdkcv20240606.models.img2_img_inpainting_request import Img2ImgInpaintingRequest
         from volcenginesdkcore.rest import ApiException
 
         self._ensure_api()
 
-        img_arr = np.frombuffer(image_bytes, dtype=np.uint8)
-        m_arr = np.frombuffer(mask_bytes, dtype=np.uint8)
-        image_bgr = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
-        mask_u8 = cv2.imdecode(m_arr, cv2.IMREAD_GRAYSCALE)
-        if image_bgr is None or mask_u8 is None:
-            raise ValueError("无法解码输入的图像或 Mask（imdecode 失败）")
-        if image_bgr.shape[:2] != mask_u8.shape[:2]:
+        try:
+            image_rgb = np.array(Image.open(io.BytesIO(image_bytes)).convert("RGB"))
+            mask_u8 = np.array(Image.open(io.BytesIO(mask_bytes)).convert("L"))
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError("无法解码输入的图像或 Mask") from exc
+        if image_rgb.shape[:2] != mask_u8.shape[:2]:
             raise ValueError("图像与 Mask 尺寸不一致")
 
-        ok_img, buf_img = cv2.imencode(".png", image_bgr)
-        ok_mask, buf_mask = cv2.imencode(".png", mask_u8)
-        if not ok_img or not ok_mask:
-            raise ValueError("PNG 编码失败")
+        buf_img = io.BytesIO()
+        buf_mask = io.BytesIO()
+        Image.fromarray(image_rgb).save(buf_img, format="PNG")
+        Image.fromarray(mask_u8, mode="L").save(buf_mask, format="PNG")
 
-        img_b64 = base64.b64encode(buf_img.tobytes()).decode("ascii")
-        mask_b64 = base64.b64encode(buf_mask.tobytes()).decode("ascii")
+        img_b64 = base64.b64encode(buf_img.getvalue()).decode("ascii")
+        mask_b64 = base64.b64encode(buf_mask.getvalue()).decode("ascii")
 
         # 与控制台 / OpenAPI 示例一致：binary_data_base64[0] 原图、[1] 待修复区域 Mask（白=修补区）
         body = Img2ImgInpaintingRequest(
