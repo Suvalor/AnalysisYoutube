@@ -1,8 +1,4 @@
-"""
-去水印云端图像修复：优先火山智能视觉 CV（Img2ImgInpainting），其次 OpenAI 兼容 images.edit。
-
-不依赖 openai SDK；火山侧使用 volcengine-python-sdk 完成签名。
-"""
+"""去水印云端图像修复：优先火山 CV，其次 OpenAI 兼容 images.edit。"""
 
 from __future__ import annotations
 
@@ -14,7 +10,7 @@ from typing import Any
 
 import httpx
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 from app.services.ai.volc_inpaint_provider import VolcInpaintProvider
 from app.services.watermark_inpaint_config import (
@@ -25,40 +21,23 @@ from app.services.watermark_inpaint_config import (
 
 logger = logging.getLogger(__name__)
 
-# 日志标记：曾尝试云端 Inpaint 后回退 OpenCV 时，业务方可据此检索
-AI_FAILED_FALLBACK_TO_OPENCV = "AI_FAILED_FALLBACK_TO_OPENCV"
+# 日志标记：曾尝试云端 Inpaint 但失败
+AI_INPAINT_FAILED = "AI_INPAINT_FAILED"
 
 # 火山视觉常见请求体大小/边长限制（保守值）
 _VOLC_MAX_SIDE_PX = 4096
 
 
-def blend_patch_with_gaussian_feather(
-    frame_bgr: np.ndarray,
-    x: int,
-    y: int,
-    patch_bgr: np.ndarray,
-    feather: int,
-) -> None:
-    """将 patch 以高斯羽化边缘贴回 frame（就地修改）。"""
-    import cv2
+def _resize_rgb(rgb: np.ndarray, width: int, height: int) -> np.ndarray:
+    pil = Image.fromarray(rgb, mode="RGB")
+    resized = pil.resize((width, height), Image.Resampling.BILINEAR)
+    return np.array(resized)
 
-    h, w = patch_bgr.shape[:2]
-    if y + h > frame_bgr.shape[0] or x + w > frame_bgr.shape[1] or y < 0 or x < 0:
-        return
-    roi = frame_bgr[y : y + h, x : x + w]
-    ph, pw = roi.shape[:2]
-    p = patch_bgr
-    if p.shape[0] != ph or p.shape[1] != pw:
-        p = cv2.resize(p, (pw, ph))
-    k = max(3, feather * 2 + 1)
-    if k % 2 == 0:
-        k += 1
-    weight = cv2.GaussianBlur(np.ones((ph, pw), np.float32), (k, k), 0)[..., None]
-    roi[:] = np.clip(
-        weight * p.astype(np.float32) + (1.0 - weight) * roi.astype(np.float32),
-        0,
-        255,
-    ).astype(np.uint8)
+
+def _resize_mask(mask: np.ndarray, width: int, height: int) -> np.ndarray:
+    pil = Image.fromarray(mask, mode="L")
+    resized = pil.resize((width, height), Image.Resampling.NEAREST)
+    return np.array(resized)
 
 
 def _mask_bbox(mask_u8: np.ndarray) -> tuple[int, int, int, int] | None:
@@ -79,17 +58,15 @@ def _choose_edit_side(max_hw: int) -> int:
 
 
 def _letterbox_to_square(
-    bgr: np.ndarray,
+    rgb: np.ndarray,
     mask: np.ndarray,
     side: int,
 ) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
-    import cv2
-
-    h, w = bgr.shape[:2]
+    h, w = rgb.shape[:2]
     scale = side / max(h, w)
     nw, nh = max(1, int(round(w * scale))), max(1, int(round(h * scale)))
-    rb = cv2.resize(bgr, (nw, nh), interpolation=cv2.INTER_AREA)
-    rm = cv2.resize(mask, (nw, nh), interpolation=cv2.INTER_NEAREST)
+    rb = _resize_rgb(rgb, nw, nh)
+    rm = _resize_mask(mask, nw, nh)
     canvas_b = np.full((side, side, 3), 114, dtype=np.uint8)
     canvas_m = np.zeros((side, side), dtype=np.uint8)
     x0 = (side - nw) // 2
@@ -121,18 +98,16 @@ def _volc_inpaint_full_bgr_or_none(
     volc_slice: VolcCvInpaintSlice,
 ) -> np.ndarray | None:
     """整图 + 整幅 Mask 调用火山 CV；必要时缩小请求，结果放大回原分辨率。"""
-    import cv2
-
     orig_h, orig_w = image_bgr.shape[:2]
-    work_b = image_bgr
+    work_b = image_bgr[:, :, ::-1].copy()
     work_m = mask_u8
     side = max(orig_h, orig_w)
     if side > _VOLC_MAX_SIDE_PX:
         scale = _VOLC_MAX_SIDE_PX / float(side)
         nw = max(1, int(round(orig_w * scale)))
         nh = max(1, int(round(orig_h * scale)))
-        work_b = cv2.resize(image_bgr, (nw, nh), interpolation=cv2.INTER_AREA)
-        work_m = cv2.resize(mask_u8, (nw, nh), interpolation=cv2.INTER_NEAREST)
+        work_b = _resize_rgb(work_b, nw, nh)
+        work_m = _resize_mask(mask_u8, nw, nh)
         logger.info(
             "火山 CV Inpaint：原图长边 %s 超过 %s，请求前缩放为 %sx%s",
             side,
@@ -141,31 +116,30 @@ def _volc_inpaint_full_bgr_or_none(
             nh,
         )
 
-    ok_i, buf_i = cv2.imencode(".png", work_b)
-    ok_m, buf_m = cv2.imencode(".png", work_m)
-    if not ok_i or not ok_m:
-        logger.warning("火山 CV Inpaint：PNG 编码失败")
-        return None
+    buf_i = io.BytesIO()
+    buf_m = io.BytesIO()
+    Image.fromarray(work_b, mode="RGB").save(buf_i, format="PNG")
+    Image.fromarray(work_m, mode="L").save(buf_m, format="PNG")
 
     provider = VolcInpaintProvider(volc_slice)
     try:
-        out_bytes = provider.process(buf_i.tobytes(), buf_m.tobytes())
+        out_bytes = provider.process(buf_i.getvalue(), buf_m.getvalue())
     except Exception:
-        logger.warning("火山 CV Inpaint 调用异常（将尝试其他通道或本地修复）", exc_info=True)
+        logger.warning("火山 CV Inpaint 调用异常（将尝试其他通道）", exc_info=True)
         return None
 
-    raw = np.frombuffer(out_bytes, dtype=np.uint8)
-    out = cv2.imdecode(raw, cv2.IMREAD_COLOR)
-    if out is None:
+    try:
+        out_rgb = np.array(Image.open(io.BytesIO(out_bytes)).convert("RGB"))
+    except Exception:
         logger.warning("火山 CV Inpaint：无法解码返回图像")
         return None
 
-    if out.shape[:2] != work_b.shape[:2]:
-        out = cv2.resize(out, (work_b.shape[1], work_b.shape[0]), interpolation=cv2.INTER_LINEAR)
+    if out_rgb.shape[:2] != work_b.shape[:2]:
+        out_rgb = _resize_rgb(out_rgb, work_b.shape[1], work_b.shape[0])
 
-    if out.shape[0] != orig_h or out.shape[1] != orig_w:
-        out = cv2.resize(out, (orig_w, orig_h), interpolation=cv2.INTER_CUBIC)
-    return out
+    if out_rgb.shape[0] != orig_h or out_rgb.shape[1] != orig_w:
+        out_rgb = _resize_rgb(out_rgb, orig_w, orig_h)
+    return out_rgb[:, :, ::-1].copy()
 
 
 def _openai_inpaint_bgr_or_none(
@@ -173,8 +147,6 @@ def _openai_inpaint_bgr_or_none(
     mask_u8: np.ndarray,
     slice_cfg: OpenAIInpaintSlice,
 ) -> np.ndarray | None:
-    import cv2
-
     bbox = _mask_bbox(mask_u8)
     if bbox is None:
         return image_bgr.copy()
@@ -186,14 +158,14 @@ def _openai_inpaint_bgr_or_none(
     by0 = max(0, y0 - pad)
     bx1 = min(W, x1 + pad + 1)
     by1 = min(H, y1 + pad + 1)
-    crop = image_bgr[by0:by1, bx0:bx1].copy()
+    crop_bgr = image_bgr[by0:by1, bx0:bx1].copy()
+    crop = crop_bgr[:, :, ::-1].copy()
     crop_mask = mask_u8[by0:by1, bx0:bx1].copy()
     ch, cw = crop.shape[:2]
     side = _choose_edit_side(max(ch, cw))
     square_b, square_m, meta = _letterbox_to_square(crop, crop_mask, side)
 
-    rgb_square = cv2.cvtColor(square_b, cv2.COLOR_BGR2RGB)
-    pil_image = Image.fromarray(rgb_square)
+    pil_image = Image.fromarray(square_b, mode="RGB")
     buf_img = io.BytesIO()
     pil_image.save(buf_img, format="PNG")
 
@@ -254,8 +226,7 @@ def _openai_inpaint_bgr_or_none(
     try:
         raw = base64.b64decode(b64)
         pil_r = Image.open(io.BytesIO(raw)).convert("RGB")
-        out_arr = np.array(pil_r)
-        out_canvas = cv2.cvtColor(out_arr, cv2.COLOR_RGB2BGR)
+        out_canvas = np.array(pil_r)
     except Exception:
         logger.warning("解码 images.edit 返回失败", exc_info=True)
         return None
@@ -264,7 +235,7 @@ def _openai_inpaint_bgr_or_none(
     inner = out_canvas[y0l : y0l + nh, x0l : x0l + nw]
     if inner.size == 0:
         return None
-    restored = cv2.resize(inner, (cw, ch), interpolation=cv2.INTER_AREA)
+    restored = _resize_rgb(inner, cw, ch)
 
     out_full = image_bgr.copy()
     roi = out_full[by0:by1, bx0:bx1]
@@ -273,11 +244,15 @@ def _openai_inpaint_bgr_or_none(
         blended = roi.copy()
         blended[cm] = restored[cm]
         k = 3
-        border = cv2.dilate(cm.astype(np.uint8) * 255, np.ones((k, k), np.uint8), iterations=1) - (
-            cm.astype(np.uint8) * 255
-        )
+        bmask_u8 = cm.astype(np.uint8) * 255
+        border = np.array(
+            Image.fromarray(bmask_u8, mode="L").filter(ImageFilter.MaxFilter(size=3)),
+            dtype=np.uint8,
+        ) - bmask_u8
         if border.any():
-            soft = cv2.GaussianBlur(blended, (5, 5), 0)
+            soft = np.array(
+                Image.fromarray(blended, mode="RGB").filter(ImageFilter.GaussianBlur(radius=1.2))
+            )
             bmask = border.astype(bool)
             blended[bmask] = soft[bmask]
         roi[:] = blended

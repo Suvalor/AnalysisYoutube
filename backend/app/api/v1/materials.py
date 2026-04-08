@@ -118,6 +118,7 @@ async def upload_material(
     current_user: CurrentUserDep,
     file: UploadFile = File(...),
     remove_watermark: bool = Form(default=False),
+    watermark_model_id: int | None = Form(default=None),
     source: str = Form(default=ASSET_SOURCE_INSPIRATION),
 ) -> MaterialUploadResponse:
     raw_bytes = await file.read()
@@ -135,6 +136,7 @@ async def upload_material(
                 db,
                 user_id=current_user.id,
                 org_id=current_user.org_id,
+                watermark_model_id=watermark_model_id,
             )
             final_path, process_info = process_watermark_removal_best_effort(
                 temp_path,

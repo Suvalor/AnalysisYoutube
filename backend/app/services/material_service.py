@@ -9,16 +9,15 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from fastapi import HTTPException, status
-
-# 注意：禁止在此文件顶层 import paddle / watermark_*，避免未请求去水印时也加载 OCR 栈。
+import numpy as np
+from PIL import Image
 
 if TYPE_CHECKING:
     from app.services.watermark_inpaint_config import InpaintRuntimeConfig
 
 logger = logging.getLogger(__name__)
 
-# 与产品文案对齐：环境/初始化类问题
-_PROCESS_INFO_SKIP_ENGINE = "素材上传成功，但去水印处理因环境组件初始化失败而跳过"
+_PROCESS_INFO_SKIP_ENGINE = "素材上传成功，但 AI 去水印处理失败，已上传原文件"
 
 
 def process_watermark_removal_best_effort(
@@ -36,42 +35,36 @@ def process_watermark_removal_best_effort(
     input_path = Path(temp_filepath)
     output_path = input_path.with_name(f"{input_path.stem}_clean{input_path.suffix}")
 
+    if inpaint_config is None or not inpaint_config.has_any_ai():
+        logger.warning("未命中可用 AI 去水印配置，跳过处理并保留原文件 path=%s", temp_filepath)
+        return temp_filepath, "素材上传成功，但未配置可用 AI 去水印模型，已上传原文件"
+
+    if file_type != "image":
+        logger.info("当前文件类型尚未支持纯 AI 去水印，跳过处理 file_type=%s", file_type)
+        return temp_filepath, "素材上传成功；当前类型暂不支持 AI 去水印，已上传原文件"
+
     try:
-        from app.services.watermark_remover import auto_remove_text_watermark
-        from app.services.video_watermark_remover import auto_remove_video_watermark
+        from app.services.watermark_inpaint_client import inpaint_bgr_with_runtime_config_or_none
     except Exception:
-        logger.exception(
-            "去水印模块加载失败（通常为 Paddle/OpenCV/numpy 环境冲突），已跳过去水印并保留原文件 path=%s",
-            temp_filepath,
-        )
+        logger.exception("AI 去水印模块加载失败，已保留原文件 path=%s", temp_filepath)
         return temp_filepath, _PROCESS_INFO_SKIP_ENGINE
 
     try:
-        if file_type == "image":
-            ok, reason = auto_remove_text_watermark(
-                str(input_path),
-                str(output_path),
-                inpaint_config=inpaint_config,
-            )
-        elif file_type == "video":
-            ok, reason = auto_remove_video_watermark(
-                str(input_path),
-                str(output_path),
-                inpaint_config=inpaint_config,
-            )
-        else:
-            logger.info("当前文件类型不支持去水印，跳过插件逻辑，file_type=%s", file_type)
-            return temp_filepath, "素材上传成功；当前类型不支持去水印，已上传原文件"
-
-        if ok:
-            return str(output_path), "去水印处理已完成"
-
-        logger.error("去水印未通过 file_type=%s input=%s reason=%s", file_type, temp_filepath, reason)
-        detail = (reason or "未知原因").strip()
-        return temp_filepath, f"素材上传成功，但去水印处理未成功（{detail}），已上传原文件"
-
+        with Image.open(input_path) as pil_img:
+            rgb = pil_img.convert("RGB")
+            image_bgr = np.array(rgb)[:, :, ::-1].copy()
+        h, w = image_bgr.shape[:2]
+        # 纯 AI 路径下没有本地 OCR，这里使用全图 mask 交由模型完成去水印。
+        mask_u8 = np.full((h, w), 255, dtype=np.uint8)
+        out_bgr = inpaint_bgr_with_runtime_config_or_none(image_bgr, mask_u8, inpaint_config)
+        if out_bgr is None:
+            logger.error("AI 去水印失败，保留原图 path=%s", temp_filepath)
+            return temp_filepath, _PROCESS_INFO_SKIP_ENGINE
+        out_rgb = out_bgr[:, :, ::-1]
+        Image.fromarray(out_rgb).save(output_path)
+        return str(output_path), "AI 去水印处理已完成"
     except Exception:
-        logger.exception("去水印处理发生未捕获异常，已降级为原文件上传，path=%s", temp_filepath)
+        logger.exception("AI 去水印处理异常，已保留原文件 path=%s", temp_filepath)
         return temp_filepath, _PROCESS_INFO_SKIP_ENGINE
 
 

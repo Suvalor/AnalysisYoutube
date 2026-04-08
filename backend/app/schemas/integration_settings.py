@@ -33,7 +33,7 @@ class IntegrationSettingsRead(BaseModel):
     volc_cv_region: str = ""
     volc_cv_host: str = Field("", description="可选，自定义 API Host（不含 https://）")
     volc_cv_inpaint_req_key: str = Field("", description="Img2ImgInpainting 的 req_key，默认 i2i_inpainting")
-    watermark_video_ai_max_frames: int = Field(180, description="视频逐帧 AI 修复最大帧数，超出则 FFmpeg delogo")
+    watermark_video_ai_max_frames: int = Field(180, description="视频 AI 去水印最大帧数阈值（预留配置）")
     watermark_inpaint_prompt: str = Field("", description="去水印 images.edit 提示词（组织默认）")
 
     has_youtube_api_key: bool = False

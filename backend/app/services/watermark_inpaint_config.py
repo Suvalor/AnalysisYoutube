@@ -81,6 +81,7 @@ async def resolve_inpaint_runtime_config(
     *,
     user_id: int,
     org_id: int | None,
+    watermark_model_id: int | None = None,
 ) -> InpaintRuntimeConfig | None:
     """
     解析运行时配置；若火山 CV 与 OpenAI 均未配置则返回 None，调用方回退本地 OpenCV。
@@ -107,16 +108,25 @@ async def resolve_inpaint_runtime_config(
         logger.debug("未配置 volc_cv_access_key_id/volc_cv_secret_access_key，跳过火山 CV Inpaint")
 
     openai_slice: OpenAIInpaintSlice | None = None
-    stmt = (
-        select(ModelLibrary)
-        .where(
-            ModelLibrary.user_id == user_id,
-            ModelLibrary.library_kind == MODEL_LIBRARY_KIND_IMAGE_INPAINT,
+    if watermark_model_id is None:
+        logger.info("未传入 watermark_model_id，跳过模型库 AI 去水印配置")
+        row = None
+    else:
+        stmt = (
+            select(ModelLibrary)
+            .where(
+                ModelLibrary.id == watermark_model_id,
+                ModelLibrary.user_id == user_id,
+                ModelLibrary.library_kind == MODEL_LIBRARY_KIND_IMAGE_INPAINT,
+            )
+            .limit(1)
         )
-        .order_by(ModelLibrary.updated_at.desc())
-        .limit(1)
-    )
-    row = (await session.execute(stmt)).scalar_one_or_none()
+        row = (await session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            logger.warning(
+                "watermark_model_id=%s 不存在、无权限或非 image_inpaint，跳过模型库 AI 去水印配置",
+                watermark_model_id,
+            )
     if row is not None:
         api_key = try_decrypt(row.api_key_encrypted)
         base = (row.api_base_url or "").strip().rstrip("/")
@@ -131,10 +141,10 @@ async def resolve_inpaint_runtime_config(
         else:
             logger.warning("图像修复模型库 id=%s 缺少 API Key 或 Base URL，跳过 OpenAI 兼容 Inpaint", row.id)
     else:
-        logger.info("未找到 model_libraries.library_kind=image_inpaint 条目，跳过 OpenAI 兼容 Inpaint")
+        logger.info("未找到可用 image_inpaint 模型配置，跳过 OpenAI 兼容 Inpaint")
 
     if volc_cv is None and openai_slice is None:
-        logger.info("未配置任何云端 Inpaint（火山 CV 与图像修复模型库均无），去水印将使用本地 OpenCV")
+        logger.info("未配置任何云端 Inpaint（火山 CV 与图像修复模型库均无）")
         return None
 
     return InpaintRuntimeConfig(
