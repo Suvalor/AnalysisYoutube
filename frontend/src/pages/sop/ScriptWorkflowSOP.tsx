@@ -380,7 +380,7 @@ export default function ScriptWorkflowSOP() {
       setSegments(sorted);
       setSelectedSegmentId((prev) => prev ?? sorted[0]?.id ?? null);
       const hydrated = sorted
-        .map((s) => `## 片段 ${s.segment_no}：${s.title}\n${s.content}`)
+        .map((s) => `${s.title}\n${s.content}`)
         .join("\n\n");
       setAiSegmentsMarkdown(hydrated);
       message.success("片段已保存到 segments");
