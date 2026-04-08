@@ -13,7 +13,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Button, Card, Drawer, Input, Modal, Select, Spin, Steps, Table, Typography, Upload, message } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { getScriptApi, listPromptsApi, type PromptItem } from "@/services/libraryApi";
 import { uploadAssetWithProcessApi } from "@/services/libraryApi";
 import { getScriptModelsApi, type ScriptModelOption } from "@/services/scriptsApi";
@@ -62,6 +62,7 @@ type SourceScript = {
 
 export default function ScriptWorkflowSOP() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const inspirationIdParam = searchParams.get("inspirationId");
   const inspirationLinkId = useMemo(() => {
@@ -111,33 +112,87 @@ export default function ScriptWorkflowSOP() {
     })
   );
 
+  /** 最近一次成功拉取的知识库剧本 id；用于从其它菜单返回同一剧本时不重复清空状态 */
+  const lastLoadedKnowledgeScriptIdRef = useRef<number | null>(null);
+
   useEffect(() => {
+    if (location.pathname !== "/sop-workflow") {
+      setLoading(false);
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (location.pathname !== "/sop-workflow") return;
+
     let mounted = true;
     (async () => {
       const rawId = localStorage.getItem("sop_current_script_id");
       if (!rawId) {
         message.warning("未选择剧本，请先从知识库进入");
-        setLoading(false);
+        if (mounted) setLoading(false);
         return;
       }
+      const scriptIdNum = Number(rawId);
+      if (!Number.isFinite(scriptIdNum) || scriptIdNum <= 0) {
+        message.warning("剧本 ID 无效，请从知识库重新进入");
+        if (mounted) setLoading(false);
+        return;
+      }
+
+      if (lastLoadedKnowledgeScriptIdRef.current === scriptIdNum) {
+        if (mounted) setLoading(false);
+        return;
+      }
+
+      splitAbortRef.current?.abort();
+      splitAbortRef.current = null;
+      shotSaveTimersRef.current.forEach((t) => clearTimeout(t));
+      shotSaveTimersRef.current.clear();
+
+      if (mounted) {
+        setLoading(true);
+        setStep(0);
+        setSplitting(false);
+        setGeneratingShots(false);
+        setAiSegmentsMarkdown("");
+        setSegments([]);
+        setShots([]);
+        setAssets([]);
+        setSelectedSegmentId(null);
+        setSavingShotIds({});
+        setMediaRows([]);
+        setSopScriptId(null);
+        setSourceScript(null);
+        setOutlineMarkdown("");
+      }
+
       try {
-        const data = await getScriptApi(Number(rawId));
-        if (!mounted) return;
+        const data = await getScriptApi(scriptIdNum);
+        const stillExpected = localStorage.getItem("sop_current_script_id") === rawId;
+        if (!mounted || !stillExpected) return;
         setSourceScript({ id: data.id, title: data.title, content: data.content });
         setOutlineMarkdown(data.content || "");
         const savedSopId = Number(localStorage.getItem(`sop_current_sop_script_id_${rawId}`) || "");
-        if (!Number.isNaN(savedSopId) && savedSopId > 0) setSopScriptId(savedSopId);
+        if (!Number.isNaN(savedSopId) && savedSopId > 0) {
+          setSopScriptId(savedSopId);
+        } else {
+          setSopScriptId(null);
+        }
+        lastLoadedKnowledgeScriptIdRef.current = scriptIdNum;
       } catch (e: any) {
-        if (!mounted) return;
-        message.error(e?.response?.data?.detail ?? e?.message ?? "加载剧本失败");
+        if (mounted) {
+          message.error(e?.response?.data?.detail ?? e?.message ?? "加载剧本失败");
+        }
+        lastLoadedKnowledgeScriptIdRef.current = null;
       } finally {
-        if (mounted) setLoading(false);
+        setLoading(false);
       }
     })();
+
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [location.pathname]);
 
   useEffect(() => {
     let mounted = true;
