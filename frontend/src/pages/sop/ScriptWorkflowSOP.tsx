@@ -320,8 +320,15 @@ export default function ScriptWorkflowSOP() {
           await new Promise((r) => setTimeout(r, 1000 * attempt));
         }
       }
-      setStep(1);
-      message.success("AI 拆解完成，可继续人工调整");
+      const finalMarkdown = splitTextRef.current.trim();
+      if (!finalMarkdown) {
+        throw new Error("AI 未返回可保存的拆解内容");
+      }
+      const saved = await saveSegmentsFromMarkdown(finalMarkdown, "AI 拆解结果已覆盖保存");
+      if (saved) {
+        setStep(1);
+        message.success("AI 拆解完成，结果已同步覆盖到前后端");
+      }
     } catch (e: any) {
       message.error(e?.response?.data?.detail ?? e?.message ?? "AI 拆解失败");
     } finally {
@@ -346,11 +353,11 @@ export default function ScriptWorkflowSOP() {
     });
   };
 
-  const handleSaveSegmentsFromMarkdown = async () => {
-    const parsed = parseSegmentsFromMarkdown(aiSegmentsMarkdown);
+  const saveSegmentsFromMarkdown = async (rawMarkdown: string, successTip = "片段已保存到 segments") => {
+    const parsed = parseSegmentsFromMarkdown(rawMarkdown);
     if (parsed.length === 0) {
       message.warning("没有可保存的片段内容，请先执行 AI 拆解或手动补充");
-      return;
+      return false;
     }
     setSavingSegments(true);
     try {
@@ -391,7 +398,7 @@ export default function ScriptWorkflowSOP() {
         .map((s) => `${s.title}\n${s.content}`)
         .join("\n\n");
       setAiSegmentsMarkdown(hydrated);
-      message.success("片段已保存到 segments");
+      message.success(successTip);
       if (inspirationLinkId) {
         try {
           await linkInspirationPlotApi(inspirationLinkId, { plot_id: sid });
@@ -406,11 +413,17 @@ export default function ScriptWorkflowSOP() {
           );
         }
       }
+      return true;
     } catch (e: any) {
       message.error(e?.response?.data?.detail ?? e?.message ?? "保存片段失败");
+      return false;
     } finally {
       setSavingSegments(false);
     }
+  };
+
+  const handleSaveSegmentsFromMarkdown = async () => {
+    await saveSegmentsFromMarkdown(aiSegmentsMarkdown);
   };
 
   useEffect(() => {
