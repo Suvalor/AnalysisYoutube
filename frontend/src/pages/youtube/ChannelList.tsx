@@ -1,6 +1,6 @@
 import { Button, Input, Modal, Popover, Select, Spin, Table, Tag, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -26,22 +26,57 @@ type Row = {
 };
 
 export default function ChannelList() {
+  const PAGE_SIZE = 10;
   const navigate = useNavigate();
   const openTab = useTabStore((s) => s.openTab);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [allRows, setAllRows] = useState<Row[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [keyword, setKeyword] = useState("");
   const [sortBy, setSortBy] = useState<string>("subscriber_desc");
   const [urls, setUrls] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  const filteredRows = useMemo(() => {
+    const kw = keyword.trim().toLowerCase();
+    if (!kw) return allRows;
+    return allRows.filter((item) => {
+      const title = item.channel.title?.toLowerCase() ?? "";
+      const desc = item.channel.description?.toLowerCase() ?? "";
+      const tags = (item.channel.ai_tags ?? []).join(" ").toLowerCase();
+      const exp = item.channel.ai_expertise?.toLowerCase() ?? "";
+      return title.includes(kw) || desc.includes(kw) || tags.includes(kw) || exp.includes(kw);
+    });
+  }, [allRows, keyword]);
+
+  const applyPage = useCallback((targetPage: number, source: Row[]) => {
+    const safePage = Math.max(1, targetPage);
+    const end = safePage * PAGE_SIZE;
+    const nextRows = source.slice(0, end);
+    setRows(nextRows);
+    setCurrentPage(safePage);
+    setHasMore(nextRows.length < source.length);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await listYouTubeChannelsApi({ sort_by: sortBy });
-      setRows(data.map((x) => ({ pool_id: x.pool_id, group_name: x.group_name, added_at: x.added_at, channel: x.channel })));
+      const mapped = data.map((x) => ({
+        pool_id: x.pool_id,
+        group_name: x.group_name,
+        added_at: x.added_at,
+        channel: x.channel,
+      }));
+      setAllRows(mapped);
     } catch {
       message.error("加载频道列表失败");
+      setAllRows([]);
     } finally {
       setLoading(false);
     }
@@ -50,6 +85,36 @@ export default function ChannelList() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    applyPage(1, filteredRows);
+  }, [filteredRows, applyPage]);
+
+  const loadNextPage = useCallback(() => {
+    if (loading || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      applyPage(currentPage + 1, filteredRows);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [applyPage, currentPage, filteredRows, hasMore, loading, loadingMore]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
+          loadNextPage();
+        }
+      },
+      { root: null, rootMargin: "120px 0px", threshold: 0.1 }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [loadNextPage]);
 
   const onRowClick = (record: Row) => {
     const id = record.channel.id;
@@ -74,6 +139,8 @@ export default function ChannelList() {
       await analyzeYouTubeBatchApi({ urls: urls.trim() });
       message.success({ content: "更新任务已提交后台，这可能需要几分钟，请稍后刷新列表查看。", key: "yt-add" });
       setUrls("");
+      setKeyword("");
+      await load();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: unknown } } };
       message.error({
@@ -104,6 +171,7 @@ export default function ChannelList() {
         try {
           await batchUpdateChannelsApi();
           message.success({ content: "更新任务已提交后台，这可能需要几分钟，请稍后刷新列表查看。", key: "yt-batch" });
+          await load();
         } catch (e: unknown) {
           const err = e as { response?: { data?: { detail?: string } } };
           message.error({ content: err.response?.data?.detail ?? "更新失败", key: "yt-batch" });
@@ -250,34 +318,46 @@ export default function ChannelList() {
 
       <Spin spinning={loading}>
         <div className="bg-white border border-slate-200 rounded-lg p-2 shadow-sm space-y-2">
-          <div className="flex justify-end px-2 pt-1">
-            <span className="text-sm text-slate-600 mr-2 self-center">排序</span>
-            <Select
-              style={{ width: 220 }}
-              value={sortBy}
-              onChange={(v) => setSortBy(v)}
-              options={[
-                { value: "added_desc", label: "最近添加" },
-                { value: "subscriber_desc", label: "订阅数 ↓" },
-                { value: "subscriber_asc", label: "订阅数 ↑" },
-                { value: "total_views_desc", label: "总播放量 ↓" },
-                { value: "total_views_asc", label: "总播放量 ↑" },
-                { value: "video_count_desc", label: "视频数 ↓" },
-                { value: "video_count_asc", label: "视频数 ↑" },
-              ]}
+          <div className="flex flex-wrap justify-between gap-2 px-2 pt-1">
+            <Input
+              allowClear
+              style={{ width: 320, maxWidth: "100%" }}
+              placeholder="搜索频道名 / 简介 / 标签 / 擅长内容"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
             />
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600 self-center">排序</span>
+              <Select
+                style={{ width: 220 }}
+                value={sortBy}
+                onChange={(v) => setSortBy(v)}
+                options={[
+                  { value: "added_desc", label: "最近添加" },
+                  { value: "subscriber_desc", label: "订阅数 ↓" },
+                  { value: "subscriber_asc", label: "订阅数 ↑" },
+                  { value: "total_views_desc", label: "总播放量 ↓" },
+                  { value: "total_views_asc", label: "总播放量 ↑" },
+                  { value: "video_count_desc", label: "视频数 ↓" },
+                  { value: "video_count_asc", label: "视频数 ↑" },
+                ]}
+              />
+            </div>
           </div>
           <Table<Row>
             rowKey="pool_id"
             columns={columns}
             dataSource={rows}
             loading={loading}
-            pagination={{ pageSize: 10 }}
+            pagination={false}
             onRow={(record) => ({
               onClick: () => onRowClick(record),
               className: "cursor-pointer hover:bg-slate-50",
             })}
           />
+          <div ref={loadMoreRef} className="py-3 text-center text-sm text-slate-500">
+            {loadingMore ? "加载中..." : hasMore ? "向下滚动加载更多" : "没有更多数据了"}
+          </div>
         </div>
       </Spin>
     </div>
