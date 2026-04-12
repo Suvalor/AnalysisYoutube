@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import re
 
 import httpx
@@ -87,6 +87,192 @@ def _require_api_key(youtube_api_key: str) -> None:
 
 def _http_error(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
+
+
+def _youtube_api_failure_detail(resp: httpx.Response) -> tuple[int, str]:
+    """
+    解析 YouTube Data API 错误响应，返回 (建议 HTTP 状态码, 中文说明)。
+    配额类错误映射为 429，其余为 502。
+    """
+    try:
+        data = resp.json()
+        err = data.get("error") or {}
+        reasons = [str(e.get("reason", "")) for e in err.get("errors", []) if isinstance(e, dict)]
+        msg = str(err.get("message", "") or "").strip() or resp.text[:800]
+        quota_like = {"quotaExceeded", "dailyLimitExceeded", "rateLimitExceeded", "userRateLimitExceeded"}
+        if any(r in quota_like for r in reasons):
+            return (
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                "YouTube API 配额不足或触发限流，请稍后再试或减少 search 类调用。",
+            )
+        return status.HTTP_502_BAD_GATEWAY, f"YouTube API 调用失败：{msg}"
+    except Exception:
+        return (
+            status.HTTP_502_BAD_GATEWAY,
+            f"YouTube API 调用失败（HTTP {resp.status_code}）：{resp.text[:500]}",
+        )
+
+
+def _raise_for_youtube_response(resp: httpx.Response) -> None:
+    """非 200 时抛出 HTTPException，避免未处理响应拖垮上层。"""
+    if resp.status_code == 200:
+        return
+    code, detail = _youtube_api_failure_detail(resp)
+    raise HTTPException(status_code=code, detail=detail)
+
+
+@dataclass
+class DiscoverChannelsByKeywordResult:
+    """关键词挖掘潜力频道：仅内存数据，供路由层序列化；不落库。"""
+
+    items: list[dict]
+    warnings: list[str]
+    search_calls: int
+    channels_list_calls: int
+
+
+async def discover_channels_by_keyword(
+    *,
+    keyword: str,
+    published_after_days: int,
+    max_subscribers: int,
+    max_results: int,
+    youtube_api_key: str,
+) -> DiscoverChannelsByKeywordResult:
+    """
+    两步策略：search.list（按播放量排序的视频）→ 去重 channelId → channels.list（snippet+statistics）→ 本地按订阅数过滤。
+    search 单次约 100 quota，channels 按批每批 1 quota。
+    """
+    _require_api_key(youtube_api_key)
+    kw = (keyword or "").strip()
+    if not kw:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="keyword 不能为空")
+
+    mr = max(1, min(int(max_results), 50))
+    warnings: list[str] = []
+    now_utc = datetime.now(timezone.utc)
+    published_after_dt = now_utc - timedelta(days=max(1, int(published_after_days)))
+    published_after_iso = published_after_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    search_calls = 0
+    channels_list_calls = 0
+
+    try:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+            resp = await client.get(
+                f"{YOUTUBE_API_BASE}/search",
+                params={
+                    "part": "snippet",
+                    "type": "video",
+                    "q": kw,
+                    "order": "viewCount",
+                    "publishedAfter": published_after_iso,
+                    "maxResults": mr,
+                    "key": youtube_api_key,
+                },
+            )
+            search_calls = 1
+            _raise_for_youtube_response(resp)
+            search_data = resp.json()
+
+        channel_first_video: dict[str, str] = {}
+        for item in search_data.get("items", []):
+            vid = (item.get("id") or {}).get("videoId")
+            cid = (item.get("snippet") or {}).get("channelId")
+            if isinstance(vid, str) and vid.strip() and isinstance(cid, str) and cid.strip():
+                cid = cid.strip()
+                if cid not in channel_first_video:
+                    channel_first_video[cid] = vid.strip()
+
+        if not channel_first_video:
+            return DiscoverChannelsByKeywordResult(
+                items=[],
+                warnings=warnings,
+                search_calls=search_calls,
+                channels_list_calls=0,
+            )
+
+        ordered_cids = list(channel_first_video.keys())
+        channel_rows: dict[str, dict] = {}
+
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+            for group in chunked(ordered_cids, MAX_IDS_PER_REQUEST):
+                channels_list_calls += 1
+                resp = await client.get(
+                    f"{YOUTUBE_API_BASE}/channels",
+                    params={
+                        "part": "snippet,statistics",
+                        "id": ",".join(group),
+                        "key": youtube_api_key,
+                    },
+                )
+                _raise_for_youtube_response(resp)
+                payload = resp.json()
+                for ch in payload.get("items", []):
+                    cid = ch.get("id")
+                    if isinstance(cid, str) and cid:
+                        channel_rows[cid] = ch
+
+        items: list[dict] = []
+        for cid in ordered_cids:
+            video_id = channel_first_video[cid]
+            ch = channel_rows.get(cid)
+            if not ch:
+                warnings.append(f"频道 {cid}：channels.list 未返回详情，已跳过")
+                continue
+            stats = ch.get("statistics") or {}
+            sub_raw = stats.get("subscriberCount")
+            if sub_raw is None:
+                warnings.append(f"频道 {cid}：订阅数未公开，已跳过")
+                continue
+            try:
+                sub = int(sub_raw)
+            except (TypeError, ValueError):
+                warnings.append(f"频道 {cid}：订阅数字段异常，已跳过")
+                continue
+            if sub >= max_subscribers:
+                continue
+            try:
+                total_views = int(stats.get("viewCount", 0))
+            except (TypeError, ValueError):
+                total_views = 0
+            snippet = ch.get("snippet") or {}
+            title = snippet.get("title") or ""
+            thumbs = snippet.get("thumbnails") or {}
+            high = thumbs.get("high") or {}
+            default = thumbs.get("default") or {}
+            thumbnail_url = high.get("url") or default.get("url")
+
+            items.append(
+                {
+                    "yt_channel_id": cid,
+                    "title": title,
+                    "thumbnail_url": thumbnail_url,
+                    "subscriber_count": sub,
+                    "total_views": total_views,
+                    "channel_url": f"https://www.youtube.com/channel/{cid}",
+                    "viral_video_url": f"https://www.youtube.com/watch?v={video_id}",
+                }
+            )
+
+        return DiscoverChannelsByKeywordResult(
+            items=items,
+            warnings=warnings,
+            search_calls=search_calls,
+            channels_list_calls=channels_list_calls,
+        )
+    except HTTPException:
+        raise
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"访问 YouTube API 网络异常：{e}",
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"挖掘过程发生异常：{e}",
+        ) from e
 
 
 def enrich_video_items(items: list[dict]) -> None:

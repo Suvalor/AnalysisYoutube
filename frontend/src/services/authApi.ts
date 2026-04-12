@@ -72,6 +72,33 @@ export async function analyzeYouTubeBatchApi(payload: { urls: string; group_name
   return res.data as SubmitTaskResponse;
 }
 
+/** 潜力频道挖掘结果项（与后端 DiscoverChannelItem 一致） */
+export type DiscoverChannelItem = {
+  yt_channel_id: string;
+  title: string;
+  thumbnail_url: string | null;
+  subscriber_count: number;
+  total_views: number;
+  channel_url: string;
+  viral_video_url: string;
+};
+
+export type ChannelDiscoverResponse = {
+  items: DiscoverChannelItem[];
+  warnings: string[];
+};
+
+/** 关键词挖掘小号（仅查询 YouTube，不落库；单次 search 约消耗 100 quota） */
+export async function discoverChannelsApi(payload: {
+  keyword: string;
+  published_after: 7 | 14 | 30;
+  max_subscribers?: number;
+  max_results?: number;
+}) {
+  const res = await apiClient.post("/api/channels/discover", payload);
+  return res.data as ChannelDiscoverResponse;
+}
+
 export async function listYouTubeChannelsApi(params?: { sort_by?: string }) {
   const searchParams = new URLSearchParams();
   if (params?.sort_by) searchParams.append("sort_by", params.sort_by);
