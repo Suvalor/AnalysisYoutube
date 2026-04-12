@@ -1,4 +1,4 @@
-import { Button, Input, Modal, Popover, Select, Spin, Table, Tag, Typography, message } from "antd";
+import { Alert, Button, Form, Input, InputNumber, Modal, Popover, Select, Spin, Table, Tag, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -8,13 +8,14 @@ import {
   analyzeYouTubeBatchApi,
   batchUpdateChannelsApi,
   deleteYouTubeChannelApi,
+  discoverChannelsApi,
   getYouTubeQuotaDashboardApi,
   listYouTubeChannelsApi,
+  type DiscoverChannelItem,
   type YouTubeAnalyzeResponse,
 } from "@/services/authApi";
 import { formatNumber } from "@/utils/format";
 import { useTabStore } from "@/store/useTabStore";
-import Icon from "@ant-design/icons";
 
 dayjs.extend(relativeTime);
 
@@ -23,6 +24,13 @@ type Row = {
   group_name: string;
   added_at: string;
   channel: YouTubeAnalyzeResponse["channel"];
+};
+
+type DiscoverFormValues = {
+  keyword: string;
+  published_after: 7 | 14 | 30;
+  max_subscribers: number;
+  max_results: number;
 };
 
 export default function ChannelList() {
@@ -40,7 +48,15 @@ export default function ChannelList() {
   const [urls, setUrls] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [discoverOpen, setDiscoverOpen] = useState(false);
+  const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [discoverItems, setDiscoverItems] = useState<DiscoverChannelItem[]>([]);
+  const [discoverWarnings, setDiscoverWarnings] = useState<string[]>([]);
+  const [addingDiscoverYtId, setAddingDiscoverYtId] = useState<string | null>(null);
+  const [discoverForm] = Form.useForm<DiscoverFormValues>();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  const monitoredYtIds = useMemo(() => new Set(allRows.map((r) => r.channel.yt_channel_id)), [allRows]);
 
   const filteredRows = useMemo(() => {
     const kw = keyword.trim().toLowerCase();
@@ -151,6 +167,134 @@ export default function ChannelList() {
       setAnalyzing(false);
     }
   };
+
+  const openDiscoverModal = () => {
+    setDiscoverItems([]);
+    setDiscoverWarnings([]);
+    discoverForm.resetFields();
+    discoverForm.setFieldsValue({
+      keyword: "",
+      published_after: 14,
+      max_subscribers: 50000,
+      max_results: 25,
+    });
+    setDiscoverOpen(true);
+  };
+
+  const onDiscoverSubmit = async (values: DiscoverFormValues) => {
+    setDiscoverLoading(true);
+    try {
+      const data = await discoverChannelsApi({
+        keyword: values.keyword.trim(),
+        published_after: values.published_after,
+        max_subscribers: values.max_subscribers,
+        max_results: values.max_results,
+      });
+      setDiscoverItems(data.items);
+      setDiscoverWarnings(data.warnings ?? []);
+      if (!data.items.length) {
+        message.info("没有符合过滤条件的频道，可尝试放宽粉丝上限或延长发布时间范围");
+      }
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: unknown } } };
+      message.error(
+        typeof err.response?.data?.detail === "string" ? err.response.data.detail : "挖掘请求失败"
+      );
+    } finally {
+      setDiscoverLoading(false);
+    }
+  };
+
+  const onDiscoverAddFollow = async (row: DiscoverChannelItem) => {
+    if (monitoredYtIds.has(row.yt_channel_id)) {
+      message.info("该频道已在关注列表中");
+      return;
+    }
+    setAddingDiscoverYtId(row.yt_channel_id);
+    message.loading({ content: "正在提交添加任务…", key: "disc-add", duration: 0 });
+    try {
+      await analyzeYouTubeBatchApi({ urls: row.channel_url });
+      message.success({
+        content: "添加任务已提交后台，请稍后刷新列表查看。",
+        key: "disc-add",
+      });
+      await load();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: unknown } } };
+      message.error({
+        content: typeof err.response?.data?.detail === "string" ? err.response.data.detail : "添加失败",
+        key: "disc-add",
+      });
+    } finally {
+      setAddingDiscoverYtId(null);
+    }
+  };
+
+  const discoverColumns: ColumnsType<DiscoverChannelItem> = [
+    {
+      title: "频道",
+      key: "ch",
+      render: (_, r) => (
+        <div className="flex items-center gap-2 min-w-0">
+          <img src={r.thumbnail_url || ""} alt="" className="w-9 h-9 rounded-full border border-slate-200 shrink-0" />
+          <Typography.Text ellipsis={{ tooltip: r.title }} className="font-medium text-slate-900">
+            {r.title}
+          </Typography.Text>
+        </div>
+      ),
+    },
+    {
+      title: "订阅数",
+      dataIndex: "subscriber_count",
+      width: 100,
+      render: (v: number) => formatNumber(v),
+    },
+    {
+      title: "总播放量",
+      dataIndex: "total_views",
+      width: 110,
+      render: (v: number) => formatNumber(v),
+    },
+    {
+      title: "频道链接",
+      key: "curl",
+      width: 88,
+      render: (_, r) => (
+        <Typography.Link href={r.channel_url} target="_blank" rel="noreferrer">
+          打开
+        </Typography.Link>
+      ),
+    },
+    {
+      title: "爆款视频",
+      key: "vurl",
+      width: 88,
+      render: (_, r) => (
+        <Typography.Link href={r.viral_video_url} target="_blank" rel="noreferrer">
+          打开
+        </Typography.Link>
+      ),
+    },
+    {
+      title: "操作",
+      key: "op",
+      width: 108,
+      render: (_, r) => {
+        const already = monitoredYtIds.has(r.yt_channel_id);
+        return (
+          <Button
+            type="primary"
+            size="small"
+            disabled={already}
+            loading={addingDiscoverYtId === r.yt_channel_id}
+            onClick={() => void onDiscoverAddFollow(r)}
+          >
+            {already ? "已关注" : "添加关注"}
+          </Button>
+        );
+      },
+    },
+  ];
 
   const onBatchUpdate = async () => {
     const q = await getYouTubeQuotaDashboardApi();
@@ -302,9 +446,12 @@ export default function ChannelList() {
             value={urls}
             onChange={(e) => setUrls(e.target.value)}
           />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button type="primary" loading={analyzing} onClick={() => void onBatchAdd()}>
               添加关注
+            </Button>
+            <Button type="primary" ghost onClick={openDiscoverModal}>
+              🔍 智能挖掘爆款小号
             </Button>
             <Button type="primary" loading={updating} onClick={() => void onBatchUpdate()}>
               一键更新数据
@@ -360,6 +507,85 @@ export default function ChannelList() {
           </div>
         </div>
       </Spin>
+
+      <Modal
+        title="潜力频道挖掘"
+        open={discoverOpen}
+        onCancel={() => setDiscoverOpen(false)}
+        footer={null}
+        width={960}
+        destroyOnClose
+      >
+        <Alert
+          type="warning"
+          showIcon
+          className="mb-3"
+          message="每次挖掘会调用 YouTube search.list，约消耗 100 点 API 配额（另加 channels.list 分块费用）。请控制使用频率。"
+        />
+        <Spin spinning={discoverLoading}>
+          <Form<DiscoverFormValues>
+            form={discoverForm}
+            layout="vertical"
+            className="mb-4"
+            initialValues={{ published_after: 14, max_subscribers: 50000, max_results: 25 }}
+            onFinish={(v) => void onDiscoverSubmit(v)}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
+              <Form.Item
+                name="keyword"
+                label="搜索关键词"
+                rules={[{ required: true, message: "请输入关键词" }]}
+              >
+                <Input allowClear placeholder="例如：健身教程、AI 工具评测" maxLength={200} />
+              </Form.Item>
+              <Form.Item name="published_after" label="发布时间范围（自现在起）">
+                <Select
+                  options={[
+                    { value: 7, label: "近 7 天" },
+                    { value: 14, label: "近 14 天" },
+                    { value: 30, label: "近 30 天" },
+                  ]}
+                />
+              </Form.Item>
+              <Form.Item name="max_subscribers" label="粉丝上限（保留订阅数小于该值的频道）">
+                <InputNumber min={0} max={999999999} className="w-full" />
+              </Form.Item>
+              <Form.Item name="max_results" label="search 抓取条数（1–50）">
+                <InputNumber min={1} max={50} className="w-full" />
+              </Form.Item>
+            </div>
+            <Button type="primary" htmlType="submit" loading={discoverLoading}>
+              开始挖掘
+            </Button>
+          </Form>
+
+          {discoverWarnings.length > 0 ? (
+            <Alert
+              type="info"
+              showIcon
+              className="mb-3"
+              message="部分条目已跳过"
+              description={
+                <ul className="list-disc pl-4 mb-0 text-sm">
+                  {discoverWarnings.slice(0, 8).map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+              }
+            />
+          ) : null}
+
+          <div className="text-sm text-slate-600 mb-2">挖掘结果（未写入数据库，点击「添加关注」后才会入库）</div>
+          <Table<DiscoverChannelItem>
+            rowKey="yt_channel_id"
+            size="small"
+            columns={discoverColumns}
+            dataSource={discoverItems}
+            pagination={false}
+            locale={{ emptyText: discoverLoading ? "加载中…" : "暂无数据，请先填写表单并点击「开始挖掘」" }}
+          />
+        </Spin>
+      </Modal>
     </div>
   );
 }
