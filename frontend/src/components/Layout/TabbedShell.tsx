@@ -12,6 +12,7 @@ import {
   Settings,
   Video,
   WandSparkles,
+  Waves,
   X,
   Youtube,
 } from "lucide-react";
@@ -35,6 +36,7 @@ import ConfigCenter from "@/pages/settings/ConfigCenter";
 import AgentEditorPage from "@/pages/settings/AgentEditorPage";
 import ScriptWorkflowSOP from "@/pages/sop/ScriptWorkflowSOP";
 import InspirationPool from "@/pages/inspiration/InspirationPool";
+import BlueOceanRadar from "@/pages/radar/BlueOceanRadar";
 
 /** 品牌色 Ant Design 主蓝，侧边栏 Logo 占位（无独立图片资源时使用） */
 const BRAND_BLUE = "#1890ff";
@@ -77,6 +79,7 @@ const navDefs: NavDef[] = [
   { path: "/assets", label: "素材库", icon: Image, type: "assets", tabId: "assets" },
   { path: "/knowledge-base", label: "知识库管理", icon: Library, type: "knowledge-base", tabId: "knowledge-base" },
   { path: "/youtube/channels", label: "频道管理", icon: Youtube, type: "channel-list", tabId: "channel-list" },
+  { path: "/blue-ocean-radar", label: "蓝海雷达", icon: Waves, type: "blue-ocean-radar", tabId: "blue-ocean-radar" },
   { path: "/youtube/videos", label: "全局视频", icon: Video, type: "global-videos", tabId: "global-videos" },
   { path: "/video-board", label: "视频看板", icon: Kanban, type: "video-board", tabId: "video-board" },
   { path: "/competitor-analysis", label: "竞对洞察", icon: BarChart3, type: "competitor-analysis", tabId: "competitor-analysis" },
@@ -91,6 +94,8 @@ function renderTabPanel(tab: TabItem) {
       return <Dashboard />;
     case "channel-list":
       return <ChannelList />;
+    case "blue-ocean-radar":
+      return <BlueOceanRadar />;
     case "global-videos":
       return <GlobalVideoList />;
     case "channel-detail":

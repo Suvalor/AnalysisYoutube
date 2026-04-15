@@ -19,7 +19,8 @@ export type TabType =
   | "config-center"
   | "sop-workflow"
   | "agent-edit"
-  | "inspiration-pool";
+  | "inspiration-pool"
+  | "blue-ocean-radar";
 
 export type TabItem = {
   id: string;

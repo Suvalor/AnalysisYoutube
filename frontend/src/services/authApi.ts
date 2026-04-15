@@ -99,6 +99,36 @@ export async function discoverChannelsApi(payload: {
   return res.data as ChannelDiscoverResponse;
 }
 
+/** 蓝海雷达单条结果（与后端 BlueOceanChannelItem 一致） */
+export type BlueOceanChannelItem = {
+  yt_channel_id: string;
+  title: string;
+  thumbnail_url: string | null;
+  subscriber_count: number;
+  total_views: number;
+  channel_url: string;
+  viral_video_url: string;
+  viral_view_count: number;
+  outlier_score: number;
+};
+
+export type BlueOceanRadarResponse = {
+  items: BlueOceanChannelItem[];
+  warnings: string[];
+};
+
+/** 蓝海雷达深度扫描（仅查询 YouTube，不落库） */
+export async function blueOceanRadarScanApi(payload: {
+  keyword: string;
+  published_after: 30 | 90 | 180;
+  max_subscribers?: number;
+  outlier_multiplier?: number;
+  video_duration?: "short" | "medium" | "long" | null;
+}) {
+  const res = await apiClient.post("/api/radar/scan", payload);
+  return res.data as BlueOceanRadarResponse;
+}
+
 export async function listYouTubeChannelsApi(params?: { sort_by?: string }) {
   const searchParams = new URLSearchParams();
   if (params?.sort_by) searchParams.append("sort_by", params.sort_by);
