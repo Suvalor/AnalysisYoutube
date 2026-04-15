@@ -129,6 +129,7 @@ class DiscoverChannelsByKeywordResult:
     warnings: list[str]
     search_calls: int
     channels_list_calls: int
+    videos_list_calls: int
 
 
 async def discover_channels_by_keyword(
@@ -156,6 +157,7 @@ async def discover_channels_by_keyword(
 
     search_calls = 0
     channels_list_calls = 0
+    videos_list_calls = 0
 
     try:
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
@@ -190,12 +192,44 @@ async def discover_channels_by_keyword(
                 warnings=warnings,
                 search_calls=search_calls,
                 channels_list_calls=0,
+                videos_list_calls=0,
             )
 
         ordered_cids = list(channel_first_video.keys())
         channel_rows: dict[str, dict] = {}
+        trigger_video_views_map: dict[str, int] = {}
 
         async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+            ordered_video_ids: list[str] = []
+            seen_video_ids: set[str] = set()
+            for cid in ordered_cids:
+                vid = channel_first_video[cid]
+                if vid not in seen_video_ids:
+                    seen_video_ids.add(vid)
+                    ordered_video_ids.append(vid)
+
+            for group in chunked(ordered_video_ids, MAX_IDS_PER_REQUEST):
+                videos_list_calls += 1
+                resp = await client.get(
+                    f"{YOUTUBE_API_BASE}/videos",
+                    params={
+                        "part": "statistics",
+                        "id": ",".join(group),
+                        "key": youtube_api_key,
+                    },
+                )
+                _raise_for_youtube_response(resp)
+                payload = resp.json()
+                for video in payload.get("items", []):
+                    vid = video.get("id")
+                    if not isinstance(vid, str) or not vid:
+                        continue
+                    try:
+                        trigger_views = int((video.get("statistics") or {}).get("viewCount", 0))
+                    except (TypeError, ValueError):
+                        trigger_views = 0
+                    trigger_video_views_map[vid] = trigger_views
+
             for group in chunked(ordered_cids, MAX_IDS_PER_REQUEST):
                 channels_list_calls += 1
                 resp = await client.get(
@@ -249,7 +283,8 @@ async def discover_channels_by_keyword(
                     "title": title,
                     "thumbnail_url": thumbnail_url,
                     "subscriber_count": sub,
-                    "total_views": total_views,
+                    "channel_total_views": total_views,
+                    "trigger_video_views": trigger_video_views_map.get(video_id, 0),
                     "channel_url": f"https://www.youtube.com/channel/{cid}",
                     "viral_video_url": f"https://www.youtube.com/watch?v={video_id}",
                 }
@@ -260,6 +295,7 @@ async def discover_channels_by_keyword(
             warnings=warnings,
             search_calls=search_calls,
             channels_list_calls=channels_list_calls,
+            videos_list_calls=videos_list_calls,
         )
     except HTTPException:
         raise
