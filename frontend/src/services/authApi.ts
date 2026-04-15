@@ -78,7 +78,8 @@ export type DiscoverChannelItem = {
   title: string;
   thumbnail_url: string | null;
   subscriber_count: number;
-  total_views: number;
+  channel_total_views: number;
+  trigger_video_views: number;
   channel_url: string;
   viral_video_url: string;
 };

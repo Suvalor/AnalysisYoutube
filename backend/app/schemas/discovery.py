@@ -37,7 +37,8 @@ class DiscoverChannelItem(BaseModel):
     title: str
     thumbnail_url: str | None = None
     subscriber_count: int
-    total_views: int
+    channel_total_views: int
+    trigger_video_views: int
     channel_url: str
     viral_video_url: str
 
