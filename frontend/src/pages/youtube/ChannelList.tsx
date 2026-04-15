@@ -250,9 +250,9 @@ export default function ChannelList() {
       render: (v: number) => formatNumber(v),
     },
     {
-      title: "频道总播放",
-      dataIndex: "channel_total_views",
-      width: 120,
+      title: "总播放量",
+      dataIndex: "total_views",
+      width: 110,
       render: (v: number) => formatNumber(v),
     },
     {
@@ -268,14 +268,11 @@ export default function ChannelList() {
     {
       title: "爆款视频",
       key: "vurl",
-      width: 168,
+      width: 88,
       render: (_, r) => (
-        <div className="flex flex-col leading-tight">
-          <Typography.Link href={r.viral_video_url} target="_blank" rel="noreferrer">
-            打开视频
-          </Typography.Link>
-          <span className="text-xs text-slate-500">播放：{formatNumber(r.trigger_video_views)}</span>
-        </div>
+        <Typography.Link href={r.viral_video_url} target="_blank" rel="noreferrer">
+          打开
+        </Typography.Link>
       ),
     },
     {
