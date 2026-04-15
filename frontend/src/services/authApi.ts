@@ -117,6 +117,29 @@ export type BlueOceanRadarResponse = {
   warnings: string[];
 };
 
+export type RadarAiRetrospectiveRequest = {
+  lookback_days?: number;
+  top_n?: number;
+  model_library_id: number;
+  llm_model_name: string;
+  agent_id: number;
+};
+
+export type RadarAiRetrospectiveResponse = {
+  analysis_summary: string;
+  recommended_parameters: {
+    max_subscribers: number;
+    outlier_multiplier: number;
+    suggested_keywords: string[];
+  };
+  next_step_action: string;
+  sample_meta: {
+    lookback_days: number;
+    top_count: number;
+    low_count: number;
+  };
+};
+
 /** 蓝海雷达深度扫描（仅查询 YouTube，不落库） */
 export async function blueOceanRadarScanApi(payload: {
   keyword: string;
@@ -127,6 +150,12 @@ export async function blueOceanRadarScanApi(payload: {
 }) {
   const res = await apiClient.post("/api/radar/scan", payload);
   return res.data as BlueOceanRadarResponse;
+}
+
+/** 蓝海雷达 AI 复盘：基于近期业务表现推荐参数 */
+export async function radarAiRetrospectiveApi(payload: RadarAiRetrospectiveRequest) {
+  const res = await apiClient.post("/api/radar/ai-retrospective", payload);
+  return res.data as RadarAiRetrospectiveResponse;
 }
 
 export async function listYouTubeChannelsApi(params?: { sort_by?: string }) {

@@ -46,3 +46,40 @@ class BlueOceanChannelItem(BaseModel):
 class BlueOceanRadarResponse(BaseModel):
     items: list[BlueOceanChannelItem]
     warnings: list[str] = Field(default_factory=list)
+
+
+class RadarAiRetrospectiveRequest(BaseModel):
+    """蓝海雷达 AI 复盘请求。"""
+
+    lookback_days: int = Field(default=14, ge=7, le=90, description="回看天数")
+    top_n: int = Field(default=8, ge=3, le=20, description="高低样本各取 N 条")
+    model_library_id: int = Field(..., ge=1, description="模型库 ID")
+    llm_model_name: str = Field(..., min_length=1, max_length=128, description="模型名")
+    agent_id: int = Field(..., ge=1, description="智能体提示词 ID")
+
+    @field_validator("llm_model_name")
+    @classmethod
+    def strip_model_name(cls, v: str) -> str:
+        s = (v or "").strip()
+        if not s:
+            raise ValueError("llm_model_name 不能为空")
+        return s
+
+
+class RadarRecommendedParameters(BaseModel):
+    max_subscribers: int
+    outlier_multiplier: float
+    suggested_keywords: list[str] = Field(default_factory=list)
+
+
+class RadarSampleMeta(BaseModel):
+    lookback_days: int
+    top_count: int
+    low_count: int
+
+
+class RadarAiRetrospectiveResponse(BaseModel):
+    analysis_summary: str
+    recommended_parameters: RadarRecommendedParameters
+    next_step_action: str
+    sample_meta: RadarSampleMeta

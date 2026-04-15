@@ -649,3 +649,78 @@ async def get_channel_histories_for_compare(
     )
     return list(result.scalars().all())
 
+
+async def list_radar_retrospective_channel_samples(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    start_date: date,
+    top_video_limit_per_channel: int = 5,
+) -> list[dict]:
+    """
+    蓝海雷达 AI 复盘样本：
+    - 当前用户监控池频道
+    - 每频道起止历史快照（start_date 以来最早/最新）
+    - 每频道高播放视频标题（用于关键词抽样）
+    """
+    pools = await list_user_competitor_channels(session, user_id)
+    if not pools:
+        return []
+
+    channel_map: dict[int, YouTubeChannel] = {}
+    for row in pools:
+        if row.channel is not None:
+            channel_map[row.channel.id] = row.channel
+    if not channel_map:
+        return []
+
+    channel_ids = list(channel_map.keys())
+
+    history_rows = await get_channel_histories_for_compare(
+        session,
+        channel_ids=channel_ids,
+        start_date=start_date,
+    )
+    earliest_by_channel: dict[int, YouTubeChannelHistory] = {}
+    latest_by_channel: dict[int, YouTubeChannelHistory] = {}
+    for row in history_rows:
+        cid = row.channel_id
+        if cid not in earliest_by_channel:
+            earliest_by_channel[cid] = row
+        latest_by_channel[cid] = row
+
+    videos_result = await session.execute(
+        select(
+            YouTubeVideo.channel_id,
+            YouTubeVideo.title,
+            YouTubeVideo.view_count,
+            YouTubeVideo.published_at,
+        )
+        .where(
+            YouTubeVideo.channel_id.in_(channel_ids),
+            YouTubeVideo.published_at.is_not(None),
+            YouTubeVideo.published_at >= start_date,
+        )
+        .order_by(YouTubeVideo.channel_id.asc(), YouTubeVideo.view_count.desc())
+    )
+    top_titles_by_channel: dict[int, list[str]] = {cid: [] for cid in channel_ids}
+    for cid, title, _view_count, _published_at in videos_result.all():
+        if not title:
+            continue
+        arr = top_titles_by_channel.setdefault(int(cid), [])
+        if len(arr) >= max(1, top_video_limit_per_channel):
+            continue
+        arr.append(str(title))
+
+    out: list[dict] = []
+    for cid, channel in channel_map.items():
+        out.append(
+            {
+                "channel": channel,
+                "start_history": earliest_by_channel.get(cid),
+                "end_history": latest_by_channel.get(cid),
+                "top_video_titles": top_titles_by_channel.get(cid, []),
+            }
+        )
+    return out
+
