@@ -3,10 +3,12 @@ import {
   Avatar,
   Button,
   Card,
+  Drawer,
   Form,
   Input,
   InputNumber,
   Select,
+  Skeleton,
   Space,
   Table,
   Tag,
@@ -14,12 +16,15 @@ import {
   message,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   analyzeYouTubeBatchApi,
   blueOceanRadarScanApi,
+  radarAiRetrospectiveApi,
   type BlueOceanChannelItem,
+  type RadarAiRetrospectiveResponse,
 } from "@/services/authApi";
+import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
 import { formatNumber } from "@/utils/format";
 
 const { Title, Text, Link } = Typography;
@@ -46,6 +51,15 @@ export default function BlueOceanRadar() {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [importedIds, setImportedIds] = useState<Set<string>>(() => new Set());
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<RadarAiRetrospectiveResponse | null>(null);
+  const [aiError, setAiError] = useState<string>("");
+  const [modelOptions, setModelOptions] = useState<ModelItem[]>([]);
+  const [agentOptions, setAgentOptions] = useState<PromptItem[]>([]);
+  const [selectedModelLibId, setSelectedModelLibId] = useState<number | undefined>(undefined);
+  const [selectedLlmModelName, setSelectedLlmModelName] = useState<string>("");
+  const [selectedAgentId, setSelectedAgentId] = useState<number | undefined>(undefined);
 
   const columns: ColumnsType<BlueOceanChannelItem> = useMemo(
     () => [
@@ -142,6 +156,78 @@ export default function BlueOceanRadar() {
     }
   };
 
+  useEffect(() => {
+    const loadAiConfigs = async () => {
+      try {
+        const [models, prompts] = await Promise.all([listModelsApi(), listPromptsApi()]);
+        const chatModels = models.filter((m) => (m.library_kind ?? "chat") === "chat");
+        setModelOptions(chatModels);
+        setAgentOptions(prompts);
+        if (chatModels.length > 0) {
+          const first = chatModels[0];
+          setSelectedModelLibId(first.id);
+          const firstModelName =
+            ((first.supported_models_json || "").match(/"value"\s*:\s*"([^"]+)"/)?.[1] ??
+              (first.supported_models_json || "").match(/"([^"]+)"/)?.[1] ??
+              "").trim();
+          setSelectedLlmModelName(firstModelName);
+        }
+        if (prompts.length > 0) {
+          setSelectedAgentId(prompts[0].id);
+        }
+      } catch {
+        message.warning("加载 AI 模型/智能体配置失败，请前往设置中心检查");
+      }
+    };
+    void loadAiConfigs();
+  }, []);
+
+  const openAiDrawer = async () => {
+    if (!selectedModelLibId || !selectedLlmModelName || !selectedAgentId) {
+      message.warning("请先在设置中心维护模型与智能体，并在本页完成选择");
+      return;
+    }
+    setAiOpen(true);
+    setAiLoading(true);
+    setAiResult(null);
+    setAiError("");
+    try {
+      const data = await radarAiRetrospectiveApi({
+        lookback_days: 14,
+        top_n: 8,
+        model_library_id: selectedModelLibId,
+        llm_model_name: selectedLlmModelName,
+        agent_id: selectedAgentId,
+      });
+      setAiResult(data);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      setAiError(err?.response?.data?.detail ?? "AI 复盘失败");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const appendKeyword = (kw: string) => {
+    const current = String(form.getFieldValue("keyword") || "").trim();
+    if (!current) {
+      form.setFieldValue("keyword", kw);
+      return;
+    }
+    if (current.includes(kw)) return;
+    form.setFieldValue("keyword", `${current} ${kw}`);
+  };
+
+  const applyAiParams = () => {
+    if (!aiResult) return;
+    form.setFieldsValue({
+      max_subscribers: aiResult.recommended_parameters.max_subscribers,
+      outlier_multiplier: aiResult.recommended_parameters.outlier_multiplier,
+    });
+    setAiOpen(false);
+    message.success("已应用 AI 推荐参数，可直接开始扫描");
+  };
+
   const onScan = async () => {
     try {
       const values = await form.validateFields();
@@ -230,10 +316,52 @@ export default function BlueOceanRadar() {
                 ]}
               />
             </Form.Item>
+            <Space className="mt-4" wrap>
+              <Form.Item label="AI 模型配置" className="mb-0 min-w-[220px]">
+                <Select
+                  value={selectedModelLibId}
+                  onChange={(v) => {
+                    setSelectedModelLibId(v);
+                    const target = modelOptions.find((x) => x.id === v);
+                    const firstModelName =
+                      ((target?.supported_models_json || "").match(/"value"\s*:\s*"([^"]+)"/)?.[1] ??
+                        (target?.supported_models_json || "").match(/"([^"]+)"/)?.[1] ??
+                        "").trim();
+                    setSelectedLlmModelName(firstModelName);
+                  }}
+                  options={modelOptions.map((m) => ({ value: m.id, label: m.name }))}
+                  placeholder="选择模型配置"
+                />
+              </Form.Item>
+              <Form.Item label="模型名" className="mb-0 min-w-[260px]">
+                <Input
+                  value={selectedLlmModelName}
+                  onChange={(e) => setSelectedLlmModelName(e.target.value)}
+                  placeholder="例如 ep-xxxx / gpt-4o-mini"
+                />
+              </Form.Item>
+              <Form.Item label="AI 智能体" className="mb-0 min-w-[220px]">
+                <Select
+                  value={selectedAgentId}
+                  onChange={setSelectedAgentId}
+                  options={agentOptions.map((p) => ({ value: p.id, label: p.title }))}
+                  placeholder="选择提示词智能体"
+                />
+              </Form.Item>
+            </Space>
             <Form.Item className="mb-0 mt-4">
-              <Button type="primary" size="large" loading={scanning} onClick={() => void onScan()}>
-                开始深度扫描
-              </Button>
+              <Space wrap>
+                <Button type="primary" size="large" loading={scanning} onClick={() => void onScan()}>
+                  开始深度扫描
+                </Button>
+                <Button
+                  size="large"
+                  className="!text-purple-600 !border-purple-200 hover:!border-purple-400 hover:!text-purple-700"
+                  onClick={() => void openAiDrawer()}
+                >
+                  ✨ AI 参数自进化
+                </Button>
+              </Space>
             </Form.Item>
           </Form>
         </Card>
@@ -258,6 +386,73 @@ export default function BlueOceanRadar() {
           />
         </Card>
       </div>
+      <Drawer
+        title="AI 参数自进化复盘"
+        placement="right"
+        width={520}
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+      >
+        {aiLoading ? (
+          <div className="space-y-4">
+            <Skeleton active paragraph={{ rows: 4 }} />
+            <Skeleton active paragraph={{ rows: 6 }} />
+          </div>
+        ) : aiError ? (
+          <Alert type="error" showIcon message="复盘失败" description={aiError} />
+        ) : aiResult ? (
+          <div className="space-y-4">
+            <Card size="small" title="复盘摘要" className="!border-slate-200">
+              <Text>{aiResult.analysis_summary}</Text>
+            </Card>
+            <Card size="small" title="推荐关键词" className="!border-slate-200">
+              <Space wrap>
+                {aiResult.recommended_parameters.suggested_keywords.length > 0 ? (
+                  aiResult.recommended_parameters.suggested_keywords.map((kw) => (
+                    <Tag
+                      key={kw}
+                      color="purple"
+                      className="cursor-pointer"
+                      onClick={() => appendKeyword(kw)}
+                    >
+                      {kw}
+                    </Tag>
+                  ))
+                ) : (
+                  <Text type="secondary">暂无关键词建议</Text>
+                )}
+              </Space>
+            </Card>
+            <Card size="small" title="推荐参数" className="!border-slate-200">
+              <div className="space-y-2">
+                <div>
+                  <Text type="secondary">粉丝上限：</Text>
+                  <Text strong>{formatNumber(aiResult.recommended_parameters.max_subscribers)}</Text>
+                </div>
+                <div>
+                  <Text type="secondary">爆款系数：</Text>
+                  <Text strong>{aiResult.recommended_parameters.outlier_multiplier}</Text>
+                </div>
+                <div>
+                  <Text type="secondary">建议动作：</Text>
+                  <Text>{aiResult.next_step_action}</Text>
+                </div>
+                <div>
+                  <Text type="secondary">
+                    样本覆盖：近 {aiResult.sample_meta.lookback_days} 天，高样本 {aiResult.sample_meta.top_count} 条，低样本{" "}
+                    {aiResult.sample_meta.low_count} 条
+                  </Text>
+                </div>
+              </div>
+            </Card>
+            <Button type="primary" size="large" block onClick={applyAiParams}>
+              ⚡️ 采纳 AI 推荐参数
+            </Button>
+          </div>
+        ) : (
+          <Text type="secondary">暂无复盘数据</Text>
+        )}
+      </Drawer>
     </div>
   );
 }

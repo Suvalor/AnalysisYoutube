@@ -3,10 +3,17 @@
 from fastapi import APIRouter
 
 from app.api.deps import CurrentUserDep, DBSessionDep
-from app.schemas.radar import BlueOceanChannelItem, BlueOceanRadarRequest, BlueOceanRadarResponse
+from app.schemas.radar import (
+    BlueOceanChannelItem,
+    BlueOceanRadarRequest,
+    BlueOceanRadarResponse,
+    RadarAiRetrospectiveRequest,
+    RadarAiRetrospectiveResponse,
+)
 from app.services.config_manager import resolve_integration_config
 from app.services.quota_service import record_api_quota_usage
 from app.services.youtube_service import blue_ocean_radar_scan
+from app.services.youtube_ai_service import analyze_radar_retrospective
 
 router = APIRouter()
 
@@ -45,3 +52,26 @@ async def blue_ocean_scan(
 
     items = [BlueOceanChannelItem.model_validate(x) for x in result.items]
     return BlueOceanRadarResponse(items=items, warnings=result.warnings)
+
+
+@router.post(
+    "/ai-retrospective",
+    response_model=RadarAiRetrospectiveResponse,
+    summary="蓝海雷达 AI 参数复盘与推荐",
+)
+async def radar_ai_retrospective(
+    body: RadarAiRetrospectiveRequest,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> RadarAiRetrospectiveResponse:
+    result = await analyze_radar_retrospective(
+        db,
+        user_id=current_user.id,
+        org_id=current_user.org_id,
+        lookback_days=body.lookback_days,
+        top_n=body.top_n,
+        model_library_id=body.model_library_id,
+        llm_model_name=body.llm_model_name,
+        agent_id=body.agent_id,
+    )
+    return RadarAiRetrospectiveResponse.model_validate(result)
