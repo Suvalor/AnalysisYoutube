@@ -100,6 +100,39 @@ export async function discoverChannelsApi(payload: {
   return res.data as ChannelDiscoverResponse;
 }
 
+// ---------------------------------------------------------------------------
+// 蓝海雷达 (Blue Ocean Radar)
+// ---------------------------------------------------------------------------
+
+export type BlueOceanChannelItem = {
+  yt_channel_id: string;
+  title: string;
+  thumbnail_url: string | null;
+  subscriber_count: number;
+  channel_total_views: number;
+  trigger_video_id: string;
+  trigger_video_views: number;
+  outlier_score: number;
+  channel_url: string;
+  viral_video_url: string;
+};
+
+export type BlueOceanRadarResponse = {
+  items: BlueOceanChannelItem[];
+  warnings: string[];
+};
+
+export async function blueOceanRadarApi(payload: {
+  keyword: string;
+  published_after?: number;
+  max_subscribers?: number;
+  outlier_multiplier?: number;
+  video_duration?: string;
+}) {
+  const res = await apiClient.post("/api/channels/blue-ocean-radar", payload);
+  return res.data as BlueOceanRadarResponse;
+}
+
 export async function listYouTubeChannelsApi(params?: { sort_by?: string }) {
   const searchParams = new URLSearchParams();
   if (params?.sort_by) searchParams.append("sort_by", params.sort_by);

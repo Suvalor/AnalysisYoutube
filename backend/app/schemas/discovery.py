@@ -46,3 +46,71 @@ class DiscoverChannelItem(BaseModel):
 class ChannelDiscoverResponse(BaseModel):
     items: list[DiscoverChannelItem]
     warnings: list[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# 蓝海雷达 (Blue Ocean Radar)
+# ---------------------------------------------------------------------------
+
+
+class BlueOceanRadarRequest(BaseModel):
+    """蓝海雷达请求：搜索低粉爆款频道，仅查询不落库。"""
+
+    keyword: str = Field(..., min_length=1, max_length=200, description="搜索关键词")
+    published_after: int = Field(
+        default=90,
+        ge=1,
+        le=365,
+        description="发布时间下限为「距今天数」",
+    )
+    max_subscribers: int = Field(
+        default=30000,
+        ge=0,
+        description="粉丝上限阈值：只保留订阅数低于该值的频道",
+    )
+    outlier_multiplier: float = Field(
+        default=10.0,
+        ge=1.0,
+        description="爆款倍数阈值：视频播放量 / 粉丝数 >= 此值才算爆款",
+    )
+    video_duration: str = Field(
+        default="long",
+        description="视频时长筛选：long (>20min), medium (4-20min), short (<4min), any (不限)",
+    )
+
+    @field_validator("keyword")
+    @classmethod
+    def strip_keyword_blue(cls, v: str) -> str:
+        s = (v or "").strip()
+        if not s:
+            raise ValueError("keyword 不能为空")
+        return s
+
+    @field_validator("video_duration")
+    @classmethod
+    def validate_duration(cls, v: str) -> str:
+        allowed = {"long", "medium", "short", "any"}
+        v = (v or "").strip().lower()
+        if v not in allowed:
+            raise ValueError(f"video_duration 只能为 {', '.join(sorted(allowed))}")
+        return v
+
+
+class BlueOceanChannelItem(BaseModel):
+    """蓝海雷达单条结果。"""
+
+    yt_channel_id: str
+    title: str
+    thumbnail_url: str | None = None
+    subscriber_count: int
+    channel_total_views: int
+    trigger_video_id: str
+    trigger_video_views: int
+    outlier_score: float = Field(description="爆款异常系数 = 视频播放量 / max(粉丝数, 1)")
+    channel_url: str
+    viral_video_url: str
+
+
+class BlueOceanRadarResponse(BaseModel):
+    items: list[BlueOceanChannelItem]
+    warnings: list[str] = Field(default_factory=list)
