@@ -56,6 +56,7 @@ class RadarAiRetrospectiveRequest(BaseModel):
     model_library_id: int = Field(..., ge=1, description="模型库 ID")
     llm_model_name: str = Field(..., min_length=1, max_length=128, description="模型名")
     agent_id: int = Field(..., ge=1, description="智能体提示词 ID")
+    conversation_id: str | None = Field(None, description="对话 ID，不传则新建")
 
     @field_validator("llm_model_name")
     @classmethod
@@ -83,3 +84,4 @@ class RadarAiRetrospectiveResponse(BaseModel):
     recommended_parameters: RadarRecommendedParameters
     next_step_action: str
     sample_meta: RadarSampleMeta
+    conversation_id: str | None = Field(None, description="对话 ID，后续请求可传入以延续上下文")

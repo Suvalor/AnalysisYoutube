@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest tests/test_llm_conversation.py -v)",
+      "Bash(.venv/bin/python -m pytest tests/test_llm_conversation.py -v)",
+      "Bash(/Users/suycity/Code/Youtube/AnalysisYoutube/backend/.venv/bin/python -m pytest tests/test_llm_conversation.py -v)",
+      "Bash(python3 *)"
+    ]
+  }
+}

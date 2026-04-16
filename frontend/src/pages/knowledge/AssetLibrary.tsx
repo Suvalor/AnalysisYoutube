@@ -8,6 +8,7 @@ import {
   Input,
   Modal,
   Pagination,
+  Popconfirm,
   Row,
   Select,
   Space,
@@ -434,9 +435,15 @@ export default function AssetLibraryPage() {
                           <span>{formatBytes(asset.file_size)}</span>
                         </div>
                         <div className="flex justify-end pt-2">
-                          <Button danger size="small" onClick={() => void onDelete(asset.id)}>
-                            删除
-                          </Button>
+                          <Popconfirm
+                            title="确认删除"
+                            description="删除后无法恢复，确认继续？"
+                            onConfirm={() => void onDelete(asset.id)}
+                            okText="确认"
+                            cancelText="取消"
+                          >
+                            <Button danger size="small">删除</Button>
+                          </Popconfirm>
                         </div>
                       </div>
                     </Card>

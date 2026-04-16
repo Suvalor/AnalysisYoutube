@@ -183,7 +183,7 @@ async def analyze_channel_ai_insight(
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"AI 分析调用失败: {exc}",
+            detail="AI 分析调用失败，请稍后重试",
         ) from exc
 
     try:
@@ -191,7 +191,7 @@ async def analyze_channel_ai_insight(
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"AI 返回格式异常: {exc}；原始片段：{raw_content[:500]}",
+            detail="AI 返回格式异常，请重试或调整提示词",
         ) from exc
 
     return _parse_insight_result(parsed)
@@ -567,6 +567,7 @@ async def analyze_radar_retrospective(
     model_library_id: int,
     llm_model_name: str,
     agent_id: int,
+    conversation_history: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     dataset = await _build_radar_retrospective_dataset(
         session,
@@ -608,6 +609,13 @@ async def analyze_radar_retrospective(
         dataset=dataset,
         lookback_days=lookback_days,
     )
+
+    # 注入对话记忆：有历史则追加当前 user 消息到历史末尾
+    system_prompt_text = messages[0]["content"] if messages else ""
+    user_prompt_text = messages[1]["content"] if len(messages) > 1 else ""
+    if conversation_history:
+        messages = conversation_history + [{"role": "user", "content": user_prompt_text}]
+
     factory = LLMClientFactory()
     cfg = LLMClientConfig(api_key=api_key, base_url=normalize_openai_base_url(base_url), model_name=upstream_model)
 
@@ -618,14 +626,14 @@ async def analyze_radar_retrospective(
             messages=messages,
         )
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"AI 复盘调用失败: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="AI 复盘调用失败，请稍后重试") from exc
 
     try:
         parsed = _extract_json_object(raw_content)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"AI 返回格式异常: {exc}；原始片段：{raw_content[:500]}",
+            detail="AI 返回格式异常，请重试或调整提示词",
         ) from exc
 
     result = _parse_radar_retrospective_result(parsed)
@@ -636,4 +644,8 @@ async def analyze_radar_retrospective(
     }
     if not result["recommended_parameters"]["suggested_keywords"]:
         result["recommended_parameters"]["suggested_keywords"] = dataset.get("seed_keywords") or []
+    # 附加对话保存所需的原始内容
+    result["_system_prompt"] = system_prompt_text
+    result["_user_prompt"] = user_prompt_text
+    result["_assistant_content"] = raw_content
     return result

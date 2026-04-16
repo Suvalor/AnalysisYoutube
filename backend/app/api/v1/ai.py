@@ -6,6 +6,10 @@ from fastapi.responses import StreamingResponse
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.services.config_manager import resolve_integration_config
 from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig, normalize_openai_base_url
+from app.services.llm_conversation_service import (
+    load_conversation_messages,
+    save_conversation_turn,
+)
 from app.crud.library import get_by_user
 from app.models.library import PromptLibrary, StyleLibrary
 from app.schemas.library import GenerateScriptStreamRequest
@@ -53,20 +57,57 @@ async def generate_script_stream(
     )
     user_message = f"请以【{payload.topic}】为主题创作。"
 
+    # 对话记忆
+    entity_type = "ai_script"
+    entity_id = f"prompt:{payload.prompt_id}:style:{payload.style_id}"
+    history = await load_conversation_messages(
+        db,
+        user_id=current_user.id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+    )
+    if history:
+        messages = history + [{"role": "user", "content": user_message}]
+    else:
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ]
+
+    collected_deltas: list[str] = []
+
     async def event_generator() -> AsyncGenerator[str, None]:
         try:
             async for delta in factory.stream_chat_completions_deltas(
                 cfg=cfg,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
+                messages=messages,
                 temperature=0.7,
             ):
+                collected_deltas.append(delta)
                 yield _sse({"type": "delta", "content": delta})
-            yield _sse({"type": "done"})
+            yield _sse({"type": "done", "conversation_id": f"{entity_type}:{entity_id}"})
+            # 保存对话
+            assistant_content = "".join(collected_deltas)
+            try:
+                await save_conversation_turn(
+                    db,
+                    user_id=current_user.id,
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    user_content=user_message,
+                    assistant_content=assistant_content,
+                    system_content=system_prompt if not history else None,
+                    model_name=resolved_model,
+                )
+                await db.commit()
+            except Exception:  # noqa: BLE001
+                import logging as _logging
+                _logging.getLogger(__name__).exception("保存对话历史失败")
+                await db.rollback()
         except Exception as exc:  # noqa: BLE001
-            yield _sse({"type": "error", "message": str(exc)})
+            import logging as _logging
+            _logging.getLogger(__name__).exception("SSE generate-script-stream 异常")
+            yield _sse({"type": "error", "message": "AI 生成服务异常，请稍后重试"})
 
     return StreamingResponse(
         event_generator(),

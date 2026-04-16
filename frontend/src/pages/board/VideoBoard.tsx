@@ -8,6 +8,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
+import { message } from "antd";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useState } from "react";
@@ -145,6 +146,7 @@ export default function VideoBoard() {
     try {
       await moveTask(activeTask.id, targetStatus, targetIndex);
     } catch {
+      message.error("移动任务失败");
       await fetchTasks();
     }
   };
@@ -162,7 +164,7 @@ export default function VideoBoard() {
         }
       }
     } catch {
-      // noop
+      message.error("创建任务失败");
     }
   };
 

@@ -44,17 +44,17 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: 1440
       # 兼容本地开发：不同机器/配置可能导致前端 Origin 在 localhost/127.0.0.1、5173/5174 之间切换
       BACKEND_CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174
-      YOUTUBE_API_KEY: AIzaSyDvV1f8rkiO6VFHj33M5gU3h_dV_kAFKdM
-      VOLCENGINE_API_KEY: cb1ae748-a74f-48ef-b057-debfed45e2c4
-      VOLCENGINE_ENDPOINT_ID: doubao-seed-2.0-pro
-      VOLCENGINE_BASE_URL: https://ark.cn-beijing.volces.com/api/coding/v3
-      VOLCENGINE_MODEL_GEMINI: gemini-1.5-pro
-      ALIYUN_ACCESS_KEY_ID: LTAI5tLpJRy1E5eeUkg8csgm
-      ALIYUN_ACCESS_KEY_SECRET: mriIs1IwxIYqsdpSjpYXwYAlKNbeWe
-      ALIYUN_ROLE_ARN: acs:ram::1379506082945137:user/suvalor
-      ALIYUN_REGION_ID: cn-guangzhou
-      ALIYUN_OSS_BUCKET_NAME: savor-tool
-      ALIYUN_OSS_ENDPOINT: oss-cn-guangzhou.aliyuncs.com
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      VOLCENGINE_API_KEY: ${VOLCENGINE_API_KEY:-}
+      VOLCENGINE_ENDPOINT_ID: ${VOLCENGINE_ENDPOINT_ID:-doubao-seed-2.0-pro}
+      VOLCENGINE_BASE_URL: ${VOLCENGINE_BASE_URL:-https://ark.cn-beijing.volces.com/api/coding/v3}
+      VOLCENGINE_MODEL_GEMINI: ${VOLCENGINE_MODEL_GEMINI:-gemini-1.5-pro}
+      ALIYUN_ACCESS_KEY_ID: ${ALIYUN_ACCESS_KEY_ID:-}
+      ALIYUN_ACCESS_KEY_SECRET: ${ALIYUN_ACCESS_KEY_SECRET:-}
+      ALIYUN_ROLE_ARN: ${ALIYUN_ROLE_ARN:-}
+      ALIYUN_REGION_ID: ${ALIYUN_REGION_ID:-cn-guangzhou}
+      ALIYUN_OSS_BUCKET_NAME: ${ALIYUN_OSS_BUCKET_NAME:-}
+      ALIYUN_OSS_ENDPOINT: ${ALIYUN_OSS_ENDPOINT:-oss-cn-guangzhou.aliyuncs.com}
     ports:
       - "8000:8000"
     # 挂载本地 backend：容器内 Alembic/应用代码与仓库一致；宿主 entrypoint.sh 须可执行（chmod +x）

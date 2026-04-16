@@ -64,6 +64,10 @@ from app.schemas.sop import (
     SopShotUpdate,
 )
 from app.services.sop_ai_service import split_outline_markdown_with_ai_stream
+from app.services.llm_conversation_service import (
+    load_conversation_messages,
+    save_conversation_turn,
+)
 
 
 router = APIRouter()
@@ -257,6 +261,18 @@ async def ai_split_segments(
 
     icfg = await resolve_integration_config(db, org_id=current_user.org_id)
 
+    # 对话记忆
+    entity_type = "sop_split"
+    entity_id = f"outline:{hash(outline) & 0xFFFFFFFF}"
+    history = await load_conversation_messages(
+        db,
+        user_id=current_user.id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+    )
+
+    collected_deltas: list[str] = []
+
     async def event_generator():
         try:
             async for delta in split_outline_markdown_with_ai_stream(
@@ -268,12 +284,32 @@ async def ai_split_segments(
             ):
                 if not delta:
                     continue
+                collected_deltas.append(delta)
                 yield _sse({"type": "delta", "text": delta})
-            yield _sse({"type": "done"})
+            yield _sse({"type": "done", "conversation_id": f"{entity_type}:{entity_id}"})
+            # 保存对话
+            assistant_content = "".join(collected_deltas)
+            try:
+                await save_conversation_turn(
+                    db,
+                    user_id=current_user.id,
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    user_content=outline[:2000],
+                    assistant_content=assistant_content,
+                    model_name=selected_model,
+                )
+                await db.commit()
+            except Exception:  # noqa: BLE001
+                import logging as _logging
+                _logging.getLogger(__name__).exception("保存 SOP 拆解对话历史失败")
+                await db.rollback()
         except ValueError as exc:
             yield _sse({"type": "error", "message": str(exc)})
         except Exception as exc:  # noqa: BLE001
-            yield _sse({"type": "error", "message": f"AI 拆解失败: {exc}"})
+            import logging as _logging
+            _logging.getLogger(__name__).exception("AI 拆解失败")
+            yield _sse({"type": "error", "message": "AI 拆解服务异常，请稍后重试"})
 
     return StreamingResponse(
         event_generator(),
