@@ -14,6 +14,10 @@ from app.services.config_manager import resolve_integration_config
 from app.services.quota_service import record_api_quota_usage
 from app.services.youtube_service import blue_ocean_radar_scan
 from app.services.youtube_ai_service import analyze_radar_retrospective
+from app.services.llm_conversation_service import (
+    load_conversation_messages,
+    save_conversation_turn,
+)
 
 router = APIRouter()
 
@@ -64,6 +68,16 @@ async def radar_ai_retrospective(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> RadarAiRetrospectiveResponse:
+    # 加载对话记忆
+    entity_type = "radar_retro"
+    entity_id = body.conversation_id or f"lookback:{body.lookback_days}:top:{body.top_n}"
+    history = await load_conversation_messages(
+        db,
+        user_id=current_user.id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+    )
+
     result = await analyze_radar_retrospective(
         db,
         user_id=current_user.id,
@@ -73,5 +87,28 @@ async def radar_ai_retrospective(
         model_library_id=body.model_library_id,
         llm_model_name=body.llm_model_name,
         agent_id=body.agent_id,
+        conversation_history=history,
     )
-    return RadarAiRetrospectiveResponse.model_validate(result)
+
+    # 保存对话
+    if result.get("_user_prompt") and result.get("_assistant_content"):
+        try:
+            await save_conversation_turn(
+                db,
+                user_id=current_user.id,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                user_content=result["_user_prompt"],
+                assistant_content=result["_assistant_content"],
+                system_content=result.get("_system_prompt"),
+                model_name=body.llm_model_name,
+            )
+            await db.commit()
+        except Exception:  # noqa: BLE001
+            import logging as _logging
+            _logging.getLogger(__name__).exception("保存雷达复盘对话历史失败")
+            await db.rollback()
+
+    response_data = result.copy()
+    response_data["conversation_id"] = f"{entity_type}:{entity_id}"
+    return RadarAiRetrospectiveResponse.model_validate(response_data)

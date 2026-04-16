@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Card } from "antd";
+import { Card, message } from "antd";
 import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { getYouTubeQuotaDashboardApi } from "@/services/authApi";
@@ -13,7 +13,7 @@ export default function Dashboard() {
   } | null>(null);
 
   useEffect(() => {
-    getYouTubeQuotaDashboardApi().then(setQuotaData).catch(() => undefined);
+    getYouTubeQuotaDashboardApi().then(setQuotaData).catch(() => message.error("加载配额数据失败"));
   }, []);
 
   return (

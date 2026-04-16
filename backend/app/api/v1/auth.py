@@ -1,10 +1,11 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import DBSessionDep
 from app.core.config import settings
+from app.core.rate_limit import limiter
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.crud.user import create_user, get_user_by_email
 from app.schemas.auth import Token, UserCreate, UserLogin, UserRead
@@ -19,7 +20,9 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
     summary="用户注册",
 )
+@limiter.limit("5/minute")
 async def register(
+    request: Request,
     user_in: UserCreate,
     db: DBSessionDep,
 ) -> UserRead:

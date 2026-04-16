@@ -10,14 +10,14 @@ class Settings(BaseSettings):
     """全局配置，优先从环境变量读取。"""
 
     mysql_user: str = Field("root", alias="MYSQL_USER")
-    mysql_password: str = Field("password", alias="MYSQL_PASSWORD")
+    mysql_password: str = Field("", alias="MYSQL_PASSWORD")
     mysql_host: str = Field("127.0.0.1", alias="MYSQL_HOST")
     mysql_port: int = Field(3306, alias="MYSQL_PORT")
     mysql_db: str = Field("creator_saas", alias="MYSQL_DB")
 
     database_url: str | None = Field(None, alias="DATABASE_URL")
 
-    secret_key: str = Field("change_me", alias="SECRET_KEY")
+    secret_key: str = Field("", alias="SECRET_KEY")
     # 可选：与 JWT 分离的字段加密盐；未设置时回退使用 secret_key
     field_encryption_secret: str = Field("", alias="FIELD_ENCRYPTION_SECRET")
     algorithm: str = Field("HS256", alias="ALGORITHM")

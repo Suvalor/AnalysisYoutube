@@ -158,7 +158,7 @@ async def discover_channels_by_keyword(
     channels_list_calls = 0
 
     try:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
             resp = await client.get(
                 f"{YOUTUBE_API_BASE}/search",
                 params={
@@ -195,7 +195,7 @@ async def discover_channels_by_keyword(
         ordered_cids = list(channel_first_video.keys())
         channel_rows: dict[str, dict] = {}
 
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
             for group in chunked(ordered_cids, MAX_IDS_PER_REQUEST):
                 channels_list_calls += 1
                 resp = await client.get(
@@ -316,7 +316,7 @@ async def blue_ocean_radar_scan(
     channels_list_calls = 0
 
     try:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
             search_params: dict[str, str | int] = {
                 "part": "snippet",
                 "type": "video",
@@ -353,7 +353,7 @@ async def blue_ocean_radar_scan(
         video_ids = [p[0] for p in pairs]
         view_by_vid: dict[str, int] = {}
 
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
             for group in chunked(video_ids, MAX_IDS_PER_REQUEST):
                 videos_list_calls += 1
                 data = await _videos_get(client, video_ids=group, youtube_api_key=youtube_api_key)
@@ -512,7 +512,7 @@ async def fetch_channel_info(identifier: dict[str, str], *, youtube_api_key: str
     else:
         params["forHandle"] = identifier["handle"].lstrip("@")
 
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
         response = await client.get(f"{YOUTUBE_API_BASE}/channels", params=params)
 
     if response.status_code != 200:
@@ -600,7 +600,7 @@ async def fetch_recent_videos(
     limit = max(1, min(limit, 50))
     quota = FetchRecentVideosQuota()
 
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
         data = await _channels_get(
             client,
             params={
@@ -670,7 +670,7 @@ async def fetch_channels_by_ids(
         return [] if not return_call_count else ([], 0)
 
     _require_api_key(youtube_api_key)
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
         all_items: list[dict] = []
         call_count = 0
         for group in chunked(channel_ids, MAX_IDS_PER_REQUEST):
@@ -867,7 +867,7 @@ async def run_bulk_analyze_pipeline(urls: str, *, youtube_api_key: str) -> BulkA
         result.errors.append("未解析到任何有效的频道链接（需要 youtube.com/channel/UC… 或 youtube.com/@handle）")
         return result
 
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
         if handles:
             mapping, herr = await resolve_handles_to_channel_ids(
                 client, list(handles), youtube_api_key=youtube_api_key
@@ -907,7 +907,7 @@ async def run_refresh_pipeline_for_youtube_channel_ids(
     if not unique:
         return result
 
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
         inner = await _pipeline_fetch_channels_and_videos(client, unique, youtube_api_key=youtube_api_key)
         result.channel_items = inner.channel_items
         result.video_items = inner.video_items
@@ -999,7 +999,7 @@ async def fetch_comment_threads_with_search(
     page_token: str | None = None
     api_calls = 0
 
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
         while len(collected) < max_total:
             batch = min(100, max_total - len(collected))
             params: dict = {

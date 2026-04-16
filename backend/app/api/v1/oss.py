@@ -43,9 +43,11 @@ async def get_sts_token(db: DBSessionDep, current_user: CurrentUserDep) -> dict:
     try:
         resp = client.assume_role(req)
     except TeaClientException as exc:
+        import logging as _logging
+        _logging.getLogger(__name__).warning("阿里云 STS 调用失败: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"阿里云 STS 调用失败: {exc}",
+            detail="阿里云 STS 调用失败，请检查配置或稍后重试",
         )
     cred = resp.body.credentials
     if cred is None:

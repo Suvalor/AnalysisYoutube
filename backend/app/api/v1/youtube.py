@@ -75,6 +75,10 @@ from app.services.youtube_service import (
 )
 from app.services.quota_service import record_api_quota_usage, record_bulk_pipeline_quota
 from app.services.config_manager import resolve_integration_config
+from app.services.llm_conversation_service import (
+    load_conversation_messages,
+    save_conversation_turn,
+)
 
 
 router = APIRouter()
@@ -686,13 +690,30 @@ async def analyze_channel_ai(
         raise
     except Exception as exc:  # noqa: BLE001
         await db.rollback()
+        logger.exception("AI 分析失败 channel_id=%s", channel_id)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"AI 分析失败: {exc}",
+            detail="AI 分析服务异常，请稍后重试",
         ) from exc
 
     await db.commit()
     await db.refresh(channel)
+
+    # 保存对话记忆：频道 AI 分析结果
+    try:
+        await save_conversation_turn(
+            db,
+            user_id=current_user.id,
+            entity_type="channel_ai",
+            entity_id=str(channel_id),
+            user_content=f"分析频道：{channel.title or channel.yt_channel_id}",
+            assistant_content=str(result),
+            model_name=result.get("llm_model_name"),
+        )
+        await db.commit()
+    except Exception:  # noqa: BLE001
+        logger.exception("保存频道 AI 分析对话历史失败 channel_id=%s", channel_id)
+        await db.rollback()
 
     return YouTubeChannelAIAnalyzeResponse(
         tags=result["tags"],
@@ -862,7 +883,8 @@ async def youtube_oauth_callback(
             },
         )
         if token_resp.status_code >= 400:
-            raise HTTPException(status_code=400, detail=f"OAuth token 兑换失败: {token_resp.text}")
+            logger.warning("OAuth token 兑换失败 status=%s", token_resp.status_code)
+            raise HTTPException(status_code=400, detail="OAuth token 兑换失败，请重新授权")
         token_data = token_resp.json()
         access_token = str(token_data.get("access_token") or "").strip()
         refresh_token = str(token_data.get("refresh_token") or "").strip()

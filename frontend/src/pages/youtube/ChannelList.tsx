@@ -1,4 +1,4 @@
-import { Alert, Button, Form, Input, InputNumber, Modal, Popover, Select, Spin, Table, Tag, Typography, message } from "antd";
+import { Alert, Button, Form, Input, InputNumber, Modal, Popconfirm, Popover, Select, Spin, Table, Tag, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -418,18 +418,21 @@ export default function ChannelList() {
       title: "操作",
       key: "op",
       render: (_, r) => (
-        <Button
-          size="small"
-          danger
-          onClick={async (e) => {
-            e.stopPropagation();
+        <Popconfirm
+          title="确认移除"
+          description="移除后需重新添加才能恢复，确认继续？"
+          onConfirm={async () => {
             await deleteYouTubeChannelApi(r.pool_id);
             message.success("已移除");
             await load();
           }}
+          okText="确认"
+          cancelText="取消"
         >
-          移除
-        </Button>
+          <Button size="small" danger onClick={(e) => e.stopPropagation()}>
+            移除
+          </Button>
+        </Popconfirm>
       ),
     },
   ];
