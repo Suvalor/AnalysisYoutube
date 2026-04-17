@@ -51,7 +51,7 @@ async def sync_channels_daily_stats() -> None:
                 logger.exception("定时任务：组织 org_id=%s 调用 YouTube API 失败", oid)
                 continue
 
-            await record_api_quota_usage(session, "channels", times=calls)
+            await record_api_quota_usage(session, "channels", times=calls, part_count=2)
 
             for item in api_items:
                 yt_channel_id = item.get("id")

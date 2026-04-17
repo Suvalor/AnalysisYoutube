@@ -13,10 +13,16 @@ from app.schemas.radar import (
     CrossRegionCompareResponse,
     ExportReportRequest,
     ExportReportResponse,
+    NavigationGuideResponse,
+    NavigationQuotaUsage,
+    NicheRecommendation,
+    AvoidNiche,
+    QuotaCheckInfo,
     RadarAiRetrospectiveRequest,
     RadarAiRetrospectiveResponse,
     NavigationGuideRequest,
-    NavigationGuideResponse,
+    NavigationChatRequest,
+    NavigationChatResponse,
 )
 from app.schemas.radar_param_iteration import (
     RadarParamIterationCreate,
@@ -32,7 +38,8 @@ from app.services.quota_service import record_api_quota_usage
 from app.services.youtube_service import blue_ocean_radar_scan, category_opportunity_scan, cross_region_compare
 from app.services.youtube_ai_service import analyze_radar_retrospective
 from app.services.radar_report_service import generate_radar_report
-from app.services.radar_navigation_service import navigation_guide
+from app.services.radar_navigation_service import navigation_guide, navigation_chat
+from app.services.quota_guard_service import check_quota_before_navigation
 from app.services.radar_param_iteration_service import (
     create_iteration,
     get_latest_iteration,
@@ -76,9 +83,9 @@ async def blue_ocean_scan(
     if result.search_calls > 0:
         await record_api_quota_usage(db, "search", times=result.search_calls)
     if result.videos_list_calls > 0:
-        await record_api_quota_usage(db, "videos", times=result.videos_list_calls)
+        await record_api_quota_usage(db, "videos", times=result.videos_list_calls, part_count=2)
     if result.channels_list_calls > 0:
-        await record_api_quota_usage(db, "channels", times=result.channels_list_calls)
+        await record_api_quota_usage(db, "channels", times=result.channels_list_calls, part_count=2)
     await db.commit()
 
     items = [BlueOceanChannelItem.model_validate(x) for x in result.items]
@@ -188,8 +195,8 @@ async def category_opportunity(
     )
     # 配额：1 search + N videos + M channels（估算：search=1, videos=1, channels=1）
     await record_api_quota_usage(db, "search", times=1)
-    await record_api_quota_usage(db, "videos", times=1)
-    await record_api_quota_usage(db, "channels", times=1)
+    await record_api_quota_usage(db, "videos", times=1, part_count=2)
+    await record_api_quota_usage(db, "channels", times=1, part_count=2)
     await db.commit()
     return CategoryOpportunityResponse(
         keyword=body.keyword,
@@ -256,9 +263,27 @@ async def navigation_guide_endpoint(
     current_user: CurrentUserDep,
 ) -> NavigationGuideResponse:
     """
-    输入自身资源（语言能力、内容形式、预算），推荐最适合的品类+地区组合，
-    并给出 Top5 频道的内容策略拆解。
+    出海导航：基于用户完整资源画像（语言+形式+预算+核心技能+变现目标），
+    LLM 深度推荐细分品类，YouTube API 补充市场数据。
     """
+    from fastapi import HTTPException, status
+
+    # ── 配额前置检查 ──
+    quota_check = await check_quota_before_navigation(
+        db, estimated_search_calls=6, estimated_channel_calls=6,
+    )
+    if not quota_check.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "message": "YouTube API 配额不足，无法执行导航",
+                "remaining": quota_check.remaining,
+                "estimated_cost": quota_check.estimated_cost,
+                "today_used": quota_check.today_used,
+                "today_total": quota_check.today_total,
+            },
+        )
+
     icfg = await resolve_integration_config(db, org_id=current_user.org_id)
     result = await navigation_guide(
         db=db,
@@ -267,12 +292,91 @@ async def navigation_guide_endpoint(
         languages=body.languages,
         content_format=body.content_format,
         budget_level=body.budget_level,
+        core_skills=body.core_skills,
+        monetization_goal=body.monetization_goal,
+        existing_channel_url=body.existing_channel_url,
+        target_regions=body.target_regions,
+        weekly_hours=body.weekly_hours,
         youtube_api_key=icfg.youtube_api_key,
         model_library_id=body.model_library_id,
         llm_model_name=body.llm_model_name,
         agent_id=body.agent_id,
     )
-    return NavigationGuideResponse.model_validate(result)
+
+    # ── 记录 API 配额消耗 ──
+    quota_usage = result.get("quota_usage", {})
+    search_calls = quota_usage.get("search_calls", 0)
+    channels_calls = quota_usage.get("channels_calls", 0)
+    if search_calls > 0:
+        await record_api_quota_usage(db, "search", times=search_calls)
+    if channels_calls > 0:
+        await record_api_quota_usage(db, "channels", times=channels_calls, part_count=2)
+    await db.commit()
+
+    # 重新获取最新配额状态
+    quota_check_after = await check_quota_before_navigation(
+        db, estimated_search_calls=0, estimated_channel_calls=0,
+    )
+
+    # ── 构建响应 ──
+    recommendations = [
+        NicheRecommendation.model_validate(r) for r in result.get("recommendations", [])
+    ]
+    avoid_niche_data = result.get("avoid_niche")
+    avoid_niche = AvoidNiche.model_validate(avoid_niche_data) if avoid_niche_data else None
+
+    # 生成对话 ID 供多轮追问使用
+    import uuid
+    conversation_id = f"nav_guide:{current_user.id}:{uuid.uuid4().hex[:8]}"
+
+    return NavigationGuideResponse(
+        recommendations=recommendations,
+        avoid_niche=avoid_niche,
+        ai_summary=result.get("ai_summary"),
+        quota_usage=NavigationQuotaUsage(
+            search_calls=search_calls,
+            channels_calls=channels_calls,
+            total_points=search_calls * 100 + channels_calls * 1,
+        ),
+        quota_check=QuotaCheckInfo(
+            allowed=quota_check_after.remaining > 0,
+            remaining=quota_check_after.remaining,
+            estimated_cost=0,
+            today_used=quota_check_after.today_used,
+            today_total=quota_check_after.today_total,
+        ),
+        conversation_id=conversation_id,
+        channel_info=result.get("channel_info"),
+    )
+
+
+@router.post(
+    "/navigation-chat",
+    response_model=NavigationChatResponse,
+    summary="出海导航追问",
+)
+async def navigation_chat_endpoint(
+    body: NavigationChatRequest,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> NavigationChatResponse:
+    """
+    出海导航多轮对话：用户对推荐结果追问，AI 基于上下文继续分析。
+    """
+    result = await navigation_chat(
+        db=db,
+        user_id=current_user.id,
+        org_id=current_user.org_id,
+        conversation_id=body.conversation_id,
+        user_message=body.user_message,
+        model_library_id=body.model_library_id,
+        llm_model_name=body.llm_model_name,
+        agent_id=body.agent_id,
+    )
+    return NavigationChatResponse(
+        assistant_message=result["assistant_message"],
+        conversation_id=result["conversation_id"],
+    )
 
 
 # ── 参数迭代 API ──

@@ -36,7 +36,7 @@ async def discover_channels(
     if result.search_calls > 0:
         await record_api_quota_usage(db, "search", times=result.search_calls)
     if result.channels_list_calls > 0:
-        await record_api_quota_usage(db, "channels", times=result.channels_list_calls)
+        await record_api_quota_usage(db, "channels", times=result.channels_list_calls, part_count=2)
     await db.commit()
 
     items = [DiscoverChannelItem.model_validate(x) for x in result.items]

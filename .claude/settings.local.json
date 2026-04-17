@@ -14,7 +14,9 @@
       "Bash(.venv/bin/python -m pytest tests/test_radar_param_iteration.py -v --tb=short)",
       "Bash(/Users/suycity/Code/Youtube/AnalysisYoutube/backend/.venv/bin/python -m pytest tests/test_radar_param_iteration.py -v --tb=short)",
       "Bash(.venv/bin/pip install *)",
-      "Bash(.venv/bin/python -c \"import app; print\\('ok'\\)\")"
+      "Bash(.venv/bin/python -c \"import app; print\\('ok'\\)\")",
+      "WebFetch(domain:developers.google.com)",
+      "WebSearch"
     ]
   }
 }
