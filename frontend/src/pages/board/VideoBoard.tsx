@@ -8,11 +8,15 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { message } from "antd";
+import { Button, Card, message, Select, Spin, Typography } from "antd";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useState } from "react";
 import { useBoardStore } from "@/store/useBoardStore";
+import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
+import apiClient from "@/services/apiClient";
+
+const { Text, Paragraph } = Typography;
 
 type BoardTask = {
   id: number;
@@ -99,6 +103,33 @@ export default function VideoBoard() {
   const [creatingForStatus, setCreatingForStatus] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  // AI 建议
+  const [aiSuggestion, setAiSuggestion] = useState<Record<string, string> | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [modelOptions, setModelOptions] = useState<ModelItem[]>([]);
+  const [agentOptions, setAgentOptions] = useState<PromptItem[]>([]);
+  const [selectedModelLibId, setSelectedModelLibId] = useState<number | undefined>(undefined);
+  const [selectedLlmModelName, setSelectedLlmModelName] = useState<string>("");
+  const [selectedAgentId, setSelectedAgentId] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    const loadConfigs = async () => {
+      try {
+        const [models, prompts] = await Promise.all([listModelsApi(), listPromptsApi()]);
+        const chatModels = models.filter((m) => (m.library_kind ?? "chat") === "chat");
+        setModelOptions(chatModels);
+        setAgentOptions(prompts);
+        if (chatModels.length > 0) {
+          setSelectedModelLibId(chatModels[0].id);
+          const first = chatModels[0];
+          const name = ((first.supported_models_json || "").match(/"value"\s*:\s*"([^"]+)"/)?.[1] ?? "").trim();
+          setSelectedLlmModelName(name);
+        }
+        if (prompts.length > 0) setSelectedAgentId(prompts[0].id);
+      } catch { /* 静默 */ }
+    };
+    void loadConfigs();
+  }, []);
 
   useEffect(() => {
     void fetchTasks();
@@ -168,8 +199,70 @@ export default function VideoBoard() {
     }
   };
 
+  const onAiSuggest = async () => {
+    if (!selectedModelLibId || !selectedLlmModelName) {
+      message.warning("请先选择 AI 模型配置");
+      return;
+    }
+    setAiLoading(true);
+    setAiSuggestion(null);
+    try {
+      const res = await apiClient.post("/api/video-projects/ai-suggest", {
+        model_library_id: selectedModelLibId,
+        llm_model_name: selectedLlmModelName,
+        agent_id: selectedAgentId,
+      });
+      setAiSuggestion(res.data.suggestion);
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail ?? "AI 策略建议失败");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <div className="p-6 md:p-8">
+      {/* AI 策略建议区域 */}
+      <Card className="!bg-white !border-slate-200 !shadow-sm mb-6" title="AI 内容策略建议">
+        <div className="flex items-center gap-3 flex-wrap mb-3">
+          <Select
+            style={{ width: 200 }}
+            placeholder="AI 模型配置"
+            value={selectedModelLibId}
+            onChange={(v) => {
+              setSelectedModelLibId(v);
+              const target = modelOptions.find((m) => m.id === v);
+              if (target) {
+                const name = ((target.supported_models_json || "").match(/"value"\s*:\s*"([^"]+)"/)?.[1] ?? "").trim();
+                setSelectedLlmModelName(name);
+              }
+            }}
+            options={modelOptions.map((m) => ({ value: m.id, label: m.name }))}
+            allowClear
+          />
+          <Select
+            style={{ width: 200 }}
+            placeholder="AI 智能体"
+            value={selectedAgentId}
+            onChange={setSelectedAgentId}
+            options={agentOptions.map((p) => ({ value: p.id, label: p.title }))}
+            allowClear
+          />
+          <Button type="primary" loading={aiLoading} onClick={onAiSuggest}>
+            生成策略建议
+          </Button>
+        </div>
+        {aiLoading && <div className="flex justify-center py-4"><Spin tip="AI 正在分析…" /></div>}
+        {aiSuggestion && (
+          <div className="space-y-3">
+            {aiSuggestion.content_gaps && <div><Text strong>内容缺口</Text><Paragraph className="!mb-0">{aiSuggestion.content_gaps}</Paragraph></div>}
+            {aiSuggestion.publishing_strategy && <div><Text strong>发布策略</Text><Paragraph className="!mb-0">{aiSuggestion.publishing_strategy}</Paragraph></div>}
+            {aiSuggestion.improvement_suggestions && <div><Text strong>改进建议</Text><Paragraph className="!mb-0">{aiSuggestion.improvement_suggestions}</Paragraph></div>}
+            {aiSuggestion.trend_opportunities && <div><Text strong>趋势机会</Text><Paragraph className="!mb-0">{aiSuggestion.trend_opportunities}</Paragraph></div>}
+          </div>
+        )}
+      </Card>
+
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-2">
           {(columns as any[]).map((col) => (

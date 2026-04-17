@@ -9,14 +9,15 @@ import {
   Typography,
   message,
 } from "antd";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
+  analyzeYouTubeBatchApi,
+  listYouTubeChannelsApi,
   navigationGuideApi,
   type CategoryRecommendation,
   type ChannelStrategyBreakdown,
 } from "@/services/authApi";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
-import { useEffect } from "react";
 
 const { Title, Text } = Typography;
 
@@ -51,10 +52,31 @@ function fitScoreColor(score: number): string {
   return "red";
 }
 
-function ChannelBreakdownCard({ channel }: { channel: ChannelStrategyBreakdown }) {
+function ChannelBreakdownCard({
+  channel,
+  followed,
+  following,
+  onFollow,
+}: {
+  channel: ChannelStrategyBreakdown;
+  followed: boolean;
+  following: boolean;
+  onFollow: (ch: ChannelStrategyBreakdown) => void;
+}) {
   return (
     <div className="border border-slate-200 rounded-lg p-3 space-y-1">
-      <div className="font-medium text-slate-900">{channel.title}</div>
+      <div className="flex items-center justify-between">
+        <div className="font-medium text-slate-900">{channel.title}</div>
+        <Button
+          type="primary"
+          size="small"
+          disabled={followed || following}
+          loading={following}
+          onClick={() => onFollow(channel)}
+        >
+          {followed ? "已关注" : "关注"}
+        </Button>
+      </div>
       <div className="text-xs text-slate-500">订阅 {channel.subscriber_count.toLocaleString()}</div>
       <div className="grid grid-cols-2 gap-1 text-xs text-slate-600">
         <span>发布频率：{channel.publish_frequency}</span>
@@ -66,7 +88,19 @@ function ChannelBreakdownCard({ channel }: { channel: ChannelStrategyBreakdown }
   );
 }
 
-function RecommendationCard({ rec, index }: { rec: CategoryRecommendation; index: number }) {
+function RecommendationCard({
+  rec,
+  index,
+  followedIds,
+  followingId,
+  onFollow,
+}: {
+  rec: CategoryRecommendation;
+  index: number;
+  followedIds: Set<string>;
+  followingId: string | null;
+  onFollow: (ch: ChannelStrategyBreakdown) => void;
+}) {
   return (
     <Card
       className="!border-slate-200 !shadow-sm"
@@ -85,7 +119,13 @@ function RecommendationCard({ rec, index }: { rec: CategoryRecommendation; index
           <Text strong className="block mb-2">Top 频道策略拆解</Text>
           <div className="space-y-2">
             {rec.top_channels.map((ch) => (
-              <ChannelBreakdownCard key={ch.channel_id} channel={ch} />
+              <ChannelBreakdownCard
+                key={ch.channel_id}
+                channel={ch}
+                followed={followedIds.has(ch.channel_id)}
+                following={followingId === ch.channel_id}
+                onFollow={onFollow}
+              />
             ))}
           </div>
         </div>
@@ -101,6 +141,35 @@ export default function NavigationGuide() {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [modelOptions, setModelOptions] = useState<ModelItem[]>([]);
   const [agentOptions, setAgentOptions] = useState<PromptItem[]>([]);
+  // 关注状态：已入库的频道ID集合 + 正在关注中的频道ID
+  const [followedIds, setFollowedIds] = useState<Set<string>>(() => new Set());
+  const [followingId, setFollowingId] = useState<string | null>(null);
+
+  // 加载已关注频道列表，用于判断推荐频道是否已入库
+  const loadFollowedChannels = useCallback(async () => {
+    try {
+      const channels = await listYouTubeChannelsApi();
+      const ytIds = new Set(channels.map((c: any) => c.channel?.yt_channel_id).filter(Boolean));
+      setFollowedIds(ytIds);
+    } catch {
+      // 静默失败，不影响主流程
+    }
+  }, []);
+
+  // 关注推荐频道
+  const onFollowChannel = useCallback(async (ch: ChannelStrategyBreakdown) => {
+    setFollowingId(ch.channel_id);
+    try {
+      await analyzeYouTubeBatchApi({ urls: ch.channel_id, group_name: "出海导航" });
+      setFollowedIds((prev) => new Set([...prev, ch.channel_id]));
+      message.success(`已关注 ${ch.title}`);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      message.error(err?.response?.data?.detail ?? "关注失败");
+    } finally {
+      setFollowingId(null);
+    }
+  }, []);
 
   useEffect(() => {
     const loadConfigs = async () => {
@@ -114,7 +183,8 @@ export default function NavigationGuide() {
       }
     };
     void loadConfigs();
-  }, []);
+    void loadFollowedChannels();
+  }, [loadFollowedChannels]);
 
   const onSubmit = async () => {
     try {
@@ -229,7 +299,14 @@ export default function NavigationGuide() {
           <div className="space-y-4">
             <Title level={4} style={{ color: "#0f172a" }}>推荐结果</Title>
             {recommendations.map((rec, i) => (
-              <RecommendationCard key={`${rec.category}-${rec.region}`} rec={rec} index={i} />
+              <RecommendationCard
+                key={`${rec.category}-${rec.region}`}
+                rec={rec}
+                index={i}
+                followedIds={followedIds}
+                followingId={followingId}
+                onFollow={onFollowChannel}
+              />
             ))}
           </div>
         )}

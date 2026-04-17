@@ -1,6 +1,6 @@
 """蓝海雷达 API（仅查询 YouTube，不落库）。"""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.schemas.radar import (
@@ -18,12 +18,29 @@ from app.schemas.radar import (
     NavigationGuideRequest,
     NavigationGuideResponse,
 )
+from app.schemas.radar_param_iteration import (
+    RadarParamIterationCreate,
+    RadarParamIterationItem,
+    RadarParamIterationListResponse,
+    RadarParamLatestResponse,
+    RadarParamApplyResponse,
+    AutoRetroRequest,
+    AutoRetroResponse,
+)
 from app.services.config_manager import resolve_integration_config
 from app.services.quota_service import record_api_quota_usage
 from app.services.youtube_service import blue_ocean_radar_scan, category_opportunity_scan, cross_region_compare
 from app.services.youtube_ai_service import analyze_radar_retrospective
 from app.services.radar_report_service import generate_radar_report
 from app.services.radar_navigation_service import navigation_guide
+from app.services.radar_param_iteration_service import (
+    create_iteration,
+    get_latest_iteration,
+    get_latest_recommended_params,
+    list_iterations,
+    apply_iteration,
+    auto_retrospective_for_user,
+)
 from app.services.llm_conversation_service import (
     load_conversation_messages,
     save_conversation_turn,
@@ -121,6 +138,30 @@ async def radar_ai_retrospective(
 
     response_data = result.copy()
     response_data["conversation_id"] = f"{entity_type}:{entity_id}"
+
+    # 自动持久化参数迭代记录
+    try:
+        from app.services.radar_param_iteration_service import create_iteration
+        await create_iteration(
+            db,
+            user_id=current_user.id,
+            org_id=current_user.org_id,
+            scan_params={
+                "max_subscribers": body.lookback_days,
+                "lookback_days": body.lookback_days,
+                "top_n": body.top_n,
+            },
+            recommended_params=result.get("recommended_parameters"),
+            scan_result_summary={
+                "analysis_summary": result.get("analysis_summary", ""),
+                "sample_meta": result.get("sample_meta", {}),
+            },
+            iteration_type="manual",
+        )
+    except Exception:  # noqa: BLE001
+        import logging as _logging2
+        _logging2.getLogger(__name__).exception("自动保存参数迭代记录失败，不影响复盘结果")
+
     return RadarAiRetrospectiveResponse.model_validate(response_data)
 
 
@@ -232,3 +273,125 @@ async def navigation_guide_endpoint(
         agent_id=body.agent_id,
     )
     return NavigationGuideResponse.model_validate(result)
+
+
+# ── 参数迭代 API ──
+
+
+@router.get(
+    "/param-iterations/latest",
+    response_model=RadarParamLatestResponse,
+    summary="获取最新推荐参数",
+)
+async def get_latest_params(
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> RadarParamLatestResponse:
+    """获取当前用户最新的 AI 推荐参数，用于扫描页面自动回填。"""
+    from sqlalchemy import select, func as sa_func
+    from app.models.radar_param_iteration import RadarParamIteration
+
+    latest = await get_latest_iteration(db, user_id=current_user.id)
+    count_q = select(sa_func.count()).select_from(RadarParamIteration).where(
+        RadarParamIteration.user_id == current_user.id
+    )
+    total = (await db.execute(count_q)).scalar() or 0
+
+    return RadarParamLatestResponse(
+        recommended_params=latest.recommended_params if latest else None,
+        iteration_count=total,
+        last_iteration_at=latest.created_at if latest else None,
+    )
+
+
+@router.post(
+    "/param-iterations",
+    response_model=RadarParamIterationItem,
+    summary="保存迭代记录",
+)
+async def save_iteration(
+    body: RadarParamIterationCreate,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> RadarParamIterationItem:
+    """手动保存一次参数迭代记录。"""
+    row = await create_iteration(
+        db,
+        user_id=current_user.id,
+        org_id=current_user.org_id,
+        scan_params=body.scan_params,
+        recommended_params=body.recommended_params,
+        scan_result_summary=body.scan_result_summary,
+        iteration_type=body.iteration_type,
+    )
+    await db.commit()
+    await db.refresh(row)
+    return RadarParamIterationItem.model_validate(row)
+
+
+@router.get(
+    "/param-iterations",
+    response_model=RadarParamIterationListResponse,
+    summary="查询迭代历史",
+)
+async def list_iteration_history(
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> RadarParamIterationListResponse:
+    """分页查询参数迭代历史记录。"""
+    rows, total = await list_iterations(db, user_id=current_user.id, limit=limit, offset=offset)
+    return RadarParamIterationListResponse(
+        items=[RadarParamIterationItem.model_validate(r) for r in rows],
+        total=total,
+    )
+
+
+@router.post(
+    "/param-iterations/apply/{iteration_id}",
+    response_model=RadarParamApplyResponse,
+    summary="应用迭代参数",
+)
+async def apply_iteration_params(
+    iteration_id: int,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> RadarParamApplyResponse:
+    """标记某次迭代参数为已应用，下次扫描将自动回填。"""
+    changed = await apply_iteration(db, user_id=current_user.id, iteration_id=iteration_id)
+    await db.commit()
+    return RadarParamApplyResponse(
+        success=True,
+        message="参数已应用" if changed else "参数已处于应用状态",
+    )
+
+
+@router.post(
+    "/param-iterations/auto-retro",
+    response_model=AutoRetroResponse,
+    summary="手动触发自动复盘",
+)
+async def trigger_auto_retrospective(
+    body: AutoRetroRequest,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> AutoRetroResponse:
+    """手动触发一次自动复盘，AI 分析历史数据并推荐下一轮参数。"""
+    row = await auto_retrospective_for_user(
+        db,
+        user_id=current_user.id,
+        org_id=current_user.org_id,
+    )
+    if not row:
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="自动复盘失败：请检查是否有足够的扫描数据，以及 LLM 配置是否完整",
+        )
+    await db.commit()
+    return AutoRetroResponse(
+        iteration_id=row.id,
+        recommended_params=row.recommended_params or {},
+        analysis_summary=(row.scan_result_summary or {}).get("analysis_summary", ""),
+    )

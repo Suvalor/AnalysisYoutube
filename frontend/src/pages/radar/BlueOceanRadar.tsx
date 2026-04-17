@@ -198,6 +198,22 @@ export default function BlueOceanRadar() {
       }
     };
     void loadAiConfigs();
+
+    // 自动加载最新推荐参数回填到扫描表单
+    const loadLatestParams = async () => {
+      try {
+        const { getLatestParamIterationApi } = await import("@/services/authApi");
+        const res = await getLatestParamIterationApi();
+        if (res.recommended_params) {
+          const p = res.recommended_params;
+          if (p.max_subscribers != null) form.setFieldValue("max_subscribers", Number(p.max_subscribers));
+          if (p.outlier_multiplier != null) form.setFieldValue("outlier_multiplier", Number(p.outlier_multiplier));
+        }
+      } catch {
+        // 静默失败，使用默认参数
+      }
+    };
+    void loadLatestParams();
   }, []);
 
   const openAiDrawer = async () => {
