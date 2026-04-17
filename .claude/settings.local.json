@@ -6,7 +6,8 @@
       "Bash(/Users/suycity/Code/Youtube/AnalysisYoutube/backend/.venv/bin/python -m pytest tests/test_llm_conversation.py -v)",
       "Bash(python3 *)",
       "Bash(npx tsc *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(git *)"
     ]
   }
 }

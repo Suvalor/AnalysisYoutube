@@ -278,8 +278,25 @@ export default function BlueOceanRadar() {
       const data = await exportReportApi({ scan_items: items, keyword: form.getFieldValue("keyword") });
       const win = window.open("", "_blank");
       if (win) {
-        win.document.write(`<html><head><title>蓝海雷达报告</title><style>body{font-family:system-ui;max-width:900px;margin:0 auto;padding:24px;color:#1e293b}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e2e8f0;padding:8px;text-align:left}th{background:#f1f5f9}</style></head><body>`);
-        win.document.write(data.markdown_content.replace(/\n/g, "<br>"));
+        // 简易 Markdown → HTML 转换（标题、表格、粗体、列表、分隔线）
+        const md = data.markdown_content;
+        const html = md
+          .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+          .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+          .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+          .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+          .replace(/^---$/gm, "<hr>")
+          .replace(/^- (.+)$/gm, "<li>$1</li>")
+          .replace(/^\|(.+)\|$/gm, (match) => {
+            const cells = match.split("|").filter((c) => c.trim() !== "");
+            const isHeader = cells.every((c) => /^[\s-]+$/.test(c));
+            if (isHeader) return "";
+            const tag = "td";
+            return "<tr>" + cells.map((c) => `<${tag}>${c.trim()}</${tag}>`).join("") + "</tr>";
+          })
+          .replace(/\n/g, "<br>");
+        win.document.write(`<html><head><title>蓝海雷达报告</title><style>body{font-family:system-ui;max-width:900px;margin:0 auto;padding:24px;color:#1e293b}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e2e8f0;padding:8px;text-align:left}th{background:#f1f5f9}h1{color:#0f172a}h2{color:#1e293b;border-bottom:1px solid #e2e8f0;padding-bottom:8px}hr{border:none;border-top:1px solid #e2e8f0;margin:16px 0}li{margin:4px 0}</style></head><body>`);
+        win.document.write(html);
         win.document.write("</body></html>");
         win.document.close();
       }

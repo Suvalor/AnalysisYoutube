@@ -275,26 +275,29 @@ async def _generate_ai_summary(
 ) -> str | None:
     """可选：调用 LLM 生成出海导航总结。"""
     try:
-        from app.services.youtube_ai_service import _call_llm
+        from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig
         from app.services.config_manager import resolve_integration_config
+        from app.crud.model_library import get_model_library
 
+        ml = await get_model_library(db, id=model_library_id)
+        if not ml:
+            return None
         icfg = await resolve_integration_config(db, org_id=org_id)
+        cfg = LLMClientConfig(
+            api_key=icfg.volcengine_api_key,
+            base_url=ml.base_url or "",
+            model_name=llm_model_name,
+        )
+        factory = LLMClientFactory()
         prompt = (
             f"用户语言能力：{', '.join(languages)}\n"
             f"预算水平：{budget_level}\n"
             f"推荐结果：{recommendations[:5]}\n\n"
             "请用中文总结：1) 最推荐的品类和地区 2) 需要注意的风险 3) 下一步行动建议"
         )
-        result = await _call_llm(
-            db=db,
-            user_id=user_id,
-            org_id=org_id,
-            prompt=prompt,
-            model_library_id=model_library_id,
-            llm_model_name=llm_model_name,
-            agent_id=agent_id,
-        )
-        return result
+        messages = [{"role": "user", "content": prompt}]
+        result = await factory.chat_completions_content(cfg=cfg, messages=messages)
+        return result or None
     except Exception:
         logger.warning("出海导航 AI 总结生成失败", exc_info=True)
         return None
