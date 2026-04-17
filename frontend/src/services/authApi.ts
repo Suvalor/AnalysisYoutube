@@ -396,29 +396,118 @@ export type ChannelStrategyBreakdown = {
   tag_pattern: string;
 };
 
+export type MarketHeat = {
+  stars: number;
+  growth_rate: string;
+};
+
+export type CompetitionIntensity = {
+  stars: number;
+  success_rate: string;
+};
+
+export type BenchmarkChannel = {
+  title: string;
+  subscribers: number;
+  monthly_growth: string;
+};
+
 export type CategoryRecommendation = {
   category: string;
   region: string;
   fit_score: number;
   reason: string;
   top_channels: ChannelStrategyBreakdown[];
+  market_heat?: MarketHeat | null;
+  competition_intensity?: CompetitionIntensity | null;
+  content_gap?: string | null;
+  benchmark_channel?: BenchmarkChannel | null;
+  cold_start_period?: string | null;
+  is_avoid?: boolean;
+  cr4?: number | null;
+};
+
+export type NavigationQuotaUsage = {
+  search_calls: number;
+  channels_calls: number;
+  total_points: number;
+};
+
+export type QuotaCheckInfo = {
+  allowed: boolean;
+  remaining: number;
+  estimated_cost: number;
+  today_used: number;
+  today_total: number;
+};
+
+export type RoadmapStep = {
+  day_range: string;
+  task: string;
+  expected_result: string;
+};
+
+export type NicheRecommendation = {
+  niche_title: string;
+  match_score: number;
+  market_heat_stars: number;
+  market_heat_desc: string;
+  competition_stars: number;
+  competition_desc: string;
+  content_gap: string;
+  cold_start_period: string;
+  target_channel_example: string;
+  action_advice: string;
+  action_roadmap?: RoadmapStep[];
+  estimated_monthly_income?: string | null;
+};
+
+export type AvoidNiche = {
+  niche_title: string;
+  reason: string;
 };
 
 export type NavigationGuideResponse = {
-  recommendations: CategoryRecommendation[];
-  ai_summary: string | null;
+  recommendations: NicheRecommendation[];
+  avoid_niche?: AvoidNiche | null;
+  ai_summary?: string | null;
+  quota_usage?: NavigationQuotaUsage | null;
+  quota_check?: QuotaCheckInfo | null;
+  conversation_id?: string | null;
+  channel_info?: Record<string, unknown> | null;
 };
 
 export async function navigationGuideApi(payload: {
   languages: string[];
   content_format?: string[];
-  budget_level?: "low" | "medium" | "high";
+  budget_level?: "zero" | "low" | "medium" | "high";
+  core_skills: string[];
+  monetization_goal?: string | null;
+  existing_channel_url?: string | null;
+  target_regions?: string[];
+  weekly_hours?: string | null;
   model_library_id?: number | null;
   llm_model_name?: string | null;
   agent_id?: number | null;
 }) {
   const res = await apiClient.post("/api/radar/navigation-guide", payload);
   return res.data as NavigationGuideResponse;
+}
+
+export type NavigationChatResponse = {
+  assistant_message: string;
+  conversation_id: string;
+};
+
+export async function navigationChatApi(payload: {
+  conversation_id: string;
+  user_message: string;
+  model_library_id?: number | null;
+  llm_model_name?: string | null;
+  agent_id?: number | null;
+}) {
+  const res = await apiClient.post("/api/radar/navigation-chat", payload);
+  return res.data as NavigationChatResponse;
 }
 
 // ── 参数迭代 API ──

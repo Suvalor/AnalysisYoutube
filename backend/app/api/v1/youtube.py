@@ -113,7 +113,7 @@ async def analyze_youtube_channel(
     icfg = await resolve_integration_config(db, org_id=current_user.org_id)
     identifier = parse_youtube_identifier(payload.youtube_url)
     item = await fetch_channel_info(identifier, youtube_api_key=icfg.youtube_api_key)
-    await record_api_quota_usage(db, "channels")
+    await record_api_quota_usage(db, "channels", part_count=2)
 
     snippet = item.get("snippet", {})
     statistics = item.get("statistics", {})
@@ -141,8 +141,11 @@ async def analyze_youtube_channel(
         db,
         for_handle_calls=0,
         channels_list_calls=fr_quota.channels_calls,
+        channels_part_count=1,
         playlist_items_calls=fr_quota.playlist_items_calls,
+        playlist_items_part_count=1,
         videos_list_calls=fr_quota.videos_list_calls,
+        videos_part_count=4,
     )
     for video in recent_videos_raw:
         video.setdefault("_parsed_published_at", parse_datetime(video.get("snippet", {}).get("publishedAt")))
@@ -205,7 +208,7 @@ async def _process_analyze_youtube_batch_task(
                 identifier = parse_youtube_identifier(raw_url)
                 item = await fetch_channel_info(identifier, youtube_api_key=youtube_api_key)
 
-                await record_api_quota_usage(session, "channels")
+                await record_api_quota_usage(session, "channels", part_count=2)
 
                 snippet = item.get("snippet", {})
                 statistics = item.get("statistics", {})
@@ -246,8 +249,11 @@ async def _process_analyze_youtube_batch_task(
                     session,
                     for_handle_calls=0,
                     channels_list_calls=fr_quota.channels_calls,
+                    channels_part_count=1,
                     playlist_items_calls=fr_quota.playlist_items_calls,
+                    playlist_items_part_count=1,
                     videos_list_calls=fr_quota.videos_list_calls,
+                    videos_part_count=4,
                 )
 
                 for video in recent_videos_raw:
@@ -320,8 +326,11 @@ async def _process_batch_update_channels_task(
                 session,
                 for_handle_calls=0,
                 channels_list_calls=pipeline.channels_list_calls,
+                channels_part_count=3,
                 playlist_items_calls=pipeline.playlist_items_calls,
+                playlist_items_part_count=1,
                 videos_list_calls=pipeline.videos_list_calls,
+                videos_part_count=4,
             )
 
             yt_to_db = await bulk_upsert_channels_from_api_items(session, pipeline.channel_items)
