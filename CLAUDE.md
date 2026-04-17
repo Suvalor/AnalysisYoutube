@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Creator SaaS — a YouTube channel analytics and content creation platform. Bilingual codebase (Chinese primary, English secondary).
+YouTube Compass — a YouTube overseas decision tool. Helps users discover untapped market opportunities before creating content. Bilingual codebase (Chinese primary, English secondary).
 
 ## Architecture
 
@@ -53,8 +53,11 @@ alembic revision --autogenerate -m "desc"    # generate from model changes
 
 - **API prefix**: All backend routes are under `/api`. Frontend `apiClient` base URL should NOT end with `/api` (it strips it automatically). `VITE_API_BASE_URL` points to backend origin only.
 - **Data isolation**: Users belong to an `org_id`; integration configs (YouTube, cloud storage) are org-level. Business resources use `current_user.id` for row-level isolation.
-- **Discovery Radar flow**: `POST /api/channels/discover` → search.list → dedupe → channels.list → JSON only (no DB write). "Follow" action reuses `POST /api/youtube/analyze/batch` to persist.
+- **Feature Flags**: `frontend/src/config/features.ts` controls module visibility. Core modules always on; creator modules (Inspiration, AI Script, SOP, Assets, Knowledge, Feishu) default off, toggled via `VITE_FEATURE_*` env vars. Navigation in `TabbedShell.tsx` filters `navDefs` through `isFeatureEnabled()`.
+- **Default landing page**: `/blue-ocean-radar` (not `/dashboard`).
+- **Radar API family** (`/api/radar/`): `/scan` (deep scan), `/ai-retrospective` (AI parameter review), `/category-opportunity` (niche opportunity report), `/cross-region-compare` (multi-region comparison), `/export-report` (Markdown report generation), `/navigation-guide` (resource-based category+region recommendations).
 - **YouTube quota**: Each `search.list` call costs ~100 quota units. Tracked per-request in `quota_service.py`.
+- **LLM conversation memory**: `llm_conversation` table stores per-entity conversation history. Service layer in `llm_conversation_service.py` with auto-truncation (DEFAULT_MAX_CHARS=8000) and auto-pruning (DEFAULT_MAX_TURNS=20). Entity types: `script`, `ai_script`, `channel_ai`, `radar_retro`, `sop_split`.
 - **Multi-cloud storage**: Active provider set via `ACTIVE_STORAGE_PROVIDER` env var (ALIYUN or TENCENT). New uploads default to Tencent COS.
 - **Frontend tab system**: `TabbedShell` renders a browser-like tab bar. Each nav item opens a tab via `useTabStore`. Dynamic tabs (channel detail, feishu viewer) matched by URL pattern.
 - **No linter configured**: Frontend `npm run lint` is a no-op echo. No backend linter config found.
@@ -67,6 +70,6 @@ Backend reads from `.env` (see `backend/.env.example`). Critical ones:
 - `VOLCENGINE_API_KEY`, `VOLCENGINE_ENDPOINT_ID` — LLM (Ark platform)
 - `ALIYUN_*` — Aliyun OSS storage
 - `TENCENT_COS_*` — Tencent COS storage
-- `SECRET_KEY` — JWT signing
+- `SECRET_KEY` — JWT signing (default empty, must be set in production)
 
-Frontend: `VITE_API_BASE_URL` (defaults to `http://localhost:8000`).
+Frontend: `VITE_API_BASE_URL` (defaults to `http://localhost:8000`), `VITE_FEATURE_*` flags for creator modules.
