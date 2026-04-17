@@ -1399,8 +1399,13 @@ async def cross_region_compare(
                     "top_channel_title": top_ch["title"] if top_ch else "",
                     "top_channel_subscribers": top_ch["subscriber_count"] if top_ch else 0,
                 })
-            except Exception:
+            except Exception as _cross_region_err:
                 # 单地区失败不影响其他地区
+                import logging as _logging
+                _logging.getLogger(__name__).warning(
+                    "跨地区对比单地区扫描失败: region=%s err=%s",
+                    region_code, _cross_region_err,
+                )
                 snapshots.append({
                     "region_code": region_code,
                     "region_name": _REGION_NAMES.get(region_code, region_code),

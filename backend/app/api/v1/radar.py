@@ -145,7 +145,10 @@ async def category_opportunity(
         lookback_months=body.lookback_months,
         youtube_api_key=icfg.youtube_api_key,
     )
+    # 配额：1 search + N videos + M channels（估算：search=1, videos=1, channels=1）
     await record_api_quota_usage(db, "search", times=1)
+    await record_api_quota_usage(db, "videos", times=1)
+    await record_api_quota_usage(db, "channels", times=1)
     await db.commit()
     return CategoryOpportunityResponse(
         keyword=body.keyword,

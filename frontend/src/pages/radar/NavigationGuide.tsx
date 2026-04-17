@@ -120,12 +120,21 @@ export default function NavigationGuide() {
     try {
       const values = await form.validateFields();
       setLoading(true);
+      // 从选定的模型库中提取模型名
+      let llm_model_name: string | undefined;
+      if (values.model_library_id) {
+        const target = modelOptions.find((m) => m.id === values.model_library_id);
+        llm_model_name =
+          ((target?.supported_models_json || "").match(/"value"\s*:\s*"([^"]+)"/)?.[1] ??
+            (target?.supported_models_json || "").match(/"([^"]+)"/)?.[1] ??
+            "").trim() || undefined;
+      }
       const data = await navigationGuideApi({
         languages: values.languages,
         content_format: values.content_format,
         budget_level: values.budget_level,
         model_library_id: values.model_library_id,
-        llm_model_name: values.llm_model_name,
+        llm_model_name,
         agent_id: values.agent_id,
       });
       setRecommendations(data.recommendations);
@@ -181,14 +190,14 @@ export default function NavigationGuide() {
               <Select options={BUDGET_OPTIONS} />
             </Form.Item>
             <Space wrap className="w-full" size="large">
-              <Form.Item label="AI 模型配置" className="mb-0 min-w-[200px]">
+              <Form.Item name="model_library_id" label="AI 模型配置" className="mb-0 min-w-[200px]">
                 <Select
                   options={modelOptions.map((m) => ({ value: m.id, label: m.name }))}
                   placeholder="可选"
                   allowClear
                 />
               </Form.Item>
-              <Form.Item label="AI 智能体" className="mb-0 min-w-[200px]">
+              <Form.Item name="agent_id" label="AI 智能体" className="mb-0 min-w-[200px]">
                 <Select
                   options={agentOptions.map((p) => ({ value: p.id, label: p.title }))}
                   placeholder="可选"
