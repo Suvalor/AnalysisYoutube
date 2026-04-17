@@ -7,7 +7,14 @@
       "Bash(python3 *)",
       "Bash(npx tsc *)",
       "Bash(npx vite *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(python -m pytest tests/test_radar_param_iteration.py -v --tb=short)",
+      "Read(//Users/suycity/Code/Youtube/AnalysisYoutube/backend/.venv/bin/**)",
+      "Bash(.venv/bin/python -m pytest tests/test_radar_param_iteration.py -v --tb=short)",
+      "Bash(/Users/suycity/Code/Youtube/AnalysisYoutube/backend/.venv/bin/python -m pytest tests/test_radar_param_iteration.py -v --tb=short)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/python -c \"import app; print\\('ok'\\)\")"
     ]
   }
 }

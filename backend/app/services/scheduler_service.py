@@ -86,6 +86,32 @@ async def sync_channels_daily_stats() -> None:
         logger.info("定时任务：频道统计同步完成，本批 API 返回约 %s 条频道。", total_items)
 
 
+async def auto_radar_retrospective() -> None:
+    """定时自动复盘：遍历所有用户，为有扫描数据的用户执行 AI 参数复盘。"""
+    from app.models.user import User
+    from app.services.radar_param_iteration_service import auto_retrospective_for_user
+
+    async with AsyncSessionLocal() as session:
+        users = list((await session.execute(select(User.id, User.org_id))).all())
+        if not users:
+            logger.info("定时复盘：无用户，跳过。")
+            return
+
+        success_count = 0
+        for uid, oid in users:
+            try:
+                row = await auto_retrospective_for_user(
+                    session, user_id=uid, org_id=oid
+                )
+                if row:
+                    success_count += 1
+            except Exception:
+                logger.exception("定时复盘：用户 %s 执行失败", uid)
+
+        await session.commit()
+        logger.info("定时复盘：完成 %s / %s 个用户。", success_count, len(users))
+
+
 def start_scheduler() -> None:
     if scheduler.running:
         return
@@ -93,6 +119,15 @@ def start_scheduler() -> None:
         sync_channels_daily_stats,
         trigger=IntervalTrigger(minutes=5),
         id="sync_channels_daily_stats",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    # 每日自动复盘（默认每24小时执行一次）
+    scheduler.add_job(
+        auto_radar_retrospective,
+        trigger=IntervalTrigger(hours=24),
+        id="auto_radar_retrospective",
         replace_existing=True,
         max_instances=1,
         coalesce=True,

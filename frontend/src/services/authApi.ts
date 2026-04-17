@@ -420,3 +420,46 @@ export async function navigationGuideApi(payload: {
   const res = await apiClient.post("/api/radar/navigation-guide", payload);
   return res.data as NavigationGuideResponse;
 }
+
+// ── 参数迭代 API ──
+
+export async function getLatestParamIterationApi() {
+  const res = await apiClient.get("/api/radar/param-iterations/latest");
+  return res.data as {
+    recommended_params: Record<string, unknown> | null;
+    iteration_count: number;
+    last_iteration_at: string | null;
+  };
+}
+
+export async function listParamIterationsApi(limit = 20, offset = 0) {
+  const res = await apiClient.get("/api/radar/param-iterations", { params: { limit, offset } });
+  return res.data as {
+    items: Array<{
+      id: number;
+      iteration_type: string;
+      scan_params: Record<string, unknown>;
+      recommended_params: Record<string, unknown> | null;
+      scan_result_summary: Record<string, unknown> | null;
+      iteration_effect: Record<string, unknown> | null;
+      is_applied: boolean;
+      applied_at: string | null;
+      created_at: string;
+    }>;
+    total: number;
+  };
+}
+
+export async function applyParamIterationApi(iterationId: number) {
+  const res = await apiClient.post(`/api/radar/param-iterations/apply/${iterationId}`);
+  return res.data as { success: boolean; message: string };
+}
+
+export async function triggerAutoRetroApi(force = false) {
+  const res = await apiClient.post("/api/radar/param-iterations/auto-retro", { force });
+  return res.data as {
+    iteration_id: number;
+    recommended_params: Record<string, unknown>;
+    analysis_summary: string;
+  };
+}
