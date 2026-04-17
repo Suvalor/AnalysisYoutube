@@ -294,3 +294,129 @@ export async function listYouTubeVideosAllApi(params: Parameters<typeof listYouT
   };
 }
 
+
+// ──────────────────────────────────────────────
+// 品类机会报告
+// ──────────────────────────────────────────────
+
+export type ChannelGrowthItem = {
+  channel_id: string;
+  title: string;
+  subscriber_count: number;
+  monthly_growth_rate: number;
+  trend: "rising" | "stable" | "declining";
+};
+
+export type ContentGapItem = {
+  duration_bucket: string;
+  supply_ratio: number;
+  avg_views: number;
+  opportunity_score: number;
+};
+
+export type CategoryOpportunityResponse = {
+  keyword: string;
+  region: string;
+  top_channels_growth: ChannelGrowthItem[];
+  content_gaps: ContentGapItem[];
+  newcomer_stats: {
+    total_new_channels: number;
+    successful_channels: number;
+    success_rate: number;
+  };
+  ai_summary: string | null;
+};
+
+export async function categoryOpportunityApi(payload: {
+  keyword: string;
+  region?: string;
+  lookback_months?: number;
+}) {
+  const res = await apiClient.post("/api/radar/category-opportunity", payload);
+  return res.data as CategoryOpportunityResponse;
+}
+
+// ──────────────────────────────────────────────
+// 跨地区对比
+// ──────────────────────────────────────────────
+
+export type RegionSnapshot = {
+  region_code: string;
+  region_name: string;
+  channel_count: number;
+  avg_views: number;
+  median_outlier_score: number;
+  top_channel_title: string;
+  top_channel_subscribers: number;
+};
+
+export type CrossRegionCompareResponse = {
+  keyword: string;
+  regions: RegionSnapshot[];
+  ai_recommendation: string | null;
+};
+
+export async function crossRegionCompareApi(payload: {
+  keyword: string;
+  regions: string[];
+  published_after?: 30 | 90 | 180;
+}) {
+  const res = await apiClient.post("/api/radar/cross-region-compare", payload);
+  return res.data as CrossRegionCompareResponse;
+}
+
+// ──────────────────────────────────────────────
+// 一键出报告
+// ──────────────────────────────────────────────
+
+export type ExportReportResponse = {
+  markdown_content: string;
+};
+
+export async function exportReportApi(payload: {
+  scan_items: BlueOceanChannelItem[];
+  keyword?: string;
+  ai_summary?: string | null;
+}) {
+  const res = await apiClient.post("/api/radar/export-report", payload);
+  return res.data as ExportReportResponse;
+}
+
+// ──────────────────────────────────────────────
+// 出海导航
+// ──────────────────────────────────────────────
+
+export type ChannelStrategyBreakdown = {
+  channel_id: string;
+  title: string;
+  subscriber_count: number;
+  publish_frequency: string;
+  avg_duration: string;
+  title_pattern: string;
+  tag_pattern: string;
+};
+
+export type CategoryRecommendation = {
+  category: string;
+  region: string;
+  fit_score: number;
+  reason: string;
+  top_channels: ChannelStrategyBreakdown[];
+};
+
+export type NavigationGuideResponse = {
+  recommendations: CategoryRecommendation[];
+  ai_summary: string | null;
+};
+
+export async function navigationGuideApi(payload: {
+  languages: string[];
+  content_format?: string[];
+  budget_level?: "low" | "medium" | "high";
+  model_library_id?: number | null;
+  llm_model_name?: string | null;
+  agent_id?: number | null;
+}) {
+  const res = await apiClient.post("/api/radar/navigation-guide", payload);
+  return res.data as NavigationGuideResponse;
+}

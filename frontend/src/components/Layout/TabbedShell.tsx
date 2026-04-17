@@ -2,6 +2,7 @@ import {
   BarChart3,
   Clapperboard,
   Cloud,
+  Compass,
   Home,
   Image,
   Kanban,
@@ -37,6 +38,8 @@ import AgentEditorPage from "@/pages/settings/AgentEditorPage";
 import ScriptWorkflowSOP from "@/pages/sop/ScriptWorkflowSOP";
 import InspirationPool from "@/pages/inspiration/InspirationPool";
 import BlueOceanRadar from "@/pages/radar/BlueOceanRadar";
+import NavigationGuide from "@/pages/radar/NavigationGuide";
+import { isFeatureEnabled, type FeatureKey } from "@/config/features";
 
 /** 品牌色 Ant Design 主蓝，侧边栏 Logo 占位（无独立图片资源时使用） */
 const BRAND_BLUE = "#1890ff";
@@ -69,23 +72,26 @@ type NavDef = {
   icon: typeof Home;
   type: TabType;
   tabId: string;
+  featureKey?: FeatureKey;
 };
 
-/** 顺序：创作 → 管理 → 监控 → 系统 */
+/** 顺序：出海核心 → 监控 → 系统；创作者工具通过 Feature Flag 控制 */
 const navDefs: NavDef[] = [
-  { path: "/inspiration-pool", label: "灵感中心", icon: Lightbulb, type: "inspiration-pool", tabId: "inspiration-pool" },
-  { path: "/ai-creator", label: "AI 脚本工坊", icon: WandSparkles, type: "ai-creator", tabId: "ai-creator" },
-  { path: "/sop-workflow", label: "SOP 工作流", icon: Clapperboard, type: "sop-workflow", tabId: "sop-workflow" },
-  { path: "/assets", label: "素材库", icon: Image, type: "assets", tabId: "assets" },
-  { path: "/knowledge-base", label: "知识库管理", icon: Library, type: "knowledge-base", tabId: "knowledge-base" },
-  { path: "/youtube/channels", label: "频道管理", icon: Youtube, type: "channel-list", tabId: "channel-list" },
   { path: "/blue-ocean-radar", label: "蓝海雷达", icon: Waves, type: "blue-ocean-radar", tabId: "blue-ocean-radar" },
+  { path: "/navigation-guide", label: "出海导航", icon: Compass, type: "navigation-guide", tabId: "navigation-guide" },
+  { path: "/competitor-analysis", label: "竞对洞察", icon: BarChart3, type: "competitor-analysis", tabId: "competitor-analysis" },
+  { path: "/youtube/channels", label: "频道管理", icon: Youtube, type: "channel-list", tabId: "channel-list" },
   { path: "/youtube/videos", label: "全局视频", icon: Video, type: "global-videos", tabId: "global-videos" },
   { path: "/video-board", label: "视频看板", icon: Kanban, type: "video-board", tabId: "video-board" },
-  { path: "/competitor-analysis", label: "竞对洞察", icon: BarChart3, type: "competitor-analysis", tabId: "competitor-analysis" },
   { path: "/dashboard", label: "仪表盘", icon: Home, type: "dashboard", tabId: "dashboard" },
   { path: "/config-center", label: "设置中心", icon: Settings, type: "config-center", tabId: "config-center" },
-  { path: "/feishu-workspace", label: "飞书云文档", icon: Cloud, type: "feishu-workspace", tabId: "feishu-workspace" },
+  // 创作者工具（Feature Flag 控制）
+  { path: "/inspiration-pool", label: "灵感中心", icon: Lightbulb, type: "inspiration-pool", tabId: "inspiration-pool", featureKey: "INSPIRATION_POOL" },
+  { path: "/ai-creator", label: "AI 脚本工坊", icon: WandSparkles, type: "ai-creator", tabId: "ai-creator", featureKey: "AI_CREATOR" },
+  { path: "/sop-workflow", label: "SOP 工作流", icon: Clapperboard, type: "sop-workflow", tabId: "sop-workflow", featureKey: "SOP_WORKFLOW" },
+  { path: "/assets", label: "素材库", icon: Image, type: "assets", tabId: "assets", featureKey: "ASSET_LIBRARY" },
+  { path: "/knowledge-base", label: "知识库管理", icon: Library, type: "knowledge-base", tabId: "knowledge-base", featureKey: "KNOWLEDGE_BASE" },
+  { path: "/feishu-workspace", label: "飞书云文档", icon: Cloud, type: "feishu-workspace", tabId: "feishu-workspace", featureKey: "FEISHU_DOCS" },
 ];
 
 function renderTabPanel(tab: TabItem) {
@@ -114,6 +120,8 @@ function renderTabPanel(tab: TabItem) {
       return <InspirationPool />;
     case "competitor-analysis":
       return <CompetitorAnalysis />;
+    case "navigation-guide":
+      return <NavigationGuide />;
     case "feishu-workspace":
       return <FeishuDocList />;
     case "feishu-viewer":
@@ -145,7 +153,7 @@ export default function TabbedShell() {
 
   useEffect(() => {
     if (location.pathname === "/" || location.pathname === "") {
-      navigate("/dashboard", { replace: true });
+      navigate("/blue-ocean-radar", { replace: true });
       return;
     }
     // 兼容旧链接：YouTube API 仪表盘已合并到仪表盘
@@ -198,7 +206,7 @@ export default function TabbedShell() {
 
   const pageTitle = useMemo(() => {
     const tab = tabs.find((x) => x.id === activeTabId);
-    return tab?.title ?? "Creator SaaS";
+    return tab?.title ?? "YouTube Compass";
   }, [tabs, activeTabId]);
 
   const handleNav = (def: NavDef) => {
@@ -217,12 +225,14 @@ export default function TabbedShell() {
       <div className="min-h-[4rem] px-4 py-3 flex items-center gap-3 border-b border-slate-200/90 shrink-0">
         <BrandMark />
         <div className="min-w-0 flex flex-col justify-center">
-          <span className="font-semibold text-slate-900 text-[15px] leading-snug truncate">Creator SaaS</span>
-          <span className="text-[11px] text-slate-500 leading-tight truncate">创作与增长工作台</span>
+          <span className="font-semibold text-slate-900 text-[15px] leading-snug truncate">YouTube Compass</span>
+          <span className="text-[11px] text-slate-500 leading-tight truncate">YouTube出海决策工具</span>
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {navDefs.map((def) => {
+        {navDefs
+          .filter((def) => !def.featureKey || isFeatureEnabled(def.featureKey))
+          .map((def) => {
           const Icon = def.icon;
           const active = activeTabId === def.tabId;
           return (
