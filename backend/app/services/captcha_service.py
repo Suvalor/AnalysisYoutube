@@ -41,32 +41,32 @@ def generate_captcha() -> tuple[str, str]:
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=CAPTCHA_TTL_SECONDS)
     _captcha_store[captcha_id] = {"code": code, "expires_at": expires_at}
 
-    # 生成图片
-    width, height = 120, 40
+    # 生成图片（画布足够大，文字清晰易读）
+    width, height = 200, 60
     img = Image.new("RGB", (width, height), color=(240, 240, 240))
     draw = ImageDraw.Draw(img)
 
-    # 绘制验证码文字
+    # 绘制验证码文字（大字号，醒目）
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 28)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)
     except (IOError, OSError):
-        font = ImageFont.load_default()
+        font = ImageFont.load_default(size=40)
 
     # 每个字符随机偏移和旋转
-    x_offset = 10
+    x_offset = 14
     for ch in code:
-        y_offset = random.randint(2, 8)
+        y_offset = random.randint(2, 10)
         draw.text((x_offset, y_offset), ch, fill=random_color(), font=font)
-        x_offset += 26
+        x_offset += 42
 
     # 添加干扰线
-    for _ in range(4):
+    for _ in range(5):
         x1, y1 = random.randint(0, width), random.randint(0, height)
         x2, y2 = random.randint(0, width), random.randint(0, height)
         draw.line((x1, y1, x2, y2), fill=random_color(), width=1)
 
     # 添加噪点
-    for _ in range(60):
+    for _ in range(100):
         x, y = random.randint(0, width - 1), random.randint(0, height - 1)
         draw.point((x, y), fill=random_color())
 

@@ -7,7 +7,7 @@ class UserLogin(BaseModel):
     """登录请求体."""
 
     email: EmailStr = Field(..., description="邮箱")
-    password: str = Field(..., min_length=8, max_length=128, description="明文密码")
+    password: str = Field(..., min_length=8, max_length=128, repr=False, description="明文密码")
     captcha_id: str = Field(..., description="验证码ID")
     captcha_code: str = Field(..., min_length=4, max_length=4, description="验证码")
 
@@ -50,7 +50,7 @@ class RegisterRequest(BaseModel):
 
     phone: str = Field(..., min_length=11, max_length=11, description="手机号")
     email: EmailStr = Field(..., description="邮箱")
-    password: str = Field(..., min_length=8, max_length=128, description="明文密码")
+    password: str = Field(..., min_length=8, max_length=128, repr=False, description="明文密码")
     email_code: str = Field(..., min_length=6, max_length=6, description="邮箱验证码")
 
 
@@ -76,4 +76,4 @@ class ResetPasswordRequest(BaseModel):
     """重置密码请求."""
 
     token: str = Field(..., description="重置Token")
-    new_password: str = Field(..., min_length=8, max_length=128, description="新密码")
+    new_password: str = Field(..., min_length=8, max_length=128, repr=False, description="新密码")
