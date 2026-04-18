@@ -1,18 +1,24 @@
 import {
   Button,
   Card,
+  Col,
   Form,
   Input,
   Progress,
   Rate,
+  Row,
   Select,
   Space,
   Spin,
   Statistic,
+  Table,
+  Tabs,
+  Tag,
   Timeline,
   Typography,
   message,
 } from "antd";
+import type { ColumnsType } from "antd/es/table";
 import {
   WarningOutlined,
   ThunderboltOutlined,
@@ -21,19 +27,28 @@ import {
   SendOutlined,
   UserOutlined,
   RobotOutlined,
+  RadarChartOutlined,
+  GlobalOutlined,
+  BarChartOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import {
   getYouTubeQuotaDashboardApi,
   navigationGuideApi,
   navigationChatApi,
+  blueOceanRadarScanApi,
+  categoryOpportunityApi,
+  crossRegionCompareApi,
   type NicheRecommendation,
   type AvoidNiche,
   type NavigationGuideResponse,
   type NavigationQuotaUsage,
   type QuotaCheckInfo,
   type RoadmapStep,
+  type BlueOceanChannelItem,
+  type CategoryOpportunityResponse,
+  type CrossRegionCompareResponse,
 } from "@/services/authApi";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
 
@@ -104,6 +119,31 @@ const WEEKLY_HOURS_OPTIONS = [
 
 // ── 工具函数 ──
 
+/** 解析模型配置的 supported_models_json 为下拉选项 */
+type ModelNameOption = { value: string; label: string };
+
+function parseModelNames(supportedModelsJson: string | null | undefined): ModelNameOption[] {
+  const raw = supportedModelsJson?.trim();
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw) as Array<string | { value?: string; label?: string }>;
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((item) => {
+        if (typeof item === "string" && item.trim()) {
+          return { value: item.trim(), label: item.trim() };
+        }
+        if (item && typeof item === "object" && item.value?.trim()) {
+          return { value: item.value.trim(), label: item.label?.trim() || item.value.trim() };
+        }
+        return null;
+      })
+      .filter((x): x is ModelNameOption => x !== null);
+  } catch {
+    return [];
+  }
+}
+
 function matchScoreColor(score: number): string {
   if (score >= 80) return "#22c55e";
   if (score >= 50) return "#f59e0b";
@@ -156,7 +196,7 @@ function QuotaBreakdown({ usage }: { usage: NavigationQuotaUsage }) {
 }
 
 /** 推荐品类卡片 — 现代SaaS极简风 */
-function NicheCard({ rec, index, onImportRadar }: { rec: NicheRecommendation; index: number; onImportRadar: (keyword: string) => void }) {
+function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecommendation; index: number; isExpanded: boolean; onToggleExpand: () => void }) {
   const isHighGrowth = index === 2; // 第3个是高增长潜力品类
 
   return (
@@ -258,10 +298,10 @@ function NicheCard({ rec, index, onImportRadar }: { rec: NicheRecommendation; in
       <Button
         type="primary"
         icon={<ThunderboltOutlined />}
-        onClick={() => onImportRadar(rec.niche_title)}
+        onClick={onToggleExpand}
         className="!rounded-lg"
       >
-        一键将此品类导入蓝海雷达
+        {isExpanded ? "收起蓝海雷达分析" : "一键将此品类导入蓝海雷达"}
       </Button>
     </Card>
   );
@@ -383,11 +423,233 @@ function ChatArea({
   );
 }
 
+/** 蓝海雷达内嵌面板 — 在出海导航页面内展示 scan + 品类机会 + 跨地区对比 */
+function RadarInlinePanel({
+  keyword,
+  region,
+  onClose,
+}: {
+  keyword: string;
+  region: string;
+  onClose: () => void;
+}) {
+  const [scanItems, setScanItems] = useState<BlueOceanChannelItem[]>([]);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [catOppResult, setCatOppResult] = useState<CategoryOpportunityResponse | null>(null);
+  const [catOppLoading, setCatOppLoading] = useState(false);
+  const [crossResult, setCrossResult] = useState<CrossRegionCompareResponse | null>(null);
+  const [crossLoading, setCrossLoading] = useState(false);
+
+  // 根据地区推断跨地区对比的默认地区组合
+  const defaultCrossRegions = (() => {
+    const regionGroups: Record<string, string[]> = {
+      US: ["US", "GB", "CA"],
+      GB: ["GB", "US", "DE"],
+      SG: ["SG", "MY", "PH"],
+      AE: ["AE", "SA", "IN"],
+      JP: ["JP", "KR", "TW"],
+    };
+    return regionGroups[region] || ["US", "SG", "AE"];
+  })();
+
+  useEffect(() => {
+    // 自动触发三项分析
+    const runAll = async () => {
+      // 1. 蓝海雷达扫描
+      setScanLoading(true);
+      try {
+        const scanData = await blueOceanRadarScanApi({
+          keyword,
+          published_after: 90,
+          max_subscribers: 30000,
+          outlier_multiplier: 10,
+        });
+        setScanItems(scanData.items);
+      } catch {
+        message.error("蓝海雷达扫描失败");
+      } finally {
+        setScanLoading(false);
+      }
+
+      // 2. 品类机会
+      setCatOppLoading(true);
+      try {
+        const catData = await categoryOpportunityApi({ keyword, region });
+        setCatOppResult(catData);
+      } catch {
+        message.error("品类机会分析失败");
+      } finally {
+        setCatOppLoading(false);
+      }
+
+      // 3. 跨地区对比
+      setCrossLoading(true);
+      try {
+        const crossData = await crossRegionCompareApi({
+          keyword,
+          regions: defaultCrossRegions,
+          published_after: 90,
+        });
+        setCrossResult(crossData);
+      } catch {
+        message.error("跨地区对比失败");
+      } finally {
+        setCrossLoading(false);
+      }
+    };
+    void runAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyword, region]);
+
+  const scanColumns: ColumnsType<BlueOceanChannelItem> = [
+    { title: "频道", dataIndex: "title", key: "title", width: 200, render: (v: string) => <span className="font-medium">{v}</span> },
+    { title: "订阅", dataIndex: "subscriber_count", key: "sub", render: (v: number) => v.toLocaleString() },
+    { title: "总播放", dataIndex: "total_views", key: "views", render: (v: number) => v.toLocaleString() },
+    { title: "爆款播放", dataIndex: "viral_view_count", key: "viral", render: (v: number) => v.toLocaleString() },
+    {
+      title: "爆款系数", dataIndex: "outlier_score", key: "score", defaultSortOrder: "descend",
+      render: (v: number) => <Tag color={v >= 30 ? "magenta" : v >= 15 ? "orange" : "blue"}>{v}</Tag>,
+    },
+  ];
+
+  const anyLoading = scanLoading || catOppLoading || crossLoading;
+
+  return (
+    <Card
+      className="!border-blue-200 !bg-blue-50/20 !shadow-md"
+      title={
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <RadarChartOutlined style={{ color: "#3b82f6" }} />
+            <span>蓝海雷达深度分析：{keyword}</span>
+            {anyLoading && <Spin size="small" />}
+          </span>
+          <Button type="text" icon={<CloseOutlined />} onClick={onClose} size="small" />
+        </div>
+      }
+      bodyStyle={{ padding: 20 }}
+    >
+      <Tabs
+        defaultActiveKey="scan"
+        items={[
+          {
+            key: "scan",
+            label: <span><RadarChartOutlined className="mr-1" />深度扫描</span>,
+            children: scanLoading ? (
+              <div className="flex justify-center py-8"><Spin tip="扫描中…" /></div>
+            ) : scanItems.length > 0 ? (
+              <Table<BlueOceanChannelItem>
+                rowKey="yt_channel_id"
+                columns={scanColumns}
+                dataSource={scanItems}
+                size="small"
+                pagination={{ pageSize: 5, showSizeChanger: true }}
+              />
+            ) : (
+              <Text type="secondary">暂无扫描结果</Text>
+            ),
+          },
+          {
+            key: "category",
+            label: <span><BarChartOutlined className="mr-1" />品类机会</span>,
+            children: catOppLoading ? (
+              <div className="flex justify-center py-8"><Spin tip="分析中…" /></div>
+            ) : catOppResult ? (
+              <div className="space-y-4">
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Statistic title="新频道数" value={catOppResult.newcomer_stats.total_new_channels} />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic title="成功频道" value={catOppResult.newcomer_stats.successful_channels} />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic
+                      title="成功率"
+                      value={(catOppResult.newcomer_stats.success_rate * 100).toFixed(1)}
+                      suffix="%"
+                      valueStyle={{ color: catOppResult.newcomer_stats.success_rate > 0.2 ? "#3f8600" : "#cf1322" }}
+                    />
+                  </Col>
+                </Row>
+                {catOppResult.top_channels_growth.length > 0 && (
+                  <Card size="small" title="头部频道增速" className="!border-slate-200">
+                    <Table
+                      dataSource={catOppResult.top_channels_growth}
+                      rowKey="channel_id"
+                      size="small"
+                      pagination={false}
+                      columns={[
+                        { title: "频道", dataIndex: "title", key: "title" },
+                        { title: "订阅", dataIndex: "subscriber_count", key: "sub", render: (v: number) => v.toLocaleString() },
+                        { title: "月增速%", dataIndex: "monthly_growth_rate", key: "rate", render: (v: number) => v.toFixed(1) },
+                        { title: "趋势", dataIndex: "trend", key: "trend", render: (v: string) => <Tag color={v === "rising" ? "green" : v === "stable" ? "blue" : "red"}>{v}</Tag> },
+                      ]}
+                    />
+                  </Card>
+                )}
+                {catOppResult.content_gaps.length > 0 && (
+                  <Card size="small" title="内容缺口" className="!border-slate-200">
+                    <Table
+                      dataSource={catOppResult.content_gaps}
+                      rowKey="duration_bucket"
+                      size="small"
+                      pagination={false}
+                      columns={[
+                        { title: "时长", dataIndex: "duration_bucket", key: "dur" },
+                        { title: "供给占比", dataIndex: "supply_ratio", key: "ratio", render: (v: number) => `${(v * 100).toFixed(1)}%` },
+                        { title: "平均播放", dataIndex: "avg_views", key: "views", render: (v: number) => v.toLocaleString() },
+                        { title: "机会分", dataIndex: "opportunity_score", key: "score", render: (v: number) => v.toFixed(1) },
+                      ]}
+                    />
+                  </Card>
+                )}
+              </div>
+            ) : (
+              <Text type="secondary">暂无品类机会数据</Text>
+            ),
+          },
+          {
+            key: "cross-region",
+            label: <span><GlobalOutlined className="mr-1" />跨地区对比</span>,
+            children: crossLoading ? (
+              <div className="flex justify-center py-8"><Spin tip="对比中…" /></div>
+            ) : crossResult ? (
+              <div className="space-y-4">
+                <Table
+                  dataSource={crossResult.regions}
+                  rowKey="region_code"
+                  size="small"
+                  pagination={false}
+                  columns={[
+                    { title: "地区", dataIndex: "region_name", key: "name" },
+                    { title: "频道数", dataIndex: "channel_count", key: "count" },
+                    { title: "平均播放", dataIndex: "avg_views", key: "views", render: (v: number) => v.toLocaleString() },
+                    { title: "爆款中位数", dataIndex: "median_outlier_score", key: "score", render: (v: number) => v.toFixed(1) },
+                    { title: "Top频道", dataIndex: "top_channel_title", key: "top" },
+                    { title: "Top订阅", dataIndex: "top_channel_subscribers", key: "top_sub", render: (v: number) => v.toLocaleString() },
+                  ]}
+                />
+                {crossResult.ai_recommendation && (
+                  <Card size="small" title="AI 推荐" className="!border-slate-200">
+                    <Text>{crossResult.ai_recommendation}</Text>
+                  </Card>
+                )}
+              </div>
+            ) : (
+              <Text type="secondary">暂无跨地区对比数据</Text>
+            ),
+          },
+        ]}
+      />
+    </Card>
+  );
+}
+
 // ── 主页面 ──
 
 export default function NavigationGuide() {
   const [form] = Form.useForm();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<NicheRecommendation[]>([]);
   const [avoidNiche, setAvoidNiche] = useState<AvoidNiche | null>(null);
@@ -398,10 +660,13 @@ export default function NavigationGuide() {
   const [channelInfo, setChannelInfo] = useState<Record<string, unknown> | null>(null);
   const [modelOptions, setModelOptions] = useState<ModelItem[]>([]);
   const [agentOptions, setAgentOptions] = useState<PromptItem[]>([]);
+  const [llmModelNameOptions, setLlmModelNameOptions] = useState<ModelNameOption[]>([]);
   // 保存当前使用的 LLM 配置，供追问使用
   const [activeModelId, setActiveModelId] = useState<number | null>(null);
   const [activeModelName, setActiveModelName] = useState<string | null>(null);
   const [activeAgentId, setActiveAgentId] = useState<number | null>(null);
+  // 蓝海雷达内嵌面板：记录当前展开的推荐索引
+  const [expandedRadarIndex, setExpandedRadarIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const loadConfigs = async () => {
@@ -414,23 +679,12 @@ export default function NavigationGuide() {
     void loadConfigs();
   }, []);
 
-  const onImportRadar = useCallback((keyword: string) => {
-    const kw = keyword.split(" - ")[0].split(" → ")[0].trim() || keyword;
-    navigate(`/blue-ocean-radar?keyword=${encodeURIComponent(kw)}`);
-  }, [navigate]);
-
   const onSubmit = async () => {
     try {
       const values = await form.validateFields();
       setLoading(true);
-      let llm_model_name: string | undefined;
-      if (values.model_library_id) {
-        const target = modelOptions.find((m) => m.id === values.model_library_id);
-        llm_model_name =
-          ((target?.supported_models_json || "").match(/"value"\s*:\s*"([^"]+)"/)?.[1] ??
-            (target?.supported_models_json || "").match(/"([^"]+)"/)?.[1] ??
-            "").trim() || undefined;
-      }
+      // llm_model_name 直接从表单获取（用户通过下拉选择）
+      const llm_model_name = values.llm_model_name || undefined;
       // 保存当前 LLM 配置
       setActiveModelId(values.model_library_id ?? null);
       setActiveModelName(llm_model_name ?? null);
@@ -570,7 +824,31 @@ export default function NavigationGuide() {
 
             <Space wrap className="w-full" size="large">
               <Form.Item name="model_library_id" label="AI 模型配置" className="mb-0 min-w-[200px]">
-                <Select options={modelOptions.map((m) => ({ value: m.id, label: m.name }))} placeholder="可选" allowClear />
+                <Select
+                  options={modelOptions.map((m) => ({ value: m.id, label: m.name }))}
+                  placeholder="可选"
+                  allowClear
+                  onChange={(value: number | undefined) => {
+                    // 切换模型配置时，解析其支持的模型名称列表
+                    const target = modelOptions.find((m) => m.id === value);
+                    const names = parseModelNames(target?.supported_models_json);
+                    setLlmModelNameOptions(names);
+                    // 自动选中第一个模型名称
+                    if (names.length > 0) {
+                      form.setFieldsValue({ llm_model_name: names[0].value });
+                    } else {
+                      form.setFieldsValue({ llm_model_name: undefined });
+                    }
+                  }}
+                />
+              </Form.Item>
+              <Form.Item name="llm_model_name" label="模型名称" className="mb-0 min-w-[200px]">
+                <Select
+                  options={llmModelNameOptions}
+                  placeholder="选择模型配置后可选"
+                  allowClear
+                  disabled={llmModelNameOptions.length === 0}
+                />
               </Form.Item>
               <Form.Item name="agent_id" label="AI 智能体" className="mb-0 min-w-[200px]">
                 <Select options={agentOptions.map((p) => ({ value: p.id, label: p.title }))} placeholder="可选" allowClear />
@@ -614,9 +892,39 @@ export default function NavigationGuide() {
         {!loading && recommendations.length > 0 && (
           <div className="space-y-5">
             <Title level={4} style={{ color: "#0f172a" }}>推荐品类</Title>
-            {recommendations.map((rec, i) => (
-              <NicheCard key={i} rec={rec} index={i} onImportRadar={onImportRadar} />
-            ))}
+            {recommendations.map((rec, i) => {
+              const isExpanded = expandedRadarIndex === i;
+              // 从 niche_title 提取关键词和地区
+              const keyword = rec.niche_title.split(" - ")[0].split(" → ")[0].trim() || rec.niche_title;
+              // 从 niche_title 提取地区代码（如 "美国" → "US"）
+              const regionNameToCode: Record<string, string> = {
+                "美国": "US", "英国": "GB", "加拿大": "CA", "澳大利亚": "AU",
+                "新加坡": "SG", "马来西亚": "MY", "菲律宾": "PH", "越南": "VN",
+                "印尼": "ID", "泰国": "TH", "阿联酋": "AE", "沙特": "SA",
+                "日本": "JP", "韩国": "KR", "台湾": "TW", "香港": "HK",
+                "德国": "DE", "法国": "FR", "巴西": "BR", "印度": "IN",
+              };
+              const regionPart = rec.niche_title.split("→").pop()?.trim() || "";
+              const regionCode = regionNameToCode[regionPart] || "US";
+
+              return (
+                <div key={i} className="space-y-3">
+                  <NicheCard
+                    rec={rec}
+                    index={i}
+                    isExpanded={isExpanded}
+                    onToggleExpand={() => setExpandedRadarIndex(isExpanded ? null : i)}
+                  />
+                  {isExpanded && (
+                    <RadarInlinePanel
+                      keyword={keyword}
+                      region={regionCode}
+                      onClose={() => setExpandedRadarIndex(null)}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
