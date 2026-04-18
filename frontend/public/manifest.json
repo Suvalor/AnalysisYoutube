@@ -1,0 +1,16 @@
+{
+  "name": "YouTube Compass",
+  "short_name": "YT Compass",
+  "description": "YouTube海外决策工具 — 发现未开发的市场机会",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "theme_color": "#1a1a2e",
+  "background_color": "#1a1a2e",
+  "display": "standalone",
+  "start_url": "/"
+}

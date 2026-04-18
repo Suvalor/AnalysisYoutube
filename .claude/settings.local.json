@@ -16,7 +16,11 @@
       "Bash(.venv/bin/pip install *)",
       "Bash(.venv/bin/python -c \"import app; print\\('ok'\\)\")",
       "WebFetch(domain:developers.google.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(cat logs/*.log)",
+      "Bash(curl -s -X POST http://localhost:8000/api/radar/navigation-guide -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(docker compose *)",
+      "Bash(curl *)"
     ]
   }
 }

@@ -197,6 +197,7 @@ def _validate_niche_json(data: dict) -> bool:
 async def generate_niche_recommendations(
     *,
     db: AsyncSession,
+    user_id: int,
     org_id: int,
     languages: list[str],
     content_format: list[str],
@@ -213,19 +214,26 @@ async def generate_niche_recommendations(
     """调用 LLM 生成深度品类推荐，含重试机制。"""
     from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig
     from app.services.config_manager import resolve_integration_config
-    from app.crud.model_library import get_model_library
+    from app.services.field_encryption import try_decrypt
+    from app.crud.library import get_by_user
+    from app.models.library import ModelLibrary
 
     if not model_library_id or not llm_model_name:
         return {"recommendations": [], "avoid_niche": None, "error": "未配置 LLM 模型"}
 
-    ml = await get_model_library(db, id=model_library_id)
+    ml = await get_by_user(db, ModelLibrary, user_id, model_library_id)
     if not ml:
         return {"recommendations": [], "avoid_niche": None, "error": "模型配置不存在"}
 
+    # 优先使用模型库自带的 API Key，回退到组织级火山引擎配置
+    ml_api_key = try_decrypt(ml.api_key_encrypted) or ""
+    ml_base_url = (ml.api_base_url or "").strip().rstrip("/")
     icfg = await resolve_integration_config(db, org_id=org_id)
+    api_key = ml_api_key or icfg.volcengine_api_key or ""
+    base_url = ml_base_url or ""
     cfg = LLMClientConfig(
-        api_key=icfg.volcengine_api_key,
-        base_url=ml.base_url or "",
+        api_key=api_key,
+        base_url=base_url,
         model_name=llm_model_name,
     )
     factory = LLMClientFactory()
@@ -398,6 +406,7 @@ async def navigation_guide(
     # ── LLM 深度推荐（核心逻辑） ──
     llm_result = await generate_niche_recommendations(
         db=db,
+        user_id=user_id,
         org_id=org_id,
         languages=languages,
         content_format=content_format,
@@ -621,7 +630,9 @@ async def navigation_chat(
     """出海导航多轮对话追问。"""
     from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig
     from app.services.config_manager import resolve_integration_config
-    from app.crud.model_library import get_model_library
+    from app.services.field_encryption import try_decrypt
+    from app.crud.library import get_by_user
+    from app.models.library import ModelLibrary
     from app.services.llm_conversation_service import (
         load_conversation_messages,
         save_conversation_turn,
@@ -630,14 +641,19 @@ async def navigation_chat(
     if not model_library_id or not llm_model_name:
         return {"assistant_message": "未配置 LLM 模型，无法追问", "conversation_id": conversation_id}
 
-    ml = await get_model_library(db, id=model_library_id)
+    ml = await get_by_user(db, ModelLibrary, user_id, model_library_id)
     if not ml:
         return {"assistant_message": "模型配置不存在", "conversation_id": conversation_id}
 
+    # 优先使用模型库自带的 API Key，回退到组织级火山引擎配置
+    ml_api_key = try_decrypt(ml.api_key_encrypted) or ""
+    ml_base_url = (ml.api_base_url or "").strip().rstrip("/")
     icfg = await resolve_integration_config(db, org_id=org_id)
+    api_key = ml_api_key or icfg.volcengine_api_key or ""
+    base_url = ml_base_url or ""
     cfg = LLMClientConfig(
-        api_key=icfg.volcengine_api_key,
-        base_url=ml.base_url or "",
+        api_key=api_key,
+        base_url=base_url,
         model_name=llm_model_name,
     )
     factory = LLMClientFactory()
