@@ -5,7 +5,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
-from app.schemas.auth import UserCreate
 
 
 async def get_user_by_email(
@@ -17,16 +16,29 @@ async def get_user_by_email(
     return result.scalar_one_or_none()
 
 
+async def get_user_by_phone(
+    session: AsyncSession,
+    phone: str,
+) -> Optional[User]:
+    """根据手机号查询用户。"""
+    result = await session.execute(select(User).where(User.phone == phone))
+    return result.scalar_one_or_none()
+
+
 async def create_user(
     session: AsyncSession,
-    user_in: UserCreate,
+    *,
+    email: str,
     hashed_password: str,
+    phone: str | None = None,
+    org_id: int = 1,
 ) -> User:
     """创建新用户，处理唯一约束冲突由上层捕获。"""
     user = User(
-        email=user_in.email,
+        email=email,
         hashed_password=hashed_password,
-        org_id=1,
+        phone=phone,
+        org_id=org_id,
     )
     session.add(user)
     try:

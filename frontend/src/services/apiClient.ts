@@ -37,7 +37,7 @@ apiClient.interceptors.response.use(
     const status = error?.response?.status;
     const url = String(error?.config?.url ?? "");
     if (status === 401 && typeof window !== "undefined") {
-      const isAuthRoute = url.includes("/api/auth/login") || url.includes("/api/auth/register");
+      const isAuthRoute = url.includes("/api/auth/login") || url.includes("/api/auth/register") || url.includes("/api/auth/forgot-password") || url.includes("/api/auth/reset-password") || url.includes("/api/auth/send-email-code") || url.includes("/api/auth/captcha");
       if (!isAuthRoute) {
         localStorage.removeItem("access_token");
         if (!window.location.pathname.startsWith("/login")) {

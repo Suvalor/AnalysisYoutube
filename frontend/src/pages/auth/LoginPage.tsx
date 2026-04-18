@@ -1,13 +1,14 @@
-import { Alert, Button, Checkbox, Form, Input } from "antd";
+import { Alert, Button, Checkbox, Form, Input, Space } from "antd";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "@/components/Layout/AuthLayout";
-import { loginApi } from "@/services/authApi";
+import { getCaptchaApi, loginApi } from "@/services/authApi";
 import { useAuth } from "@/store/authStore";
 
 type FormValues = {
   email: string;
   password: string;
+  captcha_code: string;
 };
 
 export default function LoginPage() {
@@ -15,18 +16,32 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(true);
+  const [captchaId, setCaptchaId] = useState("");
+  const [captchaImage, setCaptchaImage] = useState("");
+  const [captchaLoading, setCaptchaLoading] = useState(false);
   const navigate = useNavigate();
   const { setToken } = useAuth();
 
+  const fetchCaptcha = async () => {
+    setCaptchaLoading(true);
+    try {
+      const data = await getCaptchaApi();
+      setCaptchaId(data.captcha_id);
+      setCaptchaImage(data.captcha_image);
+      form.setFieldValue("captcha_code", "");
+    } catch {
+      setError("获取验证码失败，请刷新页面");
+    } finally {
+      setCaptchaLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    fetchCaptcha();
+    // 恢复记住的邮箱
     const storedEmail = localStorage.getItem("rememberedEmail") || "";
-    const storedPassword = localStorage.getItem("rememberedPassword") || "";
-    if (storedEmail || storedPassword) {
-      form.setFieldsValue({
-        email: storedEmail,
-        password: storedPassword
-      });
+    if (storedEmail) {
+      form.setFieldValue("email", storedEmail);
       setRememberMe(true);
     }
   }, [form]);
@@ -35,24 +50,29 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await loginApi(values);
+      const res = await loginApi({
+        email: values.email,
+        password: values.password,
+        captcha_id: captchaId,
+        captcha_code: values.captcha_code,
+      });
       setToken(res.access_token);
       if (typeof window !== "undefined") {
         if (rememberMe) {
           localStorage.setItem("rememberedEmail", values.email);
-          localStorage.setItem("rememberedPassword", values.password);
         } else {
           localStorage.removeItem("rememberedEmail");
-          localStorage.removeItem("rememberedPassword");
         }
       }
-      navigate("/dashboard");
+      navigate("/blue-ocean-radar");
     } catch (e: any) {
       const message =
         e?.response?.data?.detail ??
         e?.message ??
         "登录失败，请稍后重试";
       setError(String(message));
+      // 登录失败后刷新验证码
+      fetchCaptcha();
     } finally {
       setLoading(false);
     }
@@ -60,7 +80,7 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title="登录 Creator SaaS"
+      title="登录 YouTube Compass"
       subtitle="为 YouTube 创作者打造的一站式效率工具"
     >
       <Form
@@ -71,7 +91,7 @@ export default function LoginPage() {
       >
         {error && (
           <div className="mb-4">
-            <Alert type="error" message={error} showIcon />
+            <Alert type="error" message={error} showIcon closable onClose={() => setError(null)} />
           </div>
         )}
         <Form.Item
@@ -91,13 +111,51 @@ export default function LoginPage() {
         >
           <Input.Password placeholder="至少 8 位安全密码" size="large" />
         </Form.Item>
+        <Form.Item
+          label="验证码"
+          name="captcha_code"
+          rules={[
+            { required: true, message: "请输入验证码" },
+            { len: 4, message: "验证码为4位" }
+          ]}
+        >
+          <Space>
+            <Input
+              placeholder="4位验证码"
+              size="large"
+              maxLength={4}
+              style={{ width: 120 }}
+            />
+            {captchaImage && (
+              <img
+                src={`data:image/png;base64,${captchaImage}`}
+                alt="验证码"
+                className="h-10 cursor-pointer rounded border border-slate-600"
+                onClick={fetchCaptcha}
+                title="点击刷新验证码"
+              />
+            )}
+            <Button
+              size="large"
+              onClick={fetchCaptcha}
+              loading={captchaLoading}
+            >
+              刷新
+            </Button>
+          </Space>
+        </Form.Item>
         <Form.Item>
-          <Checkbox
-            checked={rememberMe}
-            onChange={(e) => setRememberMe(e.target.checked)}
-          >
-            记住账号和密码
-          </Checkbox>
+          <div className="flex items-center justify-between">
+            <Checkbox
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+            >
+              记住账号
+            </Checkbox>
+            <Link to="/forgot-password" className="text-indigo-400 hover:text-indigo-300 text-sm">
+              忘记密码？
+            </Link>
+          </div>
         </Form.Item>
         <Form.Item className="mt-6 mb-2">
           <Button
@@ -120,4 +178,3 @@ export default function LoginPage() {
     </AuthLayout>
   );
 }
-

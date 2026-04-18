@@ -1,21 +1,65 @@
-import { Alert, Button, Form, Input } from "antd";
-import { useState } from "react";
+import { Alert, Button, Form, Input, Space } from "antd";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "@/components/Layout/AuthLayout";
-import { loginApi, registerApi } from "@/services/authApi";
-import { useAuth } from "@/store/authStore";
+import { registerApi, sendEmailCodeApi } from "@/services/authApi";
 
 type FormValues = {
+  phone: string;
   email: string;
   password: string;
   confirmPassword: string;
+  email_code: string;
 };
 
 export default function RegisterPage() {
+  const [form] = Form.useForm<FormValues>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [codeSending, setCodeSending] = useState(false);
+  const [codeCountdown, setCodeCountdown] = useState(0);
   const navigate = useNavigate();
-  const { setToken } = useAuth();
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  const handleSendCode = async () => {
+    try {
+      await form.validateFields(["email"]);
+    } catch {
+      return;
+    }
+    const email = form.getFieldValue("email");
+    setCodeSending(true);
+    setError(null);
+    try {
+      await sendEmailCodeApi(email);
+      // 60秒倒计时
+      setCodeCountdown(60);
+      timerRef.current = setInterval(() => {
+        setCodeCountdown((prev) => {
+          if (prev <= 1) {
+            if (timerRef.current) clearInterval(timerRef.current);
+            timerRef.current = null;
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (e: any) {
+      const message =
+        e?.response?.data?.detail ??
+        e?.message ??
+        "验证码发送失败";
+      setError(String(message));
+    } finally {
+      setCodeSending(false);
+    }
+  };
 
   const onFinish = async (values: FormValues) => {
     if (values.password !== values.confirmPassword) {
@@ -25,11 +69,14 @@ export default function RegisterPage() {
     setLoading(true);
     setError(null);
     try {
-      await registerApi({ email: values.email, password: values.password });
-      // 注册成功后自动登录，提升体验
-      const res = await loginApi({ email: values.email, password: values.password });
-      setToken(res.access_token);
-      navigate("/dashboard");
+      await registerApi({
+        phone: values.phone,
+        email: values.email,
+        password: values.password,
+        email_code: values.email_code,
+      });
+      // 注册成功后跳转登录页
+      navigate("/login");
     } catch (e: any) {
       const message =
         e?.response?.data?.detail ??
@@ -43,15 +90,30 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout
-      title="创建你的 Creator SaaS 账号"
+      title="创建你的 YouTube Compass 账号"
       subtitle="几秒钟完成注册，开始提效创作"
     >
-      <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
+      <Form
+        layout="vertical"
+        onFinish={onFinish}
+        requiredMark={false}
+        form={form}
+      >
         {error && (
           <div className="mb-4">
-            <Alert type="error" message={error} showIcon />
+            <Alert type="error" message={error} showIcon closable onClose={() => setError(null)} />
           </div>
         )}
+        <Form.Item
+          label="手机号"
+          name="phone"
+          rules={[
+            { required: true, message: "请输入手机号" },
+            { pattern: /^1\d{10}$/, message: "请输入有效的11位手机号" }
+          ]}
+        >
+          <Input placeholder="11位手机号" size="large" maxLength={11} />
+        </Form.Item>
         <Form.Item
           label="邮箱"
           name="email"
@@ -61,6 +123,31 @@ export default function RegisterPage() {
           ]}
         >
           <Input placeholder="you@example.com" size="large" />
+        </Form.Item>
+        <Form.Item
+          label="邮箱验证码"
+          name="email_code"
+          rules={[
+            { required: true, message: "请输入验证码" },
+            { len: 6, message: "验证码为6位" }
+          ]}
+        >
+          <Space>
+            <Input
+              placeholder="6位验证码"
+              size="large"
+              maxLength={6}
+              style={{ width: 140 }}
+            />
+            <Button
+              size="large"
+              onClick={handleSendCode}
+              loading={codeSending}
+              disabled={codeCountdown > 0}
+            >
+              {codeCountdown > 0 ? `${codeCountdown}s` : "发送验证码"}
+            </Button>
+          </Space>
         </Form.Item>
         <Form.Item
           label="密码"
@@ -100,4 +187,3 @@ export default function RegisterPage() {
     </AuthLayout>
   );
 }
-
