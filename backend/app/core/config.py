@@ -57,6 +57,17 @@ class Settings(BaseSettings):
     google_oauth_client_secret: str = Field("", alias="GOOGLE_OAUTH_CLIENT_SECRET")
     google_oauth_redirect_uri: str = Field("", alias="GOOGLE_OAUTH_REDIRECT_URI")
 
+    # SMTP 邮件服务配置
+    smtp_host: str = Field("", alias="SMTP_HOST")
+    smtp_port: int = Field(465, alias="SMTP_PORT")
+    smtp_user: str = Field("", alias="SMTP_USER")
+    smtp_password: str = Field("", alias="SMTP_PASSWORD")
+    smtp_from_email: str = Field("", alias="SMTP_FROM_EMAIL")
+    smtp_use_ssl: bool = Field(True, alias="SMTP_USE_SSL")
+
+    # 前端站点地址（用于生成密码重置等链接）
+    frontend_base_url: str = Field("http://localhost:5173", alias="FRONTEND_BASE_URL")
+
     # 支持单个 URL、逗号分隔字符串，或 JSON 数组字符串
     backend_cors_origins: str = Field(
         "http://localhost:5173",

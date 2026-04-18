@@ -1,18 +1,59 @@
 import apiClient from "./apiClient";
 
-export type AuthFormValues = {
-  email: string;
-  password: string;
+// ── 认证 API 类型与函数 ──
+
+export type CaptchaResponse = {
+  captcha_id: string;
+  captcha_image: string;
 };
 
-export async function registerApi(data: AuthFormValues) {
+export type LoginPayload = {
+  email: string;
+  password: string;
+  captcha_id: string;
+  captcha_code: string;
+};
+
+export type RegisterPayload = {
+  phone: string;
+  email: string;
+  password: string;
+  email_code: string;
+};
+
+export type TokenResponse = {
+  access_token: string;
+  token_type: string;
+};
+
+export async function getCaptchaApi() {
+  const res = await apiClient.get("/api/auth/captcha");
+  return res.data as CaptchaResponse;
+}
+
+export async function sendEmailCodeApi(email: string) {
+  const res = await apiClient.post("/api/auth/send-email-code", { email });
+  return res.data as { message: string };
+}
+
+export async function registerApi(data: RegisterPayload) {
   const res = await apiClient.post("/api/auth/register", data);
   return res.data;
 }
 
-export async function loginApi(data: AuthFormValues) {
+export async function loginApi(data: LoginPayload) {
   const res = await apiClient.post("/api/auth/login", data);
-  return res.data as { access_token: string; token_type: string };
+  return res.data as TokenResponse;
+}
+
+export async function forgotPasswordApi(email: string) {
+  const res = await apiClient.post("/api/auth/forgot-password", { email });
+  return res.data as { message: string };
+}
+
+export async function resetPasswordApi(token: string, new_password: string) {
+  const res = await apiClient.post("/api/auth/reset-password", { token, new_password });
+  return res.data as { message: string };
 }
 
 export type YouTubeAnalyzeResponse = {
