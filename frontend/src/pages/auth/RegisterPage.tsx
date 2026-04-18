@@ -54,7 +54,7 @@ export default function RegisterPage() {
       const message =
         e?.response?.data?.detail ??
         e?.message ??
-        "验证码发送失败";
+        "验证码发送失败，请确认邮箱地址正确或稍后重试";
       setError(String(message));
     } finally {
       setCodeSending(false);

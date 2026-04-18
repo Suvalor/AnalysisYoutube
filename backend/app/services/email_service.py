@@ -118,7 +118,10 @@ async def send_email(
 ) -> bool:
     """通过 SMTP 发送邮件。"""
     if not settings.smtp_host or not settings.smtp_user:
-        logger.error("SMTP 未配置，无法发送邮件")
+        logger.warning(
+            "SMTP 未配置（SMTP_HOST/SMTP_USER 为空），邮件功能不可用。"
+            "请在 .env 中配置 SMTP 相关环境变量，参考 .env.example"
+        )
         return False
 
     msg = MIMEMultipart("alternative")
