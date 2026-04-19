@@ -20,7 +20,11 @@
       "Bash(cat logs/*.log)",
       "Bash(curl -s -X POST http://localhost:8000/api/radar/navigation-guide -H 'Content-Type: application/json' -d '{ *)",
       "Bash(docker compose *)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(npm audit *)",
+      "Bash(npm ls *)",
+      "Bash(npm install *)",
+      "WebFetch(domain:www.liblib.art)"
     ]
   }
 }

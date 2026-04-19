@@ -500,7 +500,9 @@ async def query_videos(
     )
 
     if keyword:
-        stmt = stmt.where(YouTubeVideo.title.ilike(f"%{keyword}%"))
+        # 转义 LIKE 通配符，防止用户注入 % 或 _ 绕过搜索语义
+        escaped = keyword.replace("%", "\\%").replace("_", "\\_")
+        stmt = stmt.where(YouTubeVideo.title.ilike(f"%{escaped}%", escape="\\"))
     if start_date:
         stmt = stmt.where(YouTubeVideo.published_at >= start_date)
     if end_date:

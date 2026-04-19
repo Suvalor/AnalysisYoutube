@@ -132,6 +132,7 @@ export default function FeishuDocViewer({ docId: docIdFromTab }: FeishuDocViewer
           title={showArchiveToggle && previewSource === "archive" ? "离线归档预览" : "飞书原链预览"}
           src={iframeSrc}
           className="w-full h-[calc(100vh-120px)] border-0"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
           allow="fullscreen"
         />
       </div>

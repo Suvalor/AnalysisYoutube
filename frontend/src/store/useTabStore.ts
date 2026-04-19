@@ -21,7 +21,8 @@ export type TabType =
   | "agent-edit"
   | "inspiration-pool"
   | "blue-ocean-radar"
-  | "navigation-guide";
+  | "navigation-guide"
+  | "personal-settings";
 
 export type TabItem = {
   id: string;
@@ -39,14 +40,31 @@ export type TabItem = {
 type TabState = {
   tabs: TabItem[];
   activeTabId: string | null;
+  /** 固定标签 ID 集合（来自 navDefs 的标签不可被批量关闭） */
+  pinnedTabIds: Set<string>;
   openTab: (tab: TabItem) => void;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
+  /** 关闭目标标签左侧的所有非固定标签 */
+  closeLeftTabs: (id: string) => void;
+  /** 关闭目标标签右侧的所有非固定标签 */
+  closeRightTabs: (id: string) => void;
+  /** 关闭除目标标签外的所有非固定标签 */
+  closeOtherTabs: (id: string) => void;
+  /** 关闭所有非固定标签 */
+  closeAllTabs: () => void;
+  /** 注册固定标签 ID（由 TabbedShell 初始化时调用） */
+  registerPinnedIds: (ids: string[]) => void;
 };
 
 export const useTabStore = create<TabState>((set, get) => ({
   tabs: [],
   activeTabId: null,
+  pinnedTabIds: new Set<string>(),
+
+  registerPinnedIds: (ids) => {
+    set({ pinnedTabIds: new Set(ids) });
+  },
 
   openTab: (tab) => {
     const { tabs } = get();
@@ -102,4 +120,39 @@ export const useTabStore = create<TabState>((set, get) => ({
   },
 
   setActiveTab: (id) => set({ activeTabId: id }),
+
+  closeLeftTabs: (id) => {
+    const { tabs, activeTabId, pinnedTabIds } = get();
+    const idx = tabs.findIndex((t) => t.id === id);
+    if (idx <= 0) return;
+    // 保留目标及右侧所有标签，左侧仅保留固定标签
+    const next = tabs.filter((t, i) => i >= idx || pinnedTabIds.has(t.id));
+    const nextActive = next.some((t) => t.id === activeTabId) ? activeTabId : id;
+    set({ tabs: next, activeTabId: nextActive });
+  },
+
+  closeRightTabs: (id) => {
+    const { tabs, activeTabId, pinnedTabIds } = get();
+    const idx = tabs.findIndex((t) => t.id === id);
+    if (idx < 0 || idx === tabs.length - 1) return;
+    // 保留目标及左侧所有标签，右侧仅保留固定标签
+    const next = tabs.filter((t, i) => i <= idx || pinnedTabIds.has(t.id));
+    const nextActive = next.some((t) => t.id === activeTabId) ? activeTabId : id;
+    set({ tabs: next, activeTabId: nextActive });
+  },
+
+  closeOtherTabs: (id) => {
+    const { tabs, activeTabId, pinnedTabIds } = get();
+    // 保留目标标签 + 所有固定标签
+    const next = tabs.filter((t) => t.id === id || pinnedTabIds.has(t.id));
+    set({ tabs: next, activeTabId: id });
+  },
+
+  closeAllTabs: () => {
+    const { tabs, pinnedTabIds } = get();
+    // 仅保留固定标签
+    const next = tabs.filter((t) => pinnedTabIds.has(t.id));
+    const nextActive = next[0]?.id ?? null;
+    set({ tabs: next, activeTabId: nextActive });
+  },
 }));

@@ -929,9 +929,10 @@ async def youtube_oauth_callback(
 ) -> YouTubeOAuthStatusResponse:
     if not settings.google_oauth_client_id or not settings.google_oauth_client_secret:
         raise HTTPException(status_code=500, detail="Google OAuth 配置不完整")
-    redirect_uri = (payload.redirect_uri or settings.google_oauth_redirect_uri or "").strip()
+    # 强制使用服务端配置的 redirect_uri，不接受客户端传入（防止开放重定向攻击）
+    redirect_uri = (settings.google_oauth_redirect_uri or "").strip()
     if not redirect_uri:
-        raise HTTPException(status_code=500, detail="缺少 redirect_uri")
+        raise HTTPException(status_code=500, detail="服务端未配置 GOOGLE_OAUTH_REDIRECT_URI")
 
     async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
         token_resp = await client.post(

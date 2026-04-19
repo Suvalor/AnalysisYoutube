@@ -154,10 +154,12 @@ export default function RegisterPage() {
           name="password"
           rules={[
             { required: true, message: "请输入密码" },
-            { min: 8, message: "密码至少 8 位" }
+            { min: 12, message: "密码至少 12 位" },
+            { pattern: /[a-zA-Z]/, message: "密码必须包含字母" },
+            { pattern: /[0-9]/, message: "密码必须包含数字" },
           ]}
         >
-          <Input.Password placeholder="至少 8 位安全密码" size="large" />
+          <Input.Password placeholder="至少 12 位，含字母和数字" size="large" />
         </Form.Item>
         <Form.Item
           label="确认密码"

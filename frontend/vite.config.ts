@@ -11,6 +11,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  */
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // 生产构建禁用 source map，防止源码泄露
+    sourcemap: process.env.NODE_ENV === "development",
+  },
   server: {
     port: 5173,
     proxy: {
