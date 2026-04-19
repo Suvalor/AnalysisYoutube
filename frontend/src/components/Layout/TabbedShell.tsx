@@ -1,3 +1,5 @@
+import { Dropdown } from "antd";
+import type { MenuProps } from "antd";
 import {
   BarChart3,
   Clapperboard,
@@ -11,13 +13,14 @@ import {
   LogOut,
   Menu as MenuIcon,
   Settings,
+  User,
   Video,
   WandSparkles,
   Waves,
   X,
   Youtube,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/store/authStore";
 import { useTabStore, type TabItem, type TabType } from "@/store/useTabStore";
@@ -34,15 +37,18 @@ import FeishuDocList from "@/pages/feishu/FeishuDocList";
 import FeishuDocViewer from "@/pages/feishu/FeishuDocViewer";
 import AiModelSettings from "@/pages/settings/AiModelSettings";
 import ConfigCenter from "@/pages/settings/ConfigCenter";
+import PersonalSettings from "@/pages/settings/PersonalSettings";
 import AgentEditorPage from "@/pages/settings/AgentEditorPage";
 import ScriptWorkflowSOP from "@/pages/sop/ScriptWorkflowSOP";
 import InspirationPool from "@/pages/inspiration/InspirationPool";
 import BlueOceanRadar from "@/pages/radar/BlueOceanRadar";
 import NavigationGuide from "@/pages/radar/NavigationGuide";
 import { isFeatureEnabled, type FeatureKey } from "@/config/features";
+import { useThemeStore } from "@/store/useThemeStore";
+import { getUserSettingsApi } from "@/services/userApi";
 
-/** 品牌色 Ant Design 主蓝，侧边栏 Logo 占位（无独立图片资源时使用） */
-const BRAND_BLUE = "#1890ff";
+/** 品牌色使用 CSS 变量，支持主题切换 */
+const BRAND_BLUE = "var(--color-primary)";
 
 function BrandMark() {
   return (
@@ -53,15 +59,15 @@ function BrandMark() {
       className="shrink-0"
       aria-hidden
     >
-      <rect x="2" y="2" width="32" height="32" rx="9" fill={BRAND_BLUE} fillOpacity={0.12} />
+      <rect x="2" y="2" width="32" height="32" rx="9" fill="var(--color-primary-bg)" />
       <path
         d="M11 24 L18 9 L25 24 Z"
         fill="none"
-        stroke={BRAND_BLUE}
+        stroke="var(--color-primary)"
         strokeWidth={2}
         strokeLinejoin="round"
       />
-      <circle cx="18" cy="24" r="2.25" fill={BRAND_BLUE} />
+      <circle cx="18" cy="24" r="2.25" fill="var(--color-primary)" />
     </svg>
   );
 }
@@ -130,6 +136,8 @@ function renderTabPanel(tab: TabItem) {
       return <AiModelSettings />;
     case "config-center":
       return <ConfigCenter />;
+    case "personal-settings":
+      return <PersonalSettings />;
     case "agent-edit":
       return <AgentEditorPage promptId={tab.promptId ?? Number((tab.path.match(/\/config\/agent\/edit\/(\d+)$/)?.[1] ?? 0))} />;
     case "youtube-quota":
@@ -137,7 +145,7 @@ function renderTabPanel(tab: TabItem) {
       return <Dashboard />;
     default:
       return (
-        <div className="p-6 text-slate-600 text-sm">
+        <div className="p-6 text-sm" style={{ color: "var(--color-text-secondary)" }}>
           无法识别该标签类型（{String(tab.type)}），请关闭标签后从左侧菜单重新打开对应页面。
         </div>
       );
@@ -148,8 +156,53 @@ export default function TabbedShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { setToken } = useAuth();
-  const { tabs, activeTabId, openTab, closeTab, setActiveTab } = useTabStore();
+  const {
+    tabs,
+    activeTabId,
+    pinnedTabIds,
+    openTab,
+    closeTab,
+    setActiveTab,
+    closeLeftTabs,
+    closeRightTabs,
+    closeOtherTabs,
+    closeAllTabs,
+    registerPinnedIds,
+  } = useTabStore();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // 启动时从后端同步主题偏好
+  const syncFromServer = useThemeStore((s) => s.syncFromServer);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const data = await getUserSettingsApi();
+        if (mounted && data.theme) {
+          syncFromServer(data.theme);
+        }
+      } catch {
+        // 加载失败时使用本地缓存
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [syncFromServer]);
+
+  // 初始化固定标签 ID 集合（navDefs 中的标签为固定标签，不可被批量关闭）
+  useEffect(() => {
+    registerPinnedIds(navDefs.map((d) => d.tabId));
+  }, [registerPinnedIds]);
+
+  // 批量关闭后，若活跃标签已变则自动导航
+  useEffect(() => {
+    if (!activeTabId) return;
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (activeTab && location.pathname !== activeTab.path) {
+      navigate(activeTab.path);
+    }
+  }, [activeTabId, tabs, navigate, location.pathname]);
 
   useEffect(() => {
     if (location.pathname === "/" || location.pathname === "") {
@@ -221,12 +274,34 @@ export default function TabbedShell() {
   };
 
   const SidebarContent = (
-    <aside className="h-full bg-white border-r border-slate-200/90 shadow-[4px_0_24px_rgba(15,23,42,0.07)] flex flex-col">
-      <div className="min-h-[4rem] px-4 py-3 flex items-center gap-3 border-b border-slate-200/90 shrink-0">
+    <aside
+      className="h-full flex flex-col"
+      style={{
+        backgroundColor: "var(--color-bg-sidebar)",
+        borderRight: "1px solid var(--color-border)",
+        boxShadow: "var(--shadow-sidebar)",
+        backgroundImage: "var(--gradient-sidebar)",
+        backdropFilter: "blur(var(--glass-blur))",
+      }}
+    >
+      <div
+        className="min-h-[4rem] px-4 py-3 flex items-center gap-3 shrink-0"
+        style={{ borderBottom: "1px solid var(--color-border)" }}
+      >
         <BrandMark />
         <div className="min-w-0 flex flex-col justify-center">
-          <span className="font-semibold text-slate-900 text-[15px] leading-snug truncate">YouTube Compass</span>
-          <span className="text-[11px] text-slate-500 leading-tight truncate">YouTube出海决策工具</span>
+          <span
+            className="font-semibold text-[15px] leading-snug truncate"
+            style={{ color: "var(--color-text-primary)" }}
+          >
+            YouTube Compass
+          </span>
+          <span
+            className="text-[11px] leading-tight truncate"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            YouTube出海决策工具
+          </span>
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
@@ -240,11 +315,14 @@ export default function TabbedShell() {
               key={def.path}
               type="button"
               onClick={() => handleNav(def)}
-              className={`w-full flex items-center gap-3 rounded-lg text-sm text-left transition-all duration-150 px-3 py-2.5 ${
-                active
-                  ? "bg-[#e6f4ff] text-[#1890ff] font-semibold shadow-sm ring-1 ring-[#1890ff]/15"
-                  : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
-              }`}
+              className="w-full flex items-center gap-3 rounded-lg text-sm text-left transition-all duration-150 px-3 py-2.5"
+              style={{
+                backgroundColor: active ? "var(--color-primary-bg)" : "transparent",
+                color: active ? "var(--color-primary)" : "var(--color-text-secondary)",
+                fontWeight: active ? 600 : 400,
+                boxShadow: active ? "0 1px 2px rgba(0,0,0,0.05)" : "none",
+                outline: active ? "1px solid var(--color-primary-border)" : "none",
+              }}
             >
               <Icon size={18} className={active ? "opacity-100" : "opacity-85"} strokeWidth={active ? 2.25 : 2} />
               <span className="truncate">{def.label}</span>
@@ -256,63 +334,164 @@ export default function TabbedShell() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-slate-900 flex">
+    <div
+      className="min-h-screen flex"
+      style={{ backgroundColor: "var(--color-bg-layout)", color: "var(--color-text-primary)" }}
+    >
       <div className="hidden lg:block w-72 shrink-0">{SidebarContent}</div>
 
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
-        <header className="h-16 border-b border-slate-200 bg-white px-4 md:px-6 flex items-center justify-between shrink-0">
+        <header
+          className="h-16 px-4 md:px-6 flex items-center justify-between shrink-0"
+          style={{
+            borderBottom: "1px solid var(--color-border)",
+            backgroundColor: "var(--color-bg-header)",
+            backgroundImage: "var(--gradient-header)",
+          }}
+        >
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
               onClick={() => setMobileOpen(true)}
-              className="lg:hidden p-2 rounded-md hover:bg-slate-100"
+              className="lg:hidden p-2 rounded-md"
+              style={{ color: "var(--color-text-secondary)" }}
               aria-label="打开侧边栏"
             >
               <MenuIcon size={18} />
             </button>
-            <h1 className="text-base md:text-lg font-semibold truncate">{pageTitle}</h1>
+            <h1
+              className="text-base md:text-lg font-semibold truncate"
+              style={{ color: "var(--color-text-primary)" }}
+            >
+              {pageTitle}
+            </h1>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-sm">U</div>
-            <button
-              type="button"
-              onClick={logout}
-              className="px-3 py-1.5 rounded-md bg-slate-900 text-white hover:bg-slate-700 text-sm flex items-center"
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: "personal-settings",
+                    icon: <User size={14} />,
+                    label: "个人设置",
+                    onClick: () => {
+                      openTab({
+                        id: "personal-settings",
+                        title: "个人设置",
+                        path: "/personal-settings",
+                        type: "personal-settings",
+                      });
+                      navigate("/personal-settings");
+                    },
+                  },
+                  {
+                    type: "divider",
+                  },
+                  {
+                    key: "logout",
+                    icon: <LogOut size={14} />,
+                    label: "登出",
+                    danger: true,
+                    onClick: logout,
+                  },
+                ],
+              }}
+              trigger={["click"]}
             >
-              <LogOut size={14} className="mr-1.5" />
-              登出
-            </button>
+              <button
+                type="button"
+                className="h-8 w-8 rounded-full flex items-center justify-center text-sm cursor-pointer"
+                style={{
+                  backgroundColor: "var(--color-bg-inset)",
+                  color: "var(--color-text-secondary)",
+                }}
+                aria-label="用户菜单"
+              >
+                U
+              </button>
+            </Dropdown>
           </div>
         </header>
 
         {/* 浏览器式标签栏 */}
-        <div className="bg-slate-100 border-b border-slate-200 px-2 pt-2 flex gap-1 overflow-x-auto shrink-0">
+        <div
+          className="px-2 pt-2 flex gap-1 overflow-x-auto shrink-0"
+          style={{
+            backgroundColor: "var(--color-bg-layout)",
+            borderBottom: "1px solid var(--color-border)",
+          }}
+        >
           {tabs.map((tab) => {
             const active = tab.id === activeTabId;
+            const tabIdx = tabs.findIndex((t) => t.id === tab.id);
+            const isPinned = pinnedTabIds.has(tab.id);
+            // 计算各菜单项是否可用
+            const leftCount = tabs.slice(0, tabIdx).filter((t) => !pinnedTabIds.has(t.id)).length;
+            const rightCount = tabs.slice(tabIdx + 1).filter((t) => !pinnedTabIds.has(t.id)).length;
+            const otherCount = tabs.filter((t) => t.id !== tab.id && !pinnedTabIds.has(t.id)).length;
+            const allCount = tabs.filter((t) => !pinnedTabIds.has(t.id)).length;
+
+            const contextItems: MenuProps["items"] = [
+              { key: "close-left", label: `关闭左侧`, disabled: leftCount === 0 },
+              { key: "close-right", label: `关闭右侧`, disabled: rightCount === 0 },
+              { key: "close-others", label: `关闭其他`, disabled: otherCount === 0 },
+              { key: "close-all", label: `关闭全部`, disabled: allCount === 0 },
+            ];
+
+            const handleContextClick: MenuProps["onClick"] = ({ key }) => {
+              switch (key) {
+                case "close-left":
+                  closeLeftTabs(tab.id);
+                  break;
+                case "close-right":
+                  closeRightTabs(tab.id);
+                  break;
+                case "close-others":
+                  closeOtherTabs(tab.id);
+                  break;
+                case "close-all":
+                  closeAllTabs();
+                  break;
+              }
+            };
+
             return (
-              <div
+              <Dropdown
                 key={tab.id}
-                className={`group flex items-center gap-1 max-w-[200px] rounded-t-md px-3 py-2 text-sm border border-b-0 cursor-pointer shrink-0 ${
-                  active ? "bg-white border-slate-200 text-blue-700 font-medium" : "bg-slate-50/80 border-transparent text-slate-600"
-                }`}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  navigate(tab.path);
-                }}
+                menu={{ items: contextItems, onClick: handleContextClick }}
+                trigger={["contextMenu"]}
               >
-                <span className="truncate">{tab.title}</span>
-                <button
-                  type="button"
-                  className="p-0.5 rounded hover:bg-slate-200 opacity-70 hover:opacity-100"
-                  aria-label="关闭标签"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeTab(tab.id);
+                <div
+                  className="group flex items-center gap-1 max-w-[200px] rounded-t-md px-3 py-2 text-sm border border-b-0 cursor-pointer shrink-0 select-none"
+                  style={{
+                    backgroundColor: active ? "var(--color-bg-tab-active)" : "var(--color-bg-tab)",
+                    borderColor: active ? "var(--color-border)" : "transparent",
+                    color: active ? "var(--color-primary)" : "var(--color-text-secondary)",
+                    fontWeight: active ? 500 : 400,
+                  }}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    navigate(tab.path);
                   }}
                 >
-                  <X size={14} />
-                </button>
-              </div>
+                  <span className="truncate">{tab.title}</span>
+                  {/* 固定标签不显示关闭按钮 */}
+                  {!isPinned && (
+                    <button
+                      type="button"
+                      className="p-0.5 rounded opacity-70 hover:opacity-100"
+                      style={{ backgroundColor: "var(--color-bg-inset)" }}
+                      aria-label="关闭标签"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        closeTab(tab.id);
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </Dropdown>
             );
           })}
         </div>

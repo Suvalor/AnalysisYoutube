@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 import { normalizeMarkdownForGfm } from "@/utils/markdownNormalize";
 
 type Props = {
@@ -18,7 +19,7 @@ export default function MarkdownPreview({ children, className = "" }: Props) {
 
   return (
     <div className={`markdown-body text-slate-800 text-sm leading-relaxed ${className}`.trim()}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalized}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{normalized}</ReactMarkdown>
     </div>
   );
 }

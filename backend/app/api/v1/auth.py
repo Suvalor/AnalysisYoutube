@@ -136,7 +136,9 @@ async def register(
     response_model=Token,
     summary="用户登录",
 )
+@limiter.limit("10/minute")
 async def login(
+    request: Request,
     login_in: UserLogin,
     db: DBSessionDep,
 ) -> Token:
@@ -183,8 +185,14 @@ async def forgot_password(
 
     token = create_reset_token(body.email)
     reset_url = f"{settings.frontend_base_url}/reset-password?token={token}"
-    # 发送邮件，失败时不暴露给用户（统一返回成功消息）
-    await send_reset_password_email(to_email=body.email, reset_url=reset_url)
+    # 发送邮件，失败时返回错误提示（不透露邮箱是否存在的情况已在上文处理）
+    ok = await send_reset_password_email(to_email=body.email, reset_url=reset_url)
+    if not ok:
+        # 邮件发送失败，清理 token 并返回错误
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="邮件发送失败，请检查SMTP配置或稍后再试",
+        )
     return {"message": "如果该邮箱已注册，重置链接已发送"}
 
 
@@ -193,7 +201,9 @@ async def forgot_password(
     status_code=status.HTTP_200_OK,
     summary="重置密码",
 )
+@limiter.limit("5/minute")
 async def reset_password(
+    request: Request,
     body: ResetPasswordRequest,
     db: DBSessionDep,
 ) -> dict:

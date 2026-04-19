@@ -1,6 +1,7 @@
 import { Button, Card, Input, Select, Typography, message } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { authFetch } from "@/services/apiClient";
 import {
   createScriptApi,
   listModelsApi,
@@ -119,12 +120,10 @@ export default function AICreator() {
     setGenerating(true);
     setGeneratedText("");
     try {
-      const token = localStorage.getItem("access_token");
-      const resp = await fetch("/api/v1/scripts/generate", {
+      const resp = await authFetch("/api/v1/scripts/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token ?? ""}`,
         },
         body: JSON.stringify({
           model: selectedModel,
@@ -134,10 +133,6 @@ export default function AICreator() {
         }),
       });
       if (resp.status === 401) {
-        localStorage.removeItem("access_token");
-        if (!window.location.pathname.startsWith("/login")) {
-          window.location.href = "/login";
-        }
         return;
       }
       if (!resp.ok || !resp.body) {

@@ -1,7 +1,7 @@
 from functools import lru_cache
 import json
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic import computed_field
 from pydantic_settings import BaseSettings
 
@@ -107,6 +107,16 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         extra = "ignore"
+
+    @model_validator(mode="after")
+    def _validate_secret_key(self) -> "Settings":
+        """启动时强制校验 SECRET_KEY，防止空值或弱密钥导致 JWT 伪造和加密失效。"""
+        if not self.secret_key or len(self.secret_key) < 32:
+            raise ValueError(
+                "SECRET_KEY 必须设置且至少 32 个字符。"
+                "请在 .env 或环境变量中配置强随机密钥，例如: python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+            )
+        return self
 
 
 @lru_cache

@@ -17,10 +17,13 @@ def _fernet_key_material(secret: str) -> bytes:
 
 
 def _get_secret() -> str:
-    """优先使用专用加密盐，否则回退到 JWT 用的 SECRET_KEY。生产环境务必使用强随机值。"""
+    """优先使用专用加密盐，否则回退到 JWT 用的 SECRET_KEY。强制最小 32 字符。"""
     raw = (settings.field_encryption_secret or settings.secret_key or "").strip()
-    if not raw:
-        raise ValueError("请配置 SECRET_KEY 或 FIELD_ENCRYPTION_SECRET，否则无法加密存储 API Key")
+    if not raw or len(raw) < 32:
+        raise ValueError(
+            "SECRET_KEY 或 FIELD_ENCRYPTION_SECRET 必须至少 32 个字符，"
+            "否则无法安全加密存储 API Key"
+        )
     return raw
 
 

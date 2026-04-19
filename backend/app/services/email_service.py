@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import secrets
 import string
-import uuid
 from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -85,7 +84,7 @@ def verify_email_code(email: str, user_input: str) -> bool:
 def create_reset_token(email: str) -> str:
     """创建密码重置Token。"""
     _cleanup_expired()
-    token = uuid.uuid4().hex
+    token = secrets.token_urlsafe(48)
     _reset_token_store[token] = {
         "email": email,
         "used": False,
