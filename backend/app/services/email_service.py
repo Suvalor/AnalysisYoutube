@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html as html_module
+import hmac
 import logging
 import secrets
 import string
@@ -74,7 +76,7 @@ def verify_email_code(email: str, user_input: str) -> bool:
     if entry["expires_at"] < datetime.now(timezone.utc):
         del _email_code_store[email]
         return False
-    if entry["code"] != user_input.strip():
+    if not hmac.compare_digest(entry["code"], user_input.strip()):
         return False
     # 验证成功后删除
     del _email_code_store[email]
@@ -182,12 +184,13 @@ async def send_reset_password_email(
 ) -> bool:
     """发送密码重置邮件。"""
     subject = "YouTube Compass - 密码重置"
+    safe_url = html_module.escape(reset_url, quote=True)
     html = f"""
     <div style="max-width:480px;margin:0 auto;padding:24px;font-family:system-ui,sans-serif">
       <h2 style="color:#0f172a;margin-bottom:16px">YouTube Compass 密码重置</h2>
       <p style="color:#475569;font-size:15px">您正在重置密码，请点击下方按钮：</p>
       <div style="text-align:center;margin:24px 0">
-        <a href="{reset_url}" style="background:#3b82f6;color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-size:15px;font-weight:600">重置密码</a>
+        <a href="{safe_url}" style="background:#3b82f6;color:#fff;padding:12px 32px;border-radius:8px;text-decoration:none;font-size:15px;font-weight:600">重置密码</a>
       </div>
       <p style="color:#94a3b8;font-size:13px">链接30分钟内有效。如非本人操作，请忽略此邮件。</p>
     </div>

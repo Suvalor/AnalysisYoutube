@@ -7,6 +7,7 @@ export type UserSettings = {
   ai_prompt_config_json: string | null;
   has_ai_api_key: boolean;
   theme: string | null;
+  locale: string | null;
 };
 
 /** 更新设置；不要传 ai_api_key 字段表示不修改已存密钥 */

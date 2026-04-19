@@ -1,0 +1,27 @@
+{
+  "blueOceanRadar": "蓝海雷达",
+  "navigationGuide": "出海导航",
+  "competitorAnalysis": "竞对洞察",
+  "channelManagement": "频道管理",
+  "globalVideos": "全局视频",
+  "videoBoard": "视频看板",
+  "dashboard": "仪表盘",
+  "configCenter": "设置中心",
+  "inspirationPool": "灵感中心",
+  "aiCreator": "AI 脚本工坊",
+  "sopWorkflow": "SOP 工作流",
+  "assetLibrary": "素材库",
+  "knowledgeBase": "知识库管理",
+  "feishuWorkspace": "飞书云文档",
+  "personalSettings": "个人设置",
+  "channelDetail": "博主详情",
+  "agentEdit": "编辑智能体",
+  "feishuViewer": "飞书云文档预览",
+  "tabClose": {
+    "closeLeft": "关闭左侧",
+    "closeRight": "关闭右侧",
+    "closeOthers": "关闭其他",
+    "closeAll": "关闭全部"
+  },
+  "unknownTab": "无法识别该标签类型（{{type}}），请关闭标签后从左侧菜单重新打开对应页面。"
+}

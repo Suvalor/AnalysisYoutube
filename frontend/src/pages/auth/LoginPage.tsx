@@ -1,5 +1,6 @@
 import { Alert, Button, Checkbox, Form, Input, Space } from "antd";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "@/components/Layout/AuthLayout";
 import { getCaptchaApi, loginApi } from "@/services/authApi";
@@ -21,6 +22,7 @@ export default function LoginPage() {
   const [captchaLoading, setCaptchaLoading] = useState(false);
   const navigate = useNavigate();
   const { setToken } = useAuth();
+  const { t } = useTranslation("auth");
 
   const fetchCaptcha = async () => {
     setCaptchaLoading(true);
@@ -30,7 +32,7 @@ export default function LoginPage() {
       setCaptchaImage(data.captcha_image);
       form.setFieldValue("captcha_code", "");
     } catch {
-      setError("获取验证码失败，请刷新页面");
+      setError(t("common:message.networkError"));
     } finally {
       setCaptchaLoading(false);
     }
@@ -38,7 +40,6 @@ export default function LoginPage() {
 
   useEffect(() => {
     fetchCaptcha();
-    // 恢复记住的邮箱
     const storedEmail = localStorage.getItem("rememberedEmail") || "";
     if (storedEmail) {
       form.setFieldValue("email", storedEmail);
@@ -66,12 +67,11 @@ export default function LoginPage() {
       }
       navigate("/blue-ocean-radar");
     } catch (e: any) {
-      const message =
+      const msg =
         e?.response?.data?.detail ??
         e?.message ??
-        "登录失败，请稍后重试";
-      setError(String(message));
-      // 登录失败后刷新验证码
+        t("common:message.networkError");
+      setError(String(msg));
       fetchCaptcha();
     } finally {
       setLoading(false);
@@ -80,8 +80,8 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title="登录 YouTube Compass"
-      subtitle="为 YouTube 创作者打造的一站式效率工具"
+      title={`${t("login.title")} YouTube Compass`}
+      subtitle={t("common:app.subtitle")}
     >
       <Form
         layout="vertical"
@@ -95,33 +95,33 @@ export default function LoginPage() {
           </div>
         )}
         <Form.Item
-          label="邮箱"
+          label={t("login.email")}
           name="email"
           rules={[
-            { required: true, message: "请输入邮箱" },
-            { type: "email", message: "邮箱格式不正确" }
+            { required: true, message: t("common:validation.email") },
+            { type: "email", message: t("common:validation.email") }
           ]}
         >
           <Input placeholder="you@example.com" size="large" />
         </Form.Item>
         <Form.Item
-          label="密码"
+          label={t("login.password")}
           name="password"
-          rules={[{ required: true, message: "请输入密码" }]}
+          rules={[{ required: true, message: t("common:validation.required") }]}
         >
-          <Input.Password placeholder="至少 8 位安全密码" size="large" />
+          <Input.Password placeholder="••••••••" size="large" />
         </Form.Item>
         <Form.Item
-          label="验证码"
+          label={t("login.captcha")}
           name="captcha_code"
           rules={[
-            { required: true, message: "请输入验证码" },
-            { len: 4, message: "验证码为4位" }
+            { required: true, message: t("common:validation.required") },
+            { len: 4, message: "4" }
           ]}
         >
           <Space>
             <Input
-              placeholder="4位验证码"
+              placeholder="4"
               size="large"
               maxLength={4}
               style={{ width: 120 }}
@@ -129,10 +129,10 @@ export default function LoginPage() {
             {captchaImage && (
               <img
                 src={`data:image/png;base64,${captchaImage}`}
-                alt="验证码"
+                alt={t("login.captcha")}
                 className="h-10 cursor-pointer rounded border border-slate-600"
                 onClick={fetchCaptcha}
-                title="点击刷新验证码"
+                title={t("login.captchaRefresh")}
               />
             )}
             <Button
@@ -140,7 +140,7 @@ export default function LoginPage() {
               onClick={fetchCaptcha}
               loading={captchaLoading}
             >
-              刷新
+              {t("common:action.refresh")}
             </Button>
           </Space>
         </Form.Item>
@@ -150,10 +150,10 @@ export default function LoginPage() {
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
             >
-              记住账号
+              {t("login.rememberMe")}
             </Checkbox>
             <Link to="/forgot-password" className="text-indigo-400 hover:text-indigo-300 text-sm">
-              忘记密码？
+              {t("login.forgotPassword")}
             </Link>
           </div>
         </Form.Item>
@@ -165,13 +165,13 @@ export default function LoginPage() {
             className="w-full"
             loading={loading}
           >
-            登录
+            {t("login.submit")}
           </Button>
         </Form.Item>
         <div className="text-sm text-slate-300 flex justify-between">
-          <span>还没有账号？</span>
+          <span>{t("login.noAccount")}</span>
           <Link to="/register" className="text-indigo-400 hover:text-indigo-300">
-            立即注册
+            {t("login.goRegister")}
           </Link>
         </div>
       </Form>

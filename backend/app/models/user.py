@@ -46,6 +46,7 @@ class User(Base):
     youtube_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     youtube_channel_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     theme: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    locale: Mapped[str | None] = mapped_column(String(10), nullable=True)
     competitor_pools: Mapped[list["UserCompetitorPool"]] = relationship(
         "UserCompetitorPool", back_populates="user", cascade="all, delete-orphan"
     )
