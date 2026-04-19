@@ -21,6 +21,8 @@ import {
   Youtube,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "@/i18n";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/store/authStore";
 import { useTabStore, type TabItem, type TabType } from "@/store/useTabStore";
@@ -45,6 +47,7 @@ import BlueOceanRadar from "@/pages/radar/BlueOceanRadar";
 import NavigationGuide from "@/pages/radar/NavigationGuide";
 import { isFeatureEnabled, type FeatureKey } from "@/config/features";
 import { useThemeStore } from "@/store/useThemeStore";
+import { useI18nStore } from "@/store/useI18nStore";
 import { getUserSettingsApi } from "@/services/userApi";
 
 /** 品牌色使用 CSS 变量，支持主题切换 */
@@ -74,7 +77,7 @@ function BrandMark() {
 
 type NavDef = {
   path: string;
-  label: string;
+  labelKey: string;
   icon: typeof Home;
   type: TabType;
   tabId: string;
@@ -83,21 +86,21 @@ type NavDef = {
 
 /** 顺序：出海核心 → 监控 → 系统；创作者工具通过 Feature Flag 控制 */
 const navDefs: NavDef[] = [
-  { path: "/blue-ocean-radar", label: "蓝海雷达", icon: Waves, type: "blue-ocean-radar", tabId: "blue-ocean-radar" },
-  { path: "/navigation-guide", label: "出海导航", icon: Compass, type: "navigation-guide", tabId: "navigation-guide" },
-  { path: "/competitor-analysis", label: "竞对洞察", icon: BarChart3, type: "competitor-analysis", tabId: "competitor-analysis" },
-  { path: "/youtube/channels", label: "频道管理", icon: Youtube, type: "channel-list", tabId: "channel-list" },
-  { path: "/youtube/videos", label: "全局视频", icon: Video, type: "global-videos", tabId: "global-videos" },
-  { path: "/video-board", label: "视频看板", icon: Kanban, type: "video-board", tabId: "video-board" },
-  { path: "/dashboard", label: "仪表盘", icon: Home, type: "dashboard", tabId: "dashboard" },
-  { path: "/config-center", label: "设置中心", icon: Settings, type: "config-center", tabId: "config-center" },
+  { path: "/blue-ocean-radar", labelKey: "nav:blueOceanRadar", icon: Waves, type: "blue-ocean-radar", tabId: "blue-ocean-radar" },
+  { path: "/navigation-guide", labelKey: "nav:navigationGuide", icon: Compass, type: "navigation-guide", tabId: "navigation-guide" },
+  { path: "/competitor-analysis", labelKey: "nav:competitorAnalysis", icon: BarChart3, type: "competitor-analysis", tabId: "competitor-analysis" },
+  { path: "/youtube/channels", labelKey: "nav:channelManagement", icon: Youtube, type: "channel-list", tabId: "channel-list" },
+  { path: "/youtube/videos", labelKey: "nav:globalVideos", icon: Video, type: "global-videos", tabId: "global-videos" },
+  { path: "/video-board", labelKey: "nav:videoBoard", icon: Kanban, type: "video-board", tabId: "video-board" },
+  { path: "/dashboard", labelKey: "nav:dashboard", icon: Home, type: "dashboard", tabId: "dashboard" },
+  { path: "/config-center", labelKey: "nav:configCenter", icon: Settings, type: "config-center", tabId: "config-center" },
   // 创作者工具（Feature Flag 控制）
-  { path: "/inspiration-pool", label: "灵感中心", icon: Lightbulb, type: "inspiration-pool", tabId: "inspiration-pool", featureKey: "INSPIRATION_POOL" },
-  { path: "/ai-creator", label: "AI 脚本工坊", icon: WandSparkles, type: "ai-creator", tabId: "ai-creator", featureKey: "AI_CREATOR" },
-  { path: "/sop-workflow", label: "SOP 工作流", icon: Clapperboard, type: "sop-workflow", tabId: "sop-workflow", featureKey: "SOP_WORKFLOW" },
-  { path: "/assets", label: "素材库", icon: Image, type: "assets", tabId: "assets", featureKey: "ASSET_LIBRARY" },
-  { path: "/knowledge-base", label: "知识库管理", icon: Library, type: "knowledge-base", tabId: "knowledge-base", featureKey: "KNOWLEDGE_BASE" },
-  { path: "/feishu-workspace", label: "飞书云文档", icon: Cloud, type: "feishu-workspace", tabId: "feishu-workspace", featureKey: "FEISHU_DOCS" },
+  { path: "/inspiration-pool", labelKey: "nav:inspirationPool", icon: Lightbulb, type: "inspiration-pool", tabId: "inspiration-pool", featureKey: "INSPIRATION_POOL" },
+  { path: "/ai-creator", labelKey: "nav:aiCreator", icon: WandSparkles, type: "ai-creator", tabId: "ai-creator", featureKey: "AI_CREATOR" },
+  { path: "/sop-workflow", labelKey: "nav:sopWorkflow", icon: Clapperboard, type: "sop-workflow", tabId: "sop-workflow", featureKey: "SOP_WORKFLOW" },
+  { path: "/assets", labelKey: "nav:assetLibrary", icon: Image, type: "assets", tabId: "assets", featureKey: "ASSET_LIBRARY" },
+  { path: "/knowledge-base", labelKey: "nav:knowledgeBase", icon: Library, type: "knowledge-base", tabId: "knowledge-base", featureKey: "KNOWLEDGE_BASE" },
+  { path: "/feishu-workspace", labelKey: "nav:feishuWorkspace", icon: Cloud, type: "feishu-workspace", tabId: "feishu-workspace", featureKey: "FEISHU_DOCS" },
 ];
 
 function renderTabPanel(tab: TabItem) {
@@ -146,7 +149,7 @@ function renderTabPanel(tab: TabItem) {
     default:
       return (
         <div className="p-6 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          无法识别该标签类型（{String(tab.type)}），请关闭标签后从左侧菜单重新打开对应页面。
+          {i18n.t("nav:unknownTab", { type: String(tab.type) })}
         </div>
       );
   }
@@ -155,6 +158,7 @@ function renderTabPanel(tab: TabItem) {
 export default function TabbedShell() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation(["nav", "common"]);
   const { setToken } = useAuth();
   const {
     tabs,
@@ -171,15 +175,17 @@ export default function TabbedShell() {
   } = useTabStore();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // 启动时从后端同步主题偏好
+  // 启动时从后端同步主题和语言偏好
   const syncFromServer = useThemeStore((s) => s.syncFromServer);
+  const syncLocaleFromServer = useI18nStore((s) => s.syncFromServer);
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const data = await getUserSettingsApi();
-        if (mounted && data.theme) {
-          syncFromServer(data.theme);
+        if (mounted) {
+          if (data.theme) syncFromServer(data.theme);
+          if (data.locale) syncLocaleFromServer(data.locale);
         }
       } catch {
         // 加载失败时使用本地缓存
@@ -188,7 +194,7 @@ export default function TabbedShell() {
     return () => {
       mounted = false;
     };
-  }, [syncFromServer]);
+  }, [syncFromServer, syncLocaleFromServer]);
 
   // 初始化固定标签 ID 集合（navDefs 中的标签为固定标签，不可被批量关闭）
   useEffect(() => {
@@ -220,14 +226,14 @@ export default function TabbedShell() {
     const fullPath = location.search ? `${path}${location.search}` : path;
     const def = navDefs.find((n) => n.path === path);
     if (def) {
-      openTab({ id: def.tabId, title: def.label, path: fullPath, type: def.type });
+      openTab({ id: def.tabId, title: t(def.labelKey), path: fullPath, type: def.type });
     }
     const m = path.match(/^\/youtube\/channel\/(\d+)$/);
     if (m) {
       const cid = Number(m[1]);
       openTab({
         id: `channel-detail-${cid}`,
-        title: "博主详情",
+        title: t("nav:channelDetail"),
         path: path,
         type: "channel-detail",
         channelId: cid,
@@ -238,7 +244,7 @@ export default function TabbedShell() {
       const pid = Number(editPromptMatch[1]);
       openTab({
         id: `agent-edit-${pid}`,
-        title: `编辑智能体 #${pid}`,
+        title: `${t("nav:agentEdit")} #${pid}`,
         path,
         type: "agent-edit",
         promptId: pid,
@@ -249,7 +255,7 @@ export default function TabbedShell() {
       const did = Number(feishuViewMatch[1]);
       openTab({
         id: `feishu-view-${did}`,
-        title: "飞书云文档预览",
+        title: t("nav:feishuViewer"),
         path,
         type: "feishu-viewer",
         feishuDocId: did,
@@ -263,7 +269,7 @@ export default function TabbedShell() {
   }, [tabs, activeTabId]);
 
   const handleNav = (def: NavDef) => {
-    openTab({ id: def.tabId, title: def.label, path: def.path, type: def.type });
+    openTab({ id: def.tabId, title: t(def.labelKey), path: def.path, type: def.type });
     navigate(def.path);
     setMobileOpen(false);
   };
@@ -300,7 +306,7 @@ export default function TabbedShell() {
             className="text-[11px] leading-tight truncate"
             style={{ color: "var(--color-text-secondary)" }}
           >
-            YouTube出海决策工具
+            {t("common:app.subtitle")}
           </span>
         </div>
       </div>
@@ -325,7 +331,7 @@ export default function TabbedShell() {
               }}
             >
               <Icon size={18} className={active ? "opacity-100" : "opacity-85"} strokeWidth={active ? 2.25 : 2} />
-              <span className="truncate">{def.label}</span>
+              <span className="truncate">{t(def.labelKey)}</span>
             </button>
           );
         })}
@@ -373,11 +379,11 @@ export default function TabbedShell() {
                   {
                     key: "personal-settings",
                     icon: <User size={14} />,
-                    label: "个人设置",
+                    label: t("nav:personalSettings"),
                     onClick: () => {
                       openTab({
                         id: "personal-settings",
-                        title: "个人设置",
+                        title: t("nav:personalSettings"),
                         path: "/personal-settings",
                         type: "personal-settings",
                       });
@@ -390,7 +396,7 @@ export default function TabbedShell() {
                   {
                     key: "logout",
                     icon: <LogOut size={14} />,
-                    label: "登出",
+                    label: t("common:action.logout"),
                     danger: true,
                     onClick: logout,
                   },
@@ -432,10 +438,10 @@ export default function TabbedShell() {
             const allCount = tabs.filter((t) => !pinnedTabIds.has(t.id)).length;
 
             const contextItems: MenuProps["items"] = [
-              { key: "close-left", label: `关闭左侧`, disabled: leftCount === 0 },
-              { key: "close-right", label: `关闭右侧`, disabled: rightCount === 0 },
-              { key: "close-others", label: `关闭其他`, disabled: otherCount === 0 },
-              { key: "close-all", label: `关闭全部`, disabled: allCount === 0 },
+              { key: "close-left", label: t("nav:tabClose.closeLeft"), disabled: leftCount === 0 },
+              { key: "close-right", label: t("nav:tabClose.closeRight"), disabled: rightCount === 0 },
+              { key: "close-others", label: t("nav:tabClose.closeOthers"), disabled: otherCount === 0 },
+              { key: "close-all", label: t("nav:tabClose.closeAll"), disabled: allCount === 0 },
             ];
 
             const handleContextClick: MenuProps["onClick"] = ({ key }) => {

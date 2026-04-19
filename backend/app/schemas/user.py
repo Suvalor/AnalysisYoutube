@@ -13,6 +13,7 @@ class UserSettingsRead(BaseModel):
     ai_prompt_config_json: str | None = Field(None, description="提示词与风格等 JSON 配置原文")
     has_ai_api_key: bool = Field(False, description="是否已保存过 API Key（不返回明文）")
     theme: str | None = Field(None, description="用户主题偏好（light/liblib-dark/deep-blue/warm-orange）")
+    locale: str | None = Field(None, description="用户语言偏好（zh-CN/en-US/ja-JP/ko-KR）")
 
 
 class UserSettingsUpdate(BaseModel):
@@ -32,4 +33,8 @@ class UserSettingsUpdate(BaseModel):
     theme: str | None = Field(
         None,
         description="主题偏好（light/liblib-dark/deep-blue/warm-orange）；null 表示使用默认",
+    )
+    locale: str | None = Field(
+        None,
+        description="语言偏好（zh-CN/en-US/ja-JP/ko-KR）；null 表示使用默认",
     )

@@ -6,6 +6,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 
+# update_user_settings 允许写入的字段白名单，防止 Mass Assignment
+_ALLOWED_SETTINGS_FIELDS = frozenset({
+    "feishu_doc_url",
+    "ai_api_base_url",
+    "ai_models_json",
+    "ai_prompt_config_json",
+    "ai_api_key_encrypted",
+    "theme",
+    "locale",
+})
+
 
 async def get_user_by_email(
     session: AsyncSession,
@@ -58,7 +69,7 @@ async def update_user_settings(
 ) -> User:
     """按 patch 更新用户设置字段（仅包含需要写入的键）。"""
     for key, value in patch.items():
-        if hasattr(user, key):
+        if key in _ALLOWED_SETTINGS_FIELDS:
             setattr(user, key, value)
     try:
         await session.commit()

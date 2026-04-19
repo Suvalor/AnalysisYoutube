@@ -24,7 +24,10 @@
       "Bash(npm audit *)",
       "Bash(npm ls *)",
       "Bash(npm install *)",
-      "WebFetch(domain:www.liblib.art)"
+      "WebFetch(domain:www.liblib.art)",
+      "Bash(npm run *)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/services/email_service.py'\\).read\\(\\)\\); print\\('email_service.py: OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/crud/user.py'\\).read\\(\\)\\); print\\('user.py CRUD: OK'\\)\")"
     ]
   }
 }

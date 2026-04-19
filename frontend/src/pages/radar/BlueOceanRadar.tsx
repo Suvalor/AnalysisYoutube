@@ -311,9 +311,9 @@ export default function BlueOceanRadar() {
             return "<tr>" + cells.map((c) => `<${tag}>${c.trim()}</${tag}>`).join("") + "</tr>";
           })
           .replace(/\n/g, "<br>");
-        // 用 nh3 净化 HTML，防止 XSS
-        const nh3 = await import("nh3");
-        const safeHtml = nh3.sanitize(rawHtml);
+        // 用 DOMPurify 净化 HTML，防止 XSS
+        const DOMPurify = (await import("dompurify")).default;
+        const safeHtml = DOMPurify.sanitize(rawHtml);
         win.document.write(`<html><head><title>蓝海雷达报告</title><style>body{font-family:system-ui;max-width:900px;margin:0 auto;padding:24px;color:#1e293b}table{border-collapse:collapse;width:100%}th,td{border:1px solid #e2e8f0;padding:8px;text-align:left}th{background:#f1f5f9}h1{color:#0f172a}h2{color:#1e293b;border-bottom:1px solid #e2e8f0;padding-bottom:8px}hr{border:none;border-top:1px solid #e2e8f0;margin:16px 0}li{margin:4px 0}</style></head><body>`);
         win.document.write(safeHtml);
         win.document.write("</body></html>");

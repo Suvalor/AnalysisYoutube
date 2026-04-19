@@ -20,6 +20,7 @@ def _to_settings_read(user: User) -> UserSettingsRead:
         ai_prompt_config_json=user.ai_prompt_config_json,
         has_ai_api_key=bool(user.ai_api_key_encrypted and user.ai_api_key_encrypted.strip()),
         theme=user.theme,
+        locale=user.locale,
     )
 
 
@@ -113,6 +114,19 @@ async def update_me_settings(
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"无效主题值：{v}，可选值：{', '.join(sorted(valid_themes))}",
+            )
+
+    if "locale" in incoming:
+        v = incoming["locale"]
+        valid_locales = {"zh-CN", "en-US", "ja-JP", "ko-KR"}
+        if v is None:
+            patch["locale"] = None
+        elif str(v).strip() in valid_locales:
+            patch["locale"] = str(v).strip()
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"无效语言值：{v}，可选值：{', '.join(sorted(valid_locales))}",
             )
 
     user = await update_user_settings(db, current_user, patch=patch)
