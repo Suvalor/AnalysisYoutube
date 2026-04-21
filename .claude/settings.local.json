@@ -27,7 +27,20 @@
       "WebFetch(domain:www.liblib.art)",
       "Bash(npm run *)",
       "Bash(python -c \"import ast; ast.parse\\(open\\('app/services/email_service.py'\\).read\\(\\)\\); print\\('email_service.py: OK'\\)\")",
-      "Bash(python -c \"import ast; ast.parse\\(open\\('app/crud/user.py'\\).read\\(\\)\\); print\\('user.py CRUD: OK'\\)\")"
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/crud/user.py'\\).read\\(\\)\\); print\\('user.py CRUD: OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/api/v1/radar.py'\\).read\\(\\)\\); print\\('radar.py: OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/schemas/radar.py'\\).read\\(\\)\\); print\\('schemas/radar.py: OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/models/navigation_guide_record.py'\\).read\\(\\)\\); print\\('model: OK'\\)\")",
+      "WebFetch(domain:vidiq.com)",
+      "WebFetch(domain:www.tubebuddy.com)",
+      "WebFetch(domain:www.noxinfluencer.com)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/services/keyword_research_service.py'\\).read\\(\\)\\); ast.parse\\(open\\('app/schemas/keyword_research.py'\\).read\\(\\)\\); ast.parse\\(open\\('app/api/v1/keyword.py'\\).read\\(\\)\\); ast.parse\\(open\\('app/api/v1/__init__.py'\\).read\\(\\)\\); print\\('All OK'\\)\")",
+      "Bash(xxd /Users/suycity/Code/Youtube/AnalysisYoutube/backend/app/api/v1/__init__.py)",
+      "Bash(.venv/bin/python *)",
+      "Bash(.venv/bin/python3 *)",
+      "Bash(ls *)",
+      "Bash(/Users/suycity/Code/Youtube/AnalysisYoutube/backend/.venv/bin/python *)"
     ]
   }
 }

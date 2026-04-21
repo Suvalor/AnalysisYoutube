@@ -21,8 +21,12 @@ export type TabType =
   | "agent-edit"
   | "inspiration-pool"
   | "blue-ocean-radar"
+  | "keyword-research"
+  | "seo-scoring"
+  | "trend-discovery"
   | "navigation-guide"
-  | "personal-settings";
+  | "personal-settings"
+  | "channel-growth";
 
 export type TabItem = {
   id: string;

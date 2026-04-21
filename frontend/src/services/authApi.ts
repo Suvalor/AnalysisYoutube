@@ -551,6 +551,94 @@ export async function navigationChatApi(payload: {
   return res.data as NavigationChatResponse;
 }
 
+// ── 出海导航推荐记录 API ──
+
+export type NavigationGuideRecordItem = {
+  id: number;
+  request_params: Record<string, unknown>;
+  top_niche_title: string | null;
+  top_match_score: number | null;
+  recommendation_count: number;
+  created_at: string;
+};
+
+export type NavigationGuideRecordDetail = {
+  id: number;
+  request_params: Record<string, unknown>;
+  result: {
+    recommendations: NicheRecommendation[];
+    avoid_niche?: AvoidNiche | null;
+    ai_summary?: string | null;
+    channel_info?: Record<string, unknown> | null;
+  };
+  created_at: string;
+};
+
+export async function listNavigationRecordsApi(limit = 20, offset = 0) {
+  const res = await apiClient.get("/api/radar/navigation-records", { params: { limit, offset } });
+  return res.data as { items: NavigationGuideRecordItem[]; total: number };
+}
+
+export async function getNavigationRecordApi(recordId: number) {
+  const res = await apiClient.get(`/api/radar/navigation-records/${recordId}`);
+  return res.data as NavigationGuideRecordDetail;
+}
+
+export async function deleteNavigationRecordApi(recordId: number) {
+  const res = await apiClient.delete(`/api/radar/navigation-records/${recordId}`);
+  return res.data as { message: string };
+}
+
+// ── 关键词研究 API ──
+
+export type TrendDataPoint = {
+  period: string;
+  days: number;
+  result_count: number;
+};
+
+export type TopVideoItem = {
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  channel_title: string;
+};
+
+export type RelatedKeywordItem = {
+  keyword: string;
+  search_volume_score: number;
+  competition_score: number;
+};
+
+export type KeywordResearchResponse = {
+  keyword: string;
+  region: string;
+  keyword_score: number;
+  search_volume_score: number;
+  competition_score: number;
+  keyword_difficulty: number;
+  opportunity_score: number;
+  trend_direction: "rising" | "stable" | "declining";
+  total_results: number;
+  related_keywords: string[];
+  related_keywords_with_scores: RelatedKeywordItem[];
+  trend_data: TrendDataPoint[];
+  top_videos: TopVideoItem[];
+  channel_count: number;
+  avg_channel_subscribers: number;
+  content_gap_ratio: number;
+  search_calls: number;
+};
+
+export async function keywordResearchApi(payload: {
+  keyword: string;
+  region?: string;
+  language?: string;
+}) {
+  const res = await apiClient.post("/api/keyword/research", payload);
+  return res.data as KeywordResearchResponse;
+}
+
 // ── 参数迭代 API ──
 
 export async function getLatestParamIterationApi() {
@@ -592,4 +680,124 @@ export async function triggerAutoRetroApi(force = false) {
     recommended_params: Record<string, unknown>;
     analysis_summary: string;
   };
+}
+
+// ── SEO 评分 API ──
+
+export type SeoScoringResponse = {
+  total_score: number;
+  title_score: number;
+  title_max: number;
+  description_score: number;
+  description_max: number;
+  tags_score: number;
+  tags_max: number;
+  suggestions: string[];
+};
+
+export async function seoScoringApi(payload: {
+  title: string;
+  description?: string;
+  tags?: string[];
+  target_keyword?: string;
+}) {
+  const res = await apiClient.post("/api/seo/seo-score", payload);
+  return res.data as SeoScoringResponse;
+}
+
+// ── 热门趋势 API ──
+
+export type TrendingVideoItem = {
+  video_id: string;
+  title: string;
+  channel_title: string;
+  channel_id: string;
+  channel_subscribers: number;
+  published_at: string;
+  thumbnail_url: string;
+  category_id: string;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  engagement_rate: number;
+  duration: string;
+};
+
+export type CategoryDistributionItem = {
+  category_id: string;
+  category_name: string;
+  video_count: number;
+  percentage: number;
+};
+
+export type TrendDiscoveryResponse = {
+  region: string;
+  category_id: string | null;
+  fetched_at: string;
+  trending_videos: TrendingVideoItem[];
+  category_distribution: CategoryDistributionItem[];
+  stats: {
+    total_videos: number;
+    avg_views: number;
+    avg_likes: number;
+    avg_engagement_rate: number;
+  };
+};
+
+export async function trendDiscoveryApi(payload: {
+  region?: string;
+  category_id?: string;
+  max_results?: number;
+}) {
+  const res = await apiClient.post("/api/seo/trending", payload);
+  return res.data as TrendDiscoveryResponse;
+}
+
+// ── 频道增长仪表盘 API ──
+
+export type GrowthDataPoint = {
+  date: string;
+  subscribers: number;
+  views: number;
+  videos: number;
+};
+
+export type ChannelGrowthMetrics = {
+  pool_id: number;
+  channel_id: string;
+  title: string;
+  thumbnail_url: string | null;
+  current_subscribers: number;
+  current_views: number;
+  current_videos: number;
+  subscriber_growth_rate: number;
+  view_growth_rate: number;
+  avg_views_per_video: number;
+  engagement_score: number;
+  growth_trend: "rising" | "stable" | "declining";
+  growth_data: GrowthDataPoint[];
+};
+
+export type ChannelGrowthSummary = {
+  total_subscribers: number;
+  total_views: number;
+  total_videos: number;
+  avg_subscriber_growth_rate: number;
+  avg_view_growth_rate: number;
+  fastest_growing_channel: string;
+  fastest_growing_rate: number;
+};
+
+export type ChannelGrowthResponse = {
+  channels: ChannelGrowthMetrics[];
+  summary: ChannelGrowthSummary;
+  quota_used: number;
+};
+
+export async function channelGrowthApi(payload: {
+  channel_ids: number[];
+  days?: number;
+}) {
+  const res = await apiClient.post("/api/channel-growth/dashboard", payload);
+  return res.data as ChannelGrowthResponse;
 }
