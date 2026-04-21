@@ -342,3 +342,38 @@ class NavigationChatResponse(BaseModel):
 
     assistant_message: str
     conversation_id: str
+
+
+# ──────────────────────────────────────────────
+# 出海导航推荐记录
+# ──────────────────────────────────────────────
+
+from datetime import datetime as _datetime
+
+
+class NavigationGuideRecordItem(BaseModel):
+    """推荐记录列表项（摘要）。"""
+
+    id: int
+    request_params: dict
+    # 从 result 中提取的摘要字段，方便列表展示
+    top_niche_title: str | None = Field(None, description="匹配度最高的品类名称")
+    top_match_score: int | None = Field(None, description="匹配度最高的品类分数")
+    recommendation_count: int = Field(0, description="推荐品类数量")
+    created_at: _datetime
+
+
+class NavigationGuideRecordDetail(BaseModel):
+    """推荐记录详情（完整结果）。"""
+
+    id: int
+    request_params: dict
+    result: dict
+    created_at: _datetime
+
+
+class NavigationGuideRecordListResponse(BaseModel):
+    """推荐记录分页列表。"""
+
+    items: list[NavigationGuideRecordItem]
+    total: int

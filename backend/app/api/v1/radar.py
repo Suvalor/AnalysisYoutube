@@ -23,6 +23,9 @@ from app.schemas.radar import (
     NavigationGuideRequest,
     NavigationChatRequest,
     NavigationChatResponse,
+    NavigationGuideRecordItem,
+    NavigationGuideRecordDetail,
+    NavigationGuideRecordListResponse,
 )
 from app.schemas.radar_param_iteration import (
     RadarParamIterationCreate,
@@ -329,7 +332,7 @@ async def navigation_guide_endpoint(
     import uuid
     conversation_id = f"nav_guide:{current_user.id}:{uuid.uuid4().hex[:8]}"
 
-    return NavigationGuideResponse(
+    response = NavigationGuideResponse(
         recommendations=recommendations,
         avoid_niche=avoid_niche,
         ai_summary=result.get("ai_summary"),
@@ -348,6 +351,29 @@ async def navigation_guide_endpoint(
         conversation_id=conversation_id,
         channel_info=result.get("channel_info"),
     )
+
+    # ── 自动保存推荐记录 ──
+    try:
+        from app.models.navigation_guide_record import NavigationGuideRecord
+        record = NavigationGuideRecord(
+            user_id=current_user.id,
+            org_id=current_user.org_id,
+            request_params=body.model_dump(),
+            result={
+                "recommendations": [r.model_dump() for r in recommendations],
+                "avoid_niche": avoid_niche.model_dump() if avoid_niche else None,
+                "ai_summary": result.get("ai_summary"),
+                "channel_info": result.get("channel_info"),
+            },
+        )
+        db.add(record)
+        await db.commit()
+    except Exception:  # noqa: BLE001
+        import logging as _nav_log
+        _nav_log.getLogger(__name__).exception("自动保存导航推荐记录失败，不影响推荐结果")
+        await db.rollback()
+
+    return response
 
 
 @router.post(
@@ -377,6 +403,112 @@ async def navigation_chat_endpoint(
         assistant_message=result["assistant_message"],
         conversation_id=result["conversation_id"],
     )
+
+
+# ── 出海导航推荐记录 API ──
+
+
+@router.get(
+    "/navigation-records",
+    response_model=NavigationGuideRecordListResponse,
+    summary="查询出海导航推荐历史",
+)
+async def list_navigation_records(
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> NavigationGuideRecordListResponse:
+    """分页查询当前用户的出海导航推荐历史记录。"""
+    from sqlalchemy import select, func as sa_func
+    from app.models.navigation_guide_record import NavigationGuideRecord
+
+    count_q = select(sa_func.count()).select_from(NavigationGuideRecord).where(
+        NavigationGuideRecord.user_id == current_user.id
+    )
+    total = (await db.execute(count_q)).scalar() or 0
+
+    rows_q = (
+        select(NavigationGuideRecord)
+        .where(NavigationGuideRecord.user_id == current_user.id)
+        .order_by(NavigationGuideRecord.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    rows = (await db.execute(rows_q)).scalars().all()
+
+    items = []
+    for row in rows:
+        recs = (row.result or {}).get("recommendations", [])
+        top_rec = recs[0] if recs else None
+        items.append(NavigationGuideRecordItem(
+            id=row.id,
+            request_params=row.request_params or {},
+            top_niche_title=top_rec.get("niche_title") if top_rec else None,
+            top_match_score=top_rec.get("match_score") if top_rec else None,
+            recommendation_count=len(recs),
+            created_at=row.created_at,
+        ))
+
+    return NavigationGuideRecordListResponse(items=items, total=total)
+
+
+@router.get(
+    "/navigation-records/{record_id}",
+    response_model=NavigationGuideRecordDetail,
+    summary="查看出海导航推荐详情",
+)
+async def get_navigation_record(
+    record_id: int,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> NavigationGuideRecordDetail:
+    """查看单条出海导航推荐记录的完整内容。"""
+    from fastapi import HTTPException, status
+    from sqlalchemy import select
+    from app.models.navigation_guide_record import NavigationGuideRecord
+
+    q = select(NavigationGuideRecord).where(
+        NavigationGuideRecord.id == record_id,
+        NavigationGuideRecord.user_id == current_user.id,
+    )
+    row = (await db.execute(q)).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="记录不存在")
+
+    return NavigationGuideRecordDetail(
+        id=row.id,
+        request_params=row.request_params or {},
+        result=row.result or {},
+        created_at=row.created_at,
+    )
+
+
+@router.delete(
+    "/navigation-records/{record_id}",
+    summary="删除出海导航推荐记录",
+)
+async def delete_navigation_record(
+    record_id: int,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> dict:
+    """删除单条出海导航推荐记录。"""
+    from fastapi import HTTPException, status
+    from sqlalchemy import select
+    from app.models.navigation_guide_record import NavigationGuideRecord
+
+    q = select(NavigationGuideRecord).where(
+        NavigationGuideRecord.id == record_id,
+        NavigationGuideRecord.user_id == current_user.id,
+    )
+    row = (await db.execute(q)).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="记录不存在")
+
+    await db.delete(row)
+    await db.commit()
+    return {"message": "已删除"}
 
 
 # ── 参数迭代 API ──

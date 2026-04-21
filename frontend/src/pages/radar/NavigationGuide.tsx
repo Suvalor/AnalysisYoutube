@@ -2,8 +2,12 @@ import {
   Button,
   Card,
   Col,
+  Drawer,
+  Empty,
   Form,
   Input,
+  Pagination,
+  Popconfirm,
   Progress,
   Rate,
   Row,
@@ -31,6 +35,9 @@ import {
   GlobalOutlined,
   BarChartOutlined,
   CloseOutlined,
+  HistoryOutlined,
+  DeleteOutlined,
+  EyeOutlined,
 } from "@ant-design/icons";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -40,6 +47,9 @@ import {
   blueOceanRadarScanApi,
   categoryOpportunityApi,
   crossRegionCompareApi,
+  listNavigationRecordsApi,
+  getNavigationRecordApi,
+  deleteNavigationRecordApi,
   type NicheRecommendation,
   type AvoidNiche,
   type NavigationGuideResponse,
@@ -49,6 +59,8 @@ import {
   type BlueOceanChannelItem,
   type CategoryOpportunityResponse,
   type CrossRegionCompareResponse,
+  type NavigationGuideRecordItem,
+  type NavigationGuideRecordDetail,
 } from "@/services/authApi";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
 
@@ -667,6 +679,15 @@ export default function NavigationGuide() {
   const [activeAgentId, setActiveAgentId] = useState<number | null>(null);
   // 蓝海雷达内嵌面板：记录当前展开的推荐索引
   const [expandedRadarIndex, setExpandedRadarIndex] = useState<number | null>(null);
+  // 历史记录抽屉
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyList, setHistoryList] = useState<NavigationGuideRecordItem[]>([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  // 查看历史详情
+  const [historyDetail, setHistoryDetail] = useState<NavigationGuideRecordDetail | null>(null);
+  const [historyDetailLoading, setHistoryDetailLoading] = useState(false);
 
   useEffect(() => {
     const loadConfigs = async () => {
@@ -678,6 +699,51 @@ export default function NavigationGuide() {
     };
     void loadConfigs();
   }, []);
+
+  // ── 历史记录加载 ──
+  const loadHistory = async (page = 1) => {
+    setHistoryLoading(true);
+    try {
+      const limit = 10;
+      const offset = (page - 1) * limit;
+      const data = await listNavigationRecordsApi(limit, offset);
+      setHistoryList(data.items);
+      setHistoryTotal(data.total);
+      setHistoryPage(page);
+    } catch {
+      message.error("加载历史记录失败");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const openHistory = () => {
+    setHistoryDetail(null);
+    setHistoryOpen(true);
+    void loadHistory(1);
+  };
+
+  const viewRecordDetail = async (recordId: number) => {
+    setHistoryDetailLoading(true);
+    try {
+      const data = await getNavigationRecordApi(recordId);
+      setHistoryDetail(data);
+    } catch {
+      message.error("加载记录详情失败");
+    } finally {
+      setHistoryDetailLoading(false);
+    }
+  };
+
+  const deleteRecord = async (recordId: number) => {
+    try {
+      await deleteNavigationRecordApi(recordId);
+      message.success("已删除");
+      void loadHistory(historyPage);
+    } catch {
+      message.error("删除失败");
+    }
+  };
 
   const onSubmit = async () => {
     try {
@@ -741,11 +807,20 @@ export default function NavigationGuide() {
         <QuotaDashboardCard quotaCheck={quotaCheck} />
 
         {/* 页面标题 */}
-        <div className="mb-2">
-          <Title level={3} style={{ color: "#0f172a", marginBottom: 4 }}>出海导航</Title>
-          <Text style={{ color: "#64748b" }}>
-            输入你的完整资源画像，AI 为你推演最适合的 YouTube 细分品类组合，并给出避坑建议。
-          </Text>
+        <div className="mb-2 flex items-start justify-between">
+          <div>
+            <Title level={3} style={{ color: "#0f172a", marginBottom: 4 }}>出海导航</Title>
+            <Text style={{ color: "#64748b" }}>
+              输入你的完整资源画像，AI 为你推演最适合的 YouTube 细分品类组合，并给出避坑建议。
+            </Text>
+          </div>
+          <Button
+            icon={<HistoryOutlined />}
+            onClick={openHistory}
+            className="!rounded-lg shrink-0"
+          >
+            历史记录
+          </Button>
         </div>
 
         {/* 表单 — 分组布局 */}
@@ -948,6 +1023,141 @@ export default function NavigationGuide() {
           </Card>
         )}
       </div>
+
+      {/* ── 历史记录抽屉 ── */}
+      <Drawer
+        title={historyDetail ? "推荐详情" : "推荐历史记录"}
+        open={historyOpen}
+        onClose={() => {
+          if (historyDetail) {
+            setHistoryDetail(null);
+          } else {
+            setHistoryOpen(false);
+          }
+        }}
+        width={historyDetail ? 720 : 480}
+        styles={{ body: { padding: historyDetail ? 16 : 12 } }}
+      >
+        {historyDetail ? (
+          /* ── 详情视图 ── */
+          historyDetailLoading ? (
+            <div className="flex justify-center py-12"><Spin size="large" /></div>
+          ) : (
+            <div className="space-y-5">
+              {/* 请求参数摘要 */}
+              <Card size="small" title="推荐参数" className="!border-slate-200">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><Text type="secondary">语言：</Text>{(historyDetail.request_params.languages as string[])?.join("、") ?? "-"}</div>
+                  <div><Text type="secondary">预算：</Text>{(historyDetail.request_params.budget_level as string) ?? "-"}</div>
+                  <div><Text type="secondary">技能：</Text>{(historyDetail.request_params.core_skills as string[])?.join("、") ?? "-"}</div>
+                  <div><Text type="secondary">形式：</Text>{(historyDetail.request_params.content_format as string[])?.join("、") ?? "-"}</div>
+                </div>
+                <div className="text-xs text-slate-400 mt-2">
+                  {new Date(historyDetail.created_at).toLocaleString("zh-CN")}
+                </div>
+              </Card>
+
+              {/* AI 摘要 */}
+              {historyDetail.result.ai_summary && (
+                <Card size="small" className="!border-slate-200 !bg-slate-50">
+                  <Text>{historyDetail.result.ai_summary}</Text>
+                </Card>
+              )}
+
+              {/* 推荐品类 */}
+              {historyDetail.result.recommendations.map((rec, i) => (
+                <NicheCard
+                  key={i}
+                  rec={rec}
+                  index={i}
+                  isExpanded={false}
+                  onToggleExpand={() => {}}
+                />
+              ))}
+
+              {/* 避坑提示 */}
+              {historyDetail.result.avoid_niche && (
+                <AvoidNicheCard avoid={historyDetail.result.avoid_niche} />
+              )}
+            </div>
+          )
+        ) : (
+          /* ── 列表视图 ── */
+          <>
+            {historyLoading ? (
+              <div className="flex justify-center py-12"><Spin /></div>
+            ) : historyList.length === 0 ? (
+              <Empty description="暂无推荐记录" />
+            ) : (
+              <div className="space-y-3">
+                {historyList.map((item) => (
+                  <div
+                    key={item.id}
+                    className="group rounded-lg border border-slate-200 p-3 hover:border-blue-300 hover:bg-blue-50/30 transition-all cursor-pointer"
+                    onClick={() => void viewRecordDetail(item.id)}
+                  >
+                    <div className="flex items-start justify-between mb-1">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-slate-800 truncate">
+                          {item.top_niche_title ?? "推荐结果"}
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          {(item.request_params.core_skills as string[])?.join("、")}
+                          {item.top_match_score != null && (
+                            <Tag color="blue" className="ml-2">匹配度 {item.top_match_score}</Tag>
+                          )}
+                          <Tag className="ml-1">{item.recommendation_count} 个品类</Tag>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<EyeOutlined />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void viewRecordDetail(item.id);
+                          }}
+                        />
+                        <Popconfirm
+                          title="确认删除此记录？"
+                          onConfirm={(e) => {
+                            e?.stopPropagation();
+                            void deleteRecord(item.id);
+                          }}
+                          onCancel={(e) => e?.stopPropagation()}
+                        >
+                          <Button
+                            type="text"
+                            size="small"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </Popconfirm>
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {new Date(item.created_at).toLocaleString("zh-CN")}
+                    </div>
+                  </div>
+                ))}
+                {historyTotal > 10 && (
+                  <div className="flex justify-center pt-2">
+                    <Pagination
+                      current={historyPage}
+                      total={historyTotal}
+                      pageSize={10}
+                      size="small"
+                      onChange={(page) => void loadHistory(page)}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </Drawer>
     </div>
   );
 }

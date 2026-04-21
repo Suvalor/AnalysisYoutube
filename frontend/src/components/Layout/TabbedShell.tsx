@@ -1,6 +1,7 @@
 import { Dropdown } from "antd";
 import type { MenuProps } from "antd";
 import {
+  Activity,
   BarChart3,
   Clapperboard,
   Cloud,
@@ -12,13 +13,16 @@ import {
   Lightbulb,
   LogOut,
   Menu as MenuIcon,
+  Search,
   Settings,
+  TrendingUp,
   User,
   Video,
   WandSparkles,
   Waves,
   X,
   Youtube,
+  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -45,6 +49,10 @@ import ScriptWorkflowSOP from "@/pages/sop/ScriptWorkflowSOP";
 import InspirationPool from "@/pages/inspiration/InspirationPool";
 import BlueOceanRadar from "@/pages/radar/BlueOceanRadar";
 import NavigationGuide from "@/pages/radar/NavigationGuide";
+import KeywordResearch from "@/pages/keyword/KeywordResearch";
+import SeoScoring from "@/pages/seo/SeoScoring";
+import TrendDiscovery from "@/pages/trend/TrendDiscovery";
+import ChannelGrowthDashboard from "@/pages/growth/ChannelGrowthDashboard";
 import { isFeatureEnabled, type FeatureKey } from "@/config/features";
 import { useThemeStore } from "@/store/useThemeStore";
 import { useI18nStore } from "@/store/useI18nStore";
@@ -87,8 +95,12 @@ type NavDef = {
 /** 顺序：出海核心 → 监控 → 系统；创作者工具通过 Feature Flag 控制 */
 const navDefs: NavDef[] = [
   { path: "/blue-ocean-radar", labelKey: "nav:blueOceanRadar", icon: Waves, type: "blue-ocean-radar", tabId: "blue-ocean-radar" },
+  { path: "/keyword-research", labelKey: "nav:keywordResearch", icon: Search, type: "keyword-research", tabId: "keyword-research" },
+  { path: "/seo-scoring", labelKey: "nav:seoScoring", icon: Zap, type: "seo-scoring", tabId: "seo-scoring" },
+  { path: "/trend-discovery", labelKey: "nav:trendDiscovery", icon: TrendingUp, type: "trend-discovery", tabId: "trend-discovery" },
   { path: "/navigation-guide", labelKey: "nav:navigationGuide", icon: Compass, type: "navigation-guide", tabId: "navigation-guide" },
   { path: "/competitor-analysis", labelKey: "nav:competitorAnalysis", icon: BarChart3, type: "competitor-analysis", tabId: "competitor-analysis" },
+  { path: "/channel-growth", labelKey: "nav:channelGrowth", icon: Activity, type: "channel-growth", tabId: "channel-growth" },
   { path: "/youtube/channels", labelKey: "nav:channelManagement", icon: Youtube, type: "channel-list", tabId: "channel-list" },
   { path: "/youtube/videos", labelKey: "nav:globalVideos", icon: Video, type: "global-videos", tabId: "global-videos" },
   { path: "/video-board", labelKey: "nav:videoBoard", icon: Kanban, type: "video-board", tabId: "video-board" },
@@ -111,6 +123,8 @@ function renderTabPanel(tab: TabItem) {
       return <ChannelList />;
     case "blue-ocean-radar":
       return <BlueOceanRadar />;
+    case "keyword-research":
+      return <KeywordResearch />;
     case "global-videos":
       return <GlobalVideoList />;
     case "channel-detail":
@@ -129,6 +143,8 @@ function renderTabPanel(tab: TabItem) {
       return <InspirationPool />;
     case "competitor-analysis":
       return <CompetitorAnalysis />;
+    case "channel-growth":
+      return <ChannelGrowthDashboard />;
     case "navigation-guide":
       return <NavigationGuide />;
     case "feishu-workspace":

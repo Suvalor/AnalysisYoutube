@@ -4,9 +4,11 @@ from app.api.v1 import ai
 from app.api.v1 import asset_library
 from app.api.v1 import auth
 from app.api.v1 import channels
+from app.api.v1 import channel_growth
 from app.api.v1 import inspiration
 from app.api.v1 import integration_settings
 from app.api.v1 import jimeng
+from app.api.v1 import keyword
 from app.api.v1 import knowledge
 from app.api.v1 import knowledge_base
 from app.api.v1 import materials
@@ -17,6 +19,7 @@ from app.api.v1 import prompt_library
 from app.api.v1 import radar
 from app.api.v1 import scripts
 from app.api.v1 import script_library
+from app.api.v1 import seo
 from app.api.v1 import sop
 from app.api.v1 import style_library
 from app.api.v1 import users
@@ -31,7 +34,10 @@ api_router_v1.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router_v1.include_router(inspiration.router, prefix="/inspirations", tags=["inspirations"])
 api_router_v1.include_router(youtube.router, prefix="/youtube", tags=["youtube"])
 api_router_v1.include_router(channels.router, prefix="/channels", tags=["channels"])
+api_router_v1.include_router(channel_growth.router, prefix="/channel-growth", tags=["channel-growth"])
 api_router_v1.include_router(radar.router, prefix="/radar", tags=["radar"])
+api_router_v1.include_router(keyword.router, prefix="/keyword", tags=["keyword"])
+api_router_v1.include_router(seo.router, prefix="/seo", tags=["seo"])
 api_router_v1.include_router(prompt_library.router, prefix="/libraries/prompts", tags=["prompt-library"])
 api_router_v1.include_router(style_library.router, prefix="/libraries/styles", tags=["style-library"])
 api_router_v1.include_router(model_library.router, prefix="/libraries/models", tags=["model-library"])
