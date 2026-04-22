@@ -64,7 +64,7 @@ export default function SeoScoring() {
       });
       setResult(res);
     } catch (e: any) {
-      console.error("SEO 评分失败", e);
+      // SEO 评分失败，静默处理
     } finally {
       setLoading(false);
     }

@@ -116,12 +116,12 @@ export default function LoginPage() {
           name="captcha_code"
           rules={[
             { required: true, message: t("common:validation.required") },
-            { len: 4, message: "4" }
+            { len: 4  , message: t("common:validation.captchaLength") }
           ]}
         >
           <Space>
             <Input
-              placeholder="4"
+              placeholder={t("login.captcha")}
               size="large"
               maxLength={4}
               style={{ width: 120 }}

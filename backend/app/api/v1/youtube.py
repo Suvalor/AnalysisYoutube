@@ -846,33 +846,26 @@ async def competitors_compare(
 
 @router.post("/competitors/ai-insight", summary="AI 竞争格局分析")
 async def competitors_ai_insight(
-    body: dict,
+    body: CompetitorAiInsightRequest,
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> dict:
-    """
-    基于选中的频道数据，调用 LLM 生成竞争格局分析。
-    入参: { channel_ids: list[int], model_library_id?: int, llm_model_name?: str, agent_id?: int }
-    """
+    """基于选中的频道数据，调用 LLM 生成竞争格局分析。"""
     from app.services.competitor_ai_service import generate_competitor_ai_insight
     from app.services.llm_conversation_service import load_conversation_messages, save_conversation_turn
-
-    channel_ids = body.get("channel_ids", [])
-    if len(channel_ids) < 2:
-        raise HTTPException(status_code=400, detail="至少选择 2 个频道")
 
     result = await generate_competitor_ai_insight(
         db,
         user_id=current_user.id,
-        channel_ids=channel_ids,
-        model_library_id=body.get("model_library_id"),
-        llm_model_name=body.get("llm_model_name"),
-        agent_id=body.get("agent_id"),
+        channel_ids=body.channel_ids,
+        model_library_id=body.model_library_id,
+        llm_model_name=body.llm_model_name,
+        agent_id=body.agent_id,
     )
 
     # 保存对话历史
     entity_type = "competitor_insight"
-    entity_id = ":".join(str(cid) for cid in sorted(channel_ids))
+    entity_id = ":".join(str(cid) for cid in sorted(body.channel_ids))
     if result.get("_user_prompt") and result.get("_assistant_content"):
         try:
             await save_conversation_turn(
@@ -883,7 +876,7 @@ async def competitors_ai_insight(
                 user_content=result["_user_prompt"],
                 assistant_content=result["_assistant_content"],
                 system_content=result.get("_system_prompt"),
-                model_name=body.get("llm_model_name"),
+                model_name=body.llm_model_name,
             )
             await db.commit()
         except Exception:  # noqa: BLE001

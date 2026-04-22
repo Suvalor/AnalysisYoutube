@@ -6,6 +6,8 @@ OpenAI 兼容 LLM 的协议感知与客户端构建。
 
 from __future__ import annotations
 
+import logging
+
 from enum import Enum
 from dataclasses import dataclass
 from typing import AsyncIterator, Any
@@ -14,6 +16,8 @@ import httpx
 from openai import AsyncOpenAI
 
 from app.services.config_manager import ResolvedIntegrationConfig
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_openai_base_url(url: str | None) -> str:

@@ -16,12 +16,15 @@ API 调用策略（配额优化）：
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
 from fastapi import HTTPException, status
+
+logger = logging.getLogger(__name__)
 
 from app.services.keyword_scoring_algorithm import (
     calc_channel_authority,
@@ -103,7 +106,7 @@ async def fetch_suggestions(
                 except Exception:
                     continue
     except Exception:
-        pass
+        logger.warning("获取搜索建议失败: keyword=%s, region=%s", keyword, region, exc_info=True)
 
     return suggestions[:30]  # 最多返回30个
 
@@ -146,7 +149,7 @@ async def _search_youtube(
                 if err:
                     detail = err
             except Exception:
-                pass
+                logger.warning("解析 YouTube search API 错误响应失败: status=%d", resp.status_code)
             raise HTTPException(status_code=502, detail=detail)
         return resp.json()
 
@@ -305,6 +308,7 @@ async def research_keyword(
                 "result_count": trend_count,
             })
         except Exception:
+            logger.warning("趋势搜索失败: keyword=%s, period=%s", keyword, period_label, exc_info=True)
             trend_data.append({"period": period_label, "days": days, "result_count": 0})
 
     # ── Step 3：提取频道ID和视频ID ──

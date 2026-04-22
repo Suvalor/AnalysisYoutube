@@ -143,6 +143,10 @@ function renderTabPanel(tab: TabItem) {
       return <InspirationPool />;
     case "competitor-analysis":
       return <CompetitorAnalysis />;
+    case "seo-scoring":
+      return <SeoScoring />;
+    case "trend-discovery":
+      return <TrendDiscovery />;
     case "channel-growth":
       return <ChannelGrowthDashboard />;
     case "navigation-guide":
@@ -497,21 +501,18 @@ export default function TabbedShell() {
                   }}
                 >
                   <span className="truncate">{tab.title}</span>
-                  {/* 固定标签不显示关闭按钮 */}
-                  {!isPinned && (
-                    <button
-                      type="button"
-                      className="p-0.5 rounded opacity-70 hover:opacity-100"
-                      style={{ backgroundColor: "var(--color-bg-inset)" }}
-                      aria-label="关闭标签"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        closeTab(tab.id);
-                      }}
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="p-0.5 rounded opacity-70 hover:opacity-100"
+                    style={{ backgroundColor: "var(--color-bg-inset)" }}
+                    aria-label="关闭标签"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeTab(tab.id);
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
               </Dropdown>
             );
