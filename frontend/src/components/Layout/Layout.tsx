@@ -20,7 +20,7 @@ const navItems = [
 
 function titleByPath(pathname: string) {
   const found = navItems.find((item) => pathname.startsWith(item.key));
-  return found?.label ?? "Creator SaaS";
+  return found?.label ?? "YouTube Compass";
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
@@ -38,8 +38,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const SidebarContent = (
     <aside className="h-full bg-white border-r border-slate-200 flex flex-col">
       <div className="h-16 px-4 flex items-center border-b border-slate-200">
-        <div className="h-9 w-9 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">C</div>
-        <span className="ml-3 font-semibold text-slate-900">Creator SaaS</span>
+        <div className="h-9 w-9 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">Y</div>
+        <span className="ml-3 font-semibold text-slate-900">YouTube Compass</span>
       </div>
       <nav className="p-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {

@@ -32,6 +32,7 @@ from app.crud.youtube import (
 from app.crud.quota import get_quota_by_date, list_quota_recent_days
 from app.models.youtube import YouTubeChannel, YouTubeComment, YouTubeVideo
 from app.schemas.youtube import (
+    CompetitorAiInsightRequest,
     CommentScrapeRequest,
     CommentScrapeResponse,
     QuotaDashboardResponse,
@@ -966,6 +967,8 @@ async def youtube_oauth_callback(
         current_user.youtube_refresh_token_encrypted = encrypt_plaintext(refresh_token)
     current_user.youtube_token_expires_at = expires_at
     current_user.youtube_channel_id = channel_id
+    # OAuth 回调中调用了 channels.list(mine=true)，记录配额消耗
+    await record_api_quota_usage(db, "channels", part_count=1)
     await db.commit()
     await db.refresh(current_user)
 

@@ -1075,6 +1075,9 @@ async def category_opportunity_scan(
     # 新入局者判定：频道创建时间在 lookback_months 内
     newcomer_cutoff = now_utc - timedelta(days=lookback_months * 30)
 
+    videos_list_calls = 0
+    channels_list_calls = 0
+
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
         # Step 1: search.list 获取该品类热门视频
         search_params = {
@@ -1104,6 +1107,8 @@ async def category_opportunity_scan(
                 "top_channels_growth": [],
                 "content_gaps": [],
                 "newcomer_stats": {"total_new_channels": 0, "successful_channels": 0, "success_rate": 0.0},
+                "videos_list_calls": 0,
+                "channels_list_calls": 0,
             }
 
         # Step 2: videos.list 获取播放量 + 时长
@@ -1112,6 +1117,7 @@ async def category_opportunity_scan(
 
         vid_stats: dict[str, dict] = {}  # vid -> {views, duration_seconds}
         for group in chunked(video_ids, MAX_IDS_PER_REQUEST):
+            videos_list_calls += 1
             resp_v = await client.get(
                 f"{YOUTUBE_API_BASE}/videos",
                 params={
@@ -1137,6 +1143,7 @@ async def category_opportunity_scan(
         # Step 3: channels.list 获取频道详情（订阅数、创建时间、总播放量）
         ch_details: dict[str, dict] = {}
         for group in chunked(unique_cids, MAX_IDS_PER_REQUEST):
+            channels_list_calls += 1
             resp_ch = await client.get(
                 f"{YOUTUBE_API_BASE}/channels",
                 params={
@@ -1244,6 +1251,8 @@ async def category_opportunity_scan(
         "top_channels_growth": growth_items,
         "content_gaps": content_gaps,
         "newcomer_stats": newcomer_stats,
+        "videos_list_calls": videos_list_calls,
+        "channels_list_calls": channels_list_calls,
     }
 
 
@@ -1296,6 +1305,7 @@ async def cross_region_compare(
     published_after_iso = (now_utc - timedelta(days=published_after_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     snapshots: list[dict] = []
+    channels_calls = 0
 
     async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
         for region_code in regions:
@@ -1341,6 +1351,7 @@ async def cross_region_compare(
                 # channels.list 获取订阅数和播放量
                 ch_data: dict[str, dict] = {}
                 for group in chunked(cids_seen, MAX_IDS_PER_REQUEST):
+                    channels_calls += 1
                     resp_ch = await client.get(
                         f"{YOUTUBE_API_BASE}/channels",
                         params={
@@ -1416,4 +1427,7 @@ async def cross_region_compare(
                     "top_channel_subscribers": 0,
                 })
 
-    return snapshots
+    return {
+        "snapshots": snapshots,
+        "channels_calls": channels_calls,
+    }

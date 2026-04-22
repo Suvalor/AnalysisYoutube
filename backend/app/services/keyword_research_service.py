@@ -17,6 +17,7 @@ API 调用策略（配额优化）：
 from __future__ import annotations
 
 import logging
+import math
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -331,9 +332,11 @@ async def research_keyword(
 
     # ── Step 4：获取频道统计 ──
     channel_stats = await _fetch_channel_stats(channel_ids=channel_ids, api_key=api_key)
+    channels_calls = math.ceil(len(channel_ids) / 50) if channel_ids else 0
 
     # ── Step 5：获取视频详情 ──
     video_details = await _fetch_video_details(video_ids=video_ids, api_key=api_key)
+    videos_calls = math.ceil(len(video_ids) / 50) if video_ids else 0
 
     # ── Step 6：计算评分 ──
 
@@ -485,4 +488,6 @@ async def research_keyword(
         "avg_channel_subscribers": avg_subs,
         "content_gap_ratio": round(content_gap_ratio, 2),
         "search_calls": search_calls,
+        "channels_calls": channels_calls,
+        "videos_calls": videos_calls,
     }

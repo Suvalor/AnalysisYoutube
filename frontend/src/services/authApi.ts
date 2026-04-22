@@ -684,7 +684,31 @@ export async function triggerAutoRetroApi(force = false) {
 
 // ── SEO 评分 API ──
 
+export type AiBenchmarkResult = {
+  title_benchmark: string;
+  description_benchmark: string;
+  tags_benchmark: string;
+  thumbnail_benchmark: string;
+};
+
+export type ScoreBreakdown = {
+  title_base: number;
+  title_ai_bonus: number;
+  description_base: number;
+  description_ai_bonus: number;
+  tags_base: number;
+  tags_ai_bonus: number;
+  thumbnail_base: number;
+  thumbnail_ai_bonus: number;
+};
+
+export type CompetitorSummaryItem = {
+  title: string;
+  channel_title: string;
+};
+
 export type SeoScoringResponse = {
+  record_id: number | null;
   total_score: number;
   title_score: number;
   title_max: number;
@@ -692,17 +716,53 @@ export type SeoScoringResponse = {
   description_max: number;
   tags_score: number;
   tags_max: number;
+  thumbnail_score: number;
+  thumbnail_max: number;
   suggestions: string[];
+  ai_benchmark: AiBenchmarkResult | null;
+  competitor_summary: CompetitorSummaryItem[];
+  score_breakdown: ScoreBreakdown | null;
 };
 
 export async function seoScoringApi(payload: {
   title: string;
   description?: string;
   tags?: string[];
+  thumbnail_url?: string;
   target_keyword?: string;
+  model_library_id?: number | null;
 }) {
   const res = await apiClient.post("/api/seo/seo-score", payload);
   return res.data as SeoScoringResponse;
+}
+
+export type SeoScoreRecordItem = {
+  id: number;
+  title: string;
+  total_score: number;
+  title_score: number;
+  description_score: number;
+  tags_score: number;
+  thumbnail_score: number;
+  target_keyword: string | null;
+  created_at: string;
+};
+
+export type SeoScoreHistoryResponse = {
+  items: SeoScoreRecordItem[];
+  total: number;
+};
+
+export async function seoScoreHistoryApi(page = 1, pageSize = 20) {
+  const res = await apiClient.get("/api/seo/seo-score/history", {
+    params: { page, page_size: pageSize },
+  });
+  return res.data as SeoScoreHistoryResponse;
+}
+
+export async function deleteSeoScoreRecordApi(recordId: number) {
+  const res = await apiClient.delete(`/api/seo/seo-score/history/${recordId}`);
+  return res.data;
 }
 
 // ── 热门趋势 API ──

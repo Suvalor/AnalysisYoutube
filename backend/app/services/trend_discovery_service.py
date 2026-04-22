@@ -41,6 +41,7 @@ async def fetch_trending(
     返回趋势视频列表 + 品类分布 + 统计摘要。
     """
     now = datetime.now(timezone.utc)
+    channels_list_calls = 0
 
     # ── Step 1: 获取热门视频 ──
     video_params: dict = {
@@ -69,6 +70,7 @@ async def fetch_trending(
                     "avg_likes": 0,
                     "avg_engagement_rate": 0,
                 },
+                "channels_list_calls": 0,
             }
 
         data = resp.json()
@@ -87,6 +89,7 @@ async def fetch_trending(
                     "avg_likes": 0,
                     "avg_engagement_rate": 0,
                 },
+                "channels_list_calls": 0,
             }
 
         # ── Step 2: 解析视频数据 ──
@@ -138,6 +141,7 @@ async def fetch_trending(
         if channel_ids:
             ch_ids_list = list(channel_ids)
             for i in range(0, len(ch_ids_list), 50):
+                channels_list_calls += 1
                 batch = ch_ids_list[i : i + 50]
                 try:
                     ch_resp = await client.get(
@@ -203,4 +207,5 @@ async def fetch_trending(
         "trending_videos": trending_videos,
         "category_distribution": category_distribution,
         "stats": stats,
+        "channels_list_calls": channels_list_calls,
     }

@@ -49,3 +49,4 @@ class TrendDiscoveryResponse(BaseModel):
     trending_videos: list[TrendingVideoItem]
     category_distribution: list[CategoryDistributionItem]
     stats: dict
+    channels_list_calls: int = Field(0, description="channels.list API 调用次数")

@@ -423,7 +423,7 @@ async def navigation_guide(
 
     # ── YouTube API 数据补充（可选） ──
     search_calls = 0
-    channels_calls = 0
+    channels_calls = 1 if channel_info else 0  # fetch_channel_info 消耗 1-2 次 channels.list
     now_utc = datetime.now(timezone.utc)
     published_after_iso = (now_utc - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
     regions = _BUDGET_REGIONS.get(budget_level, _BUDGET_REGIONS["low"])

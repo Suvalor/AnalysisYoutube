@@ -40,7 +40,10 @@
       "Bash(.venv/bin/python *)",
       "Bash(.venv/bin/python3 *)",
       "Bash(ls *)",
-      "Bash(/Users/suycity/Code/Youtube/AnalysisYoutube/backend/.venv/bin/python *)"
+      "Bash(/Users/suycity/Code/Youtube/AnalysisYoutube/backend/.venv/bin/python *)",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/api/v1/keyword.py'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(python *)"
     ]
   }
 }
