@@ -28,7 +28,7 @@ async def lifespan(_: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Creator SaaS Backend",
+        title="YouTube Compass Backend",
         version="0.1.0",
         lifespan=lifespan,
     )

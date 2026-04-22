@@ -94,6 +94,7 @@ type NavDef = {
 
 /** 顺序：出海核心 → 监控 → 系统；创作者工具通过 Feature Flag 控制 */
 const navDefs: NavDef[] = [
+  { path: "/dashboard", labelKey: "nav:dashboard", icon: Home, type: "dashboard", tabId: "dashboard" },
   { path: "/blue-ocean-radar", labelKey: "nav:blueOceanRadar", icon: Waves, type: "blue-ocean-radar", tabId: "blue-ocean-radar" },
   { path: "/keyword-research", labelKey: "nav:keywordResearch", icon: Search, type: "keyword-research", tabId: "keyword-research" },
   { path: "/seo-scoring", labelKey: "nav:seoScoring", icon: Zap, type: "seo-scoring", tabId: "seo-scoring" },
@@ -104,7 +105,6 @@ const navDefs: NavDef[] = [
   { path: "/youtube/channels", labelKey: "nav:channelManagement", icon: Youtube, type: "channel-list", tabId: "channel-list" },
   { path: "/youtube/videos", labelKey: "nav:globalVideos", icon: Video, type: "global-videos", tabId: "global-videos" },
   { path: "/video-board", labelKey: "nav:videoBoard", icon: Kanban, type: "video-board", tabId: "video-board" },
-  { path: "/dashboard", labelKey: "nav:dashboard", icon: Home, type: "dashboard", tabId: "dashboard" },
   { path: "/config-center", labelKey: "nav:configCenter", icon: Settings, type: "config-center", tabId: "config-center" },
   // 创作者工具（Feature Flag 控制）
   { path: "/inspiration-pool", labelKey: "nav:inspirationPool", icon: Lightbulb, type: "inspiration-pool", tabId: "inspiration-pool", featureKey: "INSPIRATION_POOL" },

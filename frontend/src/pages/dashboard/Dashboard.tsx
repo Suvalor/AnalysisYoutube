@@ -19,7 +19,7 @@ export default function Dashboard() {
   return (
     <div className="p-6 md:p-10 space-y-6">
       <div className="max-w-4xl rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl text-slate-100">
-        <h2 className="text-2xl font-semibold mb-3">欢迎来到 Creator SaaS</h2>
+        <h2 className="text-2xl font-semibold mb-3">欢迎来到 YouTube Compass</h2>
         <p className="text-slate-300 mb-6"> 您可以将关注博主的信息保存，做竞争对手分析。</p>
       </div>
 

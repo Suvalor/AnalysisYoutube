@@ -43,14 +43,17 @@ async def keyword_research(
         youtube_api_key=icfg.youtube_api_key,
     )
 
-    # 记录配额消耗
+    # 记录 YouTube API 配额消耗
     search_calls = result.get("search_calls", 0)
+    channels_calls = result.get("channels_calls", 0)
+    videos_calls = result.get("videos_calls", 0)
     if search_calls > 0:
-        await record_api_quota_usage(
-            db, "search", times=search_calls, part_count=2
-        )
-        await db.commit()
-
+        await record_api_quota_usage(db, "search", times=search_calls, part_count=2)
+    if channels_calls > 0:
+        await record_api_quota_usage(db, "channels", times=channels_calls, part_count=2)
+    if videos_calls > 0:
+        await record_api_quota_usage(db, "videos", times=videos_calls, part_count=2)
+    await db.commit()
     return KeywordResearchResponse(
         keyword=result["keyword"],
         region=result["region"],

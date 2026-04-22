@@ -198,8 +198,8 @@ async def category_opportunity(
     )
     # 配额：1 search + N videos + M channels（估算：search=1, videos=1, channels=1）
     await record_api_quota_usage(db, "search", times=1)
-    await record_api_quota_usage(db, "videos", times=1, part_count=2)
-    await record_api_quota_usage(db, "channels", times=1, part_count=2)
+    await record_api_quota_usage(db, "videos", times=result.get("videos_list_calls", 1), part_count=2)
+    await record_api_quota_usage(db, "channels", times=result.get("channels_list_calls", 1), part_count=2)
     await db.commit()
     return CategoryOpportunityResponse(
         keyword=body.keyword,
@@ -224,13 +224,17 @@ async def cross_region_compare_endpoint(
     同一关键词，对比不同地区的市场情况（US/SEA/ME 等）。
     """
     icfg = await resolve_integration_config(db, org_id=current_user.org_id)
-    snapshots = await cross_region_compare(
+    result = await cross_region_compare(
         keyword=body.keyword,
         regions=body.regions,
         published_after_days=body.published_after,
         youtube_api_key=icfg.youtube_api_key,
     )
+    snapshots = result["snapshots"]
+    channels_calls = result.get("channels_calls", 0)
     await record_api_quota_usage(db, "search", times=len(body.regions))
+    if channels_calls > 0:
+        await record_api_quota_usage(db, "channels", times=channels_calls, part_count=2)
     await db.commit()
     return CrossRegionCompareResponse(keyword=body.keyword, regions=snapshots)
 

@@ -61,6 +61,16 @@ alembic revision --autogenerate -m "desc"    # generate from model changes
 - **Multi-cloud storage**: Active provider set via `ACTIVE_STORAGE_PROVIDER` env var (ALIYUN or TENCENT). New uploads default to Tencent COS.
 - **Frontend tab system**: `TabbedShell` renders a browser-like tab bar. Each nav item opens a tab via `useTabStore`. Dynamic tabs (channel detail, feishu viewer) matched by URL pattern.
 - **No linter configured**: Frontend `npm run lint` is a no-op echo. No backend linter config found.
+ - **LLM 集成规则**：本项目已集成 LLM（Volcengine/Ark OpenAI 兼容协议），所有 LLM
+    调用必须通过配置中心（`model_libraries` 表）获取 API Key、Base URL
+    和模型配置，禁止硬编码或绕过配置中心。调用流程：`resolve_integration_config(db,
+    org_id)` 获取组织级配置 → `get_by_user(db, ModelLibrary, user_id,                 
+    model_library_id)` 获取模型库配置 → `try_decrypt(ml.api_key_encrypted)` 解密 API
+    Key → `LLMClientFactory().chat_completions_content(cfg=LLMClientConfig(...))`     
+    发起调用。协议感知由 `llm_openai_factory.py` 自动处理（Coding Plan URL
+    自动注入默认模型等）。
+
+
 
 ## Environment Variables
 
