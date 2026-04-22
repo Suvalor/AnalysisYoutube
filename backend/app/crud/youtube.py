@@ -1,3 +1,5 @@
+import logging
+
 from datetime import date
 
 from sqlalchemy import Select, exists, func, select
@@ -16,6 +18,8 @@ from app.models.youtube import (
     UserCompetitorPool,
 )
 from app.services.youtube_service import parse_datetime
+
+logger = logging.getLogger(__name__)
 
 
 async def upsert_channel(

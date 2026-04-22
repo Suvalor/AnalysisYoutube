@@ -147,3 +147,12 @@ class YouTubeVideoAnalysisResponse(BaseModel):
     content: str
     updated_at: datetime
 
+
+class CompetitorAiInsightRequest(BaseModel):
+    """AI 竞争格局分析请求。"""
+
+    channel_ids: list[int] = Field(..., min_length=2, description="至少选择 2 个频道")
+    model_library_id: int | None = Field(default=None, description="model_libraries 表主键")
+    llm_model_name: str | None = Field(default=None, description="LLM 模型名称")
+    agent_id: int | None = Field(default=None, description="prompt_libraries 表主键")
+
