@@ -225,7 +225,8 @@ export default function TabbedShell() {
   useEffect(() => {
     if (!activeTabId) return;
     const activeTab = tabs.find((t) => t.id === activeTabId);
-    if (activeTab && location.pathname !== activeTab.path) {
+    // 只比较 pathname 部分，忽略 search params（tab.path 可能含 ?tab=xxx）
+    if (activeTab && location.pathname !== activeTab.path.split("?")[0]) {
       navigate(activeTab.path);
     }
   }, [activeTabId, tabs, navigate, location.pathname]);

@@ -634,6 +634,8 @@ export async function keywordResearchApi(payload: {
   keyword: string;
   region?: string;
   language?: string;
+  region_label?: string;
+  language_label?: string;
 }) {
   const res = await apiClient.post("/api/keyword/research", payload);
   return res.data as KeywordResearchResponse;
@@ -808,9 +810,73 @@ export async function trendDiscoveryApi(payload: {
   region?: string;
   category_id?: string;
   max_results?: number;
+  region_label?: string;
+  category_label?: string;
 }) {
   const res = await apiClient.post("/api/seo/trending", payload);
   return res.data as TrendDiscoveryResponse;
+}
+
+// ── 趋势历史 API ──
+
+export type TrendHistoryItem = {
+  id: number;
+  cache_date: string;
+  region: string;
+  category_id: string;
+  region_label: string;
+  category_label: string;
+  created_at: string;
+};
+
+export type TrendHistoryListResponse = {
+  items: TrendHistoryItem[];
+  total: number;
+};
+
+export async function trendHistoryApi(limit = 10) {
+  const res = await apiClient.get("/api/seo/trend-history", { params: { limit } });
+  return res.data as TrendHistoryListResponse;
+}
+
+// ── 频道入库 API ──
+
+export type AddChannelByIdResponse = {
+  success: boolean;
+  message: string;
+  pool_id: number | null;
+};
+
+export async function addChannelByIdApi(payload: {
+  channel_id: string;
+  channel_title?: string;
+  thumbnail_url?: string;
+  subscriber_count?: number;
+  group_name?: string;
+}) {
+  const res = await apiClient.post("/api/channels/add-by-channel-id", payload);
+  return res.data as AddChannelByIdResponse;
+}
+
+// ── 关键词历史 API ──
+
+export type KeywordHistoryItem = {
+  id: number;
+  cache_date: string;
+  keyword: string;
+  region: string;
+  language: string;
+  created_at: string;
+};
+
+export type KeywordHistoryListResponse = {
+  items: KeywordHistoryItem[];
+  total: number;
+};
+
+export async function keywordHistoryApi(limit = 10) {
+  const res = await apiClient.get("/api/keyword/keyword-history", { params: { limit } });
+  return res.data as KeywordHistoryListResponse;
 }
 
 // ── 频道增长仪表盘 API ──

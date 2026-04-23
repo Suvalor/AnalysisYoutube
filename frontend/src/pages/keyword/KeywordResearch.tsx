@@ -1,37 +1,34 @@
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Button,
   Card,
-  Col,
-  Form,
-  Input,
-  Progress,
-  Row,
   Select,
+  Button,
+  Tag,
+  Row,
+  Col,
+  Typography,
   Space,
+  Image,
+  Tooltip,
+  Empty,
+  message,
+  Input,
   Spin,
   Statistic,
-  Table,
-  Tag,
-  Tooltip,
-  Typography,
-  message,
 } from "antd";
-import type { ColumnsType } from "antd/es/table";
 import {
-  ArrowUpOutlined,
-  ArrowDownOutlined,
-  MinusOutlined,
-  BulbOutlined,
   SearchOutlined,
-  ThunderboltOutlined,
+  GlobalOutlined,
+  EyeOutlined,
+  LikeOutlined,
+  MessageOutlined,
+  RiseOutlined,
+  HistoryOutlined,
 } from "@ant-design/icons";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   keywordResearchApi,
-  type KeywordResearchResponse,
-  type RelatedKeywordItem,
-  type TopVideoItem,
+  keywordHistoryApi,
+  type KeywordHistoryItem,
 } from "@/services/authApi";
 
 const { Title, Text } = Typography;
@@ -45,545 +42,411 @@ const REGION_OPTIONS = [
   { value: "FR", label: "🇫🇷 法国" },
   { value: "BR", label: "🇧🇷 巴西" },
   { value: "IN", label: "🇮🇳 印度" },
-  { value: "SG", label: "🇸🇬 新加坡" },
-  { value: "AE", label: "🇦🇪 阿联酋" },
 ];
 
 const LANGUAGE_OPTIONS = [
   { value: "zh", label: "中文" },
-  { value: "en", label: "English" },
-  { value: "ja", label: "日本語" },
-  { value: "ko", label: "한국어" },
-  { value: "de", label: "Deutsch" },
-  { value: "fr", label: "Français" },
-  { value: "pt", label: "Português" },
-  { value: "hi", label: "हिन्दी" },
-  { value: "ar", label: "العربية" },
+  { value: "en", label: "英语" },
+  { value: "ja", label: "日语" },
+  { value: "ko", label: "韩语" },
+  { value: "de", label: "德语" },
+  { value: "fr", label: "法语" },
+  { value: "pt", label: "葡萄牙语" },
+  { value: "hi", label: "印地语" },
 ];
 
-function volumeColor(score: number): string {
-  if (score >= 70) return "#22c55e";
-  if (score >= 40) return "#f59e0b";
-  return "#ef4444";
+function formatNumber(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
 }
 
-function competitionColor(score: number): string {
-  if (score >= 70) return "#ef4444";
-  if (score >= 40) return "#f59e0b";
-  return "#22c55e";
+function getRegionLabel(region: string): string {
+  const found = REGION_OPTIONS.find((o) => o.value === region);
+  return found ? found.label.replace(/^./, "").trim() : region;
 }
 
-function difficultyColor(score: number): string {
-  if (score >= 70) return "#ef4444";
-  if (score >= 40) return "#f59e0b";
-  return "#22c55e";
-}
-
-function opportunityColor(score: number): string {
-  if (score >= 70) return "#22c55e";
-  if (score >= 40) return "#f59e0b";
-  return "#ef4444";
-}
-
-function trendIcon(direction: string) {
-  switch (direction) {
-    case "rising":
-      return <ArrowUpOutlined style={{ color: "#22c55e" }} />;
-    case "declining":
-      return <ArrowDownOutlined style={{ color: "#ef4444" }} />;
-    default:
-      return <MinusOutlined style={{ color: "#f59e0b" }} />;
-  }
-}
-
-function trendLabel(direction: string): string {
-  switch (direction) {
-    case "rising": return "上升";
-    case "declining": return "下降";
-    default: return "稳定";
-  }
-}
-
-function trendTagColor(direction: string): string {
-  switch (direction) {
-    case "rising": return "success";
-    case "declining": return "error";
-    default: return "warning";
-  }
-}
-
-function scoreLabel(score: number): string {
-  if (score >= 80) return "极优";
-  if (score >= 60) return "良好";
-  if (score >= 40) return "中等";
-  if (score >= 20) return "较差";
-  return "极差";
-}
-
-function difficultyLabel(score: number): string {
-  if (score >= 80) return "极难";
-  if (score >= 60) return "困难";
-  if (score >= 40) return "中等";
-  if (score >= 20) return "容易";
-  return "极易";
+function getLanguageLabel(language: string): string {
+  const found = LANGUAGE_OPTIONS.find((o) => o.value === language);
+  return found ? found.label : language;
 }
 
 export default function KeywordResearch() {
-  const [form] = Form.useForm();
+  const [keyword, setKeyword] = useState("");
+  const [region, setRegion] = useState("US");
+  const [language, setLanguage] = useState("zh");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<KeywordResearchResponse | null>(null);
-  const navigate = useNavigate();
+  const [result, setResult] = useState<any>(null);
+  const [history, setHistory] = useState<KeywordHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
-  const onSearch = async () => {
+  // 无限滚动状态
+  const [displayCount, setDisplayCount] = useState(10);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true);
     try {
-      const values = await form.validateFields();
-      setLoading(true);
-      const data = await keywordResearchApi({
-        keyword: values.keyword,
-        region: values.region || "US",
-        language: values.language || "zh",
+      const res = await keywordHistoryApi(10);
+      setHistory(res.items);
+    } catch {
+      // 静默失败
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
+
+  const handleSearch = async () => {
+    if (!keyword.trim()) {
+      message.warning("请输入关键词");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await keywordResearchApi({
+        keyword: keyword.trim(),
+        region,
+        language,
+        region_label: getRegionLabel(region),
+        language_label: getLanguageLabel(language),
       });
-      setResult(data);
-      if (data.related_keywords.length > 0) {
-        message.success(`找到 ${data.related_keywords.length} 个相关关键词`);
-      }
-    } catch (e: unknown) {
-      const err = e as { errorFields?: unknown; response?: { data?: { detail?: string } } };
-      if (err?.errorFields) return;
-      const detail = err?.response?.data?.detail;
-      const msg = typeof detail === "object" ? JSON.stringify(detail) : detail;
-      message.error(msg ?? "关键词研究失败");
+      setResult(res);
+      setDisplayCount(10);
+      await fetchHistory();
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || "关键词研究失败");
     } finally {
       setLoading(false);
     }
   };
 
-  const importToRadar = (keyword: string) => {
-    navigate(`/blue-ocean-radar?keyword=${encodeURIComponent(keyword)}`);
+  // 无限滚动：Intersection Observer
+  useEffect(() => {
+    if (!result?.popular_videos || !sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          const total = result.popular_videos.length;
+          if (displayCount < total) {
+            setDisplayCount((prev) => Math.min(prev + 10, total));
+          }
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [result, displayCount]);
+
+  const visibleVideos = result?.popular_videos?.slice(0, displayCount) || [];
+
+  // 点击历史记录回溯
+  const handleHistoryClick = async (item: KeywordHistoryItem) => {
+    setKeyword(item.keyword);
+    setRegion(item.region);
+    setLanguage(item.language);
+    setLoading(true);
+    try {
+      const res = await keywordResearchApi({
+        keyword: item.keyword,
+        region: item.region,
+        language: item.language,
+        region_label: getRegionLabel(item.region),
+        language_label: getLanguageLabel(item.language),
+      });
+      setResult(res);
+      setDisplayCount(10);
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || "关键词研究失败");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const videoColumns: ColumnsType<TopVideoItem> = [
-    {
-      title: "频道",
-      dataIndex: "channel_title",
-      key: "channel",
-      width: 200,
-      render: (v: string) => <span className="font-medium">{v || "-"}</span>,
-    },
-    {
-      title: "播放量",
-      dataIndex: "view_count",
-      key: "views",
-      sorter: (a, b) => a.view_count - b.view_count,
-      render: (v: number) => v.toLocaleString(),
-    },
-    {
-      title: "点赞",
-      dataIndex: "like_count",
-      key: "likes",
-      render: (v: number) => v.toLocaleString(),
-    },
-    {
-      title: "评论",
-      dataIndex: "comment_count",
-      key: "comments",
-      render: (v: number) => v.toLocaleString(),
-    },
-  ];
+  // 外部传入关键词（从 Channel Growth 联动）
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const kw = params.get("keyword");
+    if (kw) {
+      setKeyword(kw);
+      handleSearchWithKeyword(kw);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [window.location.search]);
 
-  const relatedColumns: ColumnsType<RelatedKeywordItem> = [
-    {
-      title: "关键词",
-      dataIndex: "keyword",
-      key: "keyword",
-      render: (v: string) => (
-        <a
-          className="cursor-pointer text-blue-600 hover:text-blue-800"
-          onClick={() => {
-            form.setFieldsValue({ keyword: v });
-            void onSearch();
-          }}
-        >
-          {v}
-        </a>
-      ),
-    },
-    {
-      title: "搜索量评分",
-      dataIndex: "search_volume_score",
-      key: "volume",
-      width: 140,
-      sorter: (a, b) => a.search_volume_score - b.search_volume_score,
-      render: (v: number) => (
-        <div className="flex items-center gap-2">
-          <Progress
-            percent={v}
-            size="small"
-            strokeColor={volumeColor(v)}
-            showInfo={false}
-            style={{ width: 60 }}
-          />
-          <span style={{ color: volumeColor(v), fontWeight: 500 }}>{v}</span>
-        </div>
-      ),
-    },
-    {
-      title: "竞争度",
-      dataIndex: "competition_score",
-      key: "competition",
-      width: 140,
-      sorter: (a, b) => a.competition_score - b.competition_score,
-      render: (v: number) => (
-        <div className="flex items-center gap-2">
-          <Progress
-            percent={v}
-            size="small"
-            strokeColor={competitionColor(v)}
-            showInfo={false}
-            style={{ width: 60 }}
-          />
-          <span style={{ color: competitionColor(v), fontWeight: 500 }}>{v}</span>
-        </div>
-      ),
-    },
-    {
-      title: "操作",
-      key: "action",
-      width: 100,
-      render: (_: unknown, record: RelatedKeywordItem) => (
-        <Button
-          type="link"
-          size="small"
-          icon={<ThunderboltOutlined />}
-          onClick={() => importToRadar(record.keyword)}
-        >
-          雷达
-        </Button>
-      ),
-    },
-  ];
+  const handleSearchWithKeyword = async (kw: string) => {
+    if (!kw.trim()) return;
+    setLoading(true);
+    try {
+      const res = await keywordResearchApi({
+        keyword: kw.trim(),
+        region,
+        language,
+        region_label: getRegionLabel(region),
+        language_label: getLanguageLabel(language),
+      });
+      setResult(res);
+      setDisplayCount(10);
+      await fetchHistory();
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || "关键词研究失败");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] p-6 md:p-10 text-slate-900">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* 页面标题 */}
-        <div className="mb-2">
-          <Title level={3} style={{ color: "#0f172a", marginBottom: 4 }}>关键词研究</Title>
-          <Text style={{ color: "#64748b" }}>
-            输入关键词，分析搜索量、竞争度、难度和趋势，发现 YouTube 内容机会。
-          </Text>
-        </div>
+    <div style={{ padding: 24, maxWidth: 1200, margin: "0 auto" }}>
+      <Title level={3} style={{ marginBottom: 24 }}>
+        <SearchOutlined style={{ marginRight: 8, color: "#1890ff" }} />
+        关键词研究
+      </Title>
 
-        {/* 搜索表单 */}
-        <Card className="!bg-white !border-slate-200 !shadow-sm" bodyStyle={{ padding: 24 }}>
-          <Form form={form} layout="inline" initialValues={{ region: "US", language: "zh" }}>
-            <Form.Item
-              name="keyword"
-              rules={[{ required: true, message: "请输入关键词" }]}
-              className="flex-1 min-w-[200px]"
+      {/* 搜索区 */}
+      <Card style={{ marginBottom: 24 }}>
+        <Row gutter={16} align="middle">
+          <Col flex="auto">
+            <Input
+              placeholder="输入关键词..."
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onPressEnter={handleSearch}
+              size="large"
+              prefix={<SearchOutlined />}
+            />
+          </Col>
+          <Col>
+            <Space>
+              <GlobalOutlined />
+              <Text strong>地区</Text>
+            </Space>
+            <Select
+              value={region}
+              onChange={setRegion}
+              options={REGION_OPTIONS}
+              style={{ width: 140, marginLeft: 8 }}
+            />
+          </Col>
+          <Col>
+            <Space>
+              <RiseOutlined />
+              <Text strong>语言</Text>
+            </Space>
+            <Select
+              value={language}
+              onChange={setLanguage}
+              options={LANGUAGE_OPTIONS}
+              style={{ width: 120, marginLeft: 8 }}
+            />
+          </Col>
+          <Col>
+            <Button
+              type="primary"
+              icon={<SearchOutlined />}
+              loading={loading}
+              onClick={handleSearch}
+              size="large"
             >
-              <Input
-                size="large"
-                placeholder="输入关键词，如：tech review, 美妆教程, cooking"
-                onPressEnter={() => void onSearch()}
-              />
-            </Form.Item>
-            <Form.Item name="region">
-              <Select options={REGION_OPTIONS} size="large" style={{ width: 140 }} />
-            </Form.Item>
-            <Form.Item name="language">
-              <Select options={LANGUAGE_OPTIONS} size="large" style={{ width: 120 }} />
-            </Form.Item>
-            <Form.Item>
-              <Button
-                type="primary"
-                size="large"
-                icon={<SearchOutlined />}
-                loading={loading}
-                onClick={() => void onSearch()}
-                className="!rounded-lg"
+              搜索
+            </Button>
+          </Col>
+        </Row>
+      </Card>
+
+      {/* 关键词历史 */}
+      {history.length > 0 && (
+        <Card
+          title={<><HistoryOutlined style={{ marginRight: 8 }} />研究历史</>}
+          style={{ marginBottom: 24 }}
+          size="small"
+          loading={historyLoading}
+        >
+          <Space wrap>
+            {history.map((item) => (
+              <Tag
+                key={item.id}
+                color="blue"
+                style={{ fontSize: 13, padding: "4px 10px", cursor: "pointer" }}
+                onClick={() => handleHistoryClick(item)}
               >
-                分析
-              </Button>
-            </Form.Item>
-          </Form>
+                {item.keyword}
+                <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>
+                  {item.cache_date}
+                </Text>
+              </Tag>
+            ))}
+          </Space>
         </Card>
+      )}
 
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-16">
-            <Spin size="large" />
-            <Text type="secondary" className="mt-4">正在分析关键词数据…</Text>
-          </div>
-        )}
-
-        {/* 分析结果 */}
-        {!loading && result && (
-          <>
-            {/* 综合评分 + 趋势方向 */}
-            <Row gutter={16}>
-              <Col span={8}>
-                <Card
-                  className="!bg-white !border-slate-200 !shadow-sm"
-                  bodyStyle={{ padding: 20 }}
-                >
-                  <Statistic
-                    title="综合评分"
-                    value={result.keyword_score}
-                    suffix="/ 100"
-                    valueStyle={{ color: volumeColor(result.keyword_score), fontSize: 32 }}
-                  />
-                  <Progress
-                    percent={result.keyword_score}
-                    strokeColor={volumeColor(result.keyword_score)}
-                    showInfo={false}
-                    className="mt-2"
-                  />
-                  <div className="mt-2 flex items-center gap-2">
-                    <Tag color={volumeColor(result.keyword_score) === "#22c55e" ? "success" : volumeColor(result.keyword_score) === "#f59e0b" ? "warning" : "error"}>
-                      {scoreLabel(result.keyword_score)}
-                    </Tag>
-                    <Text type="secondary" className="text-xs">
-                      Volume×0.30 + Comp_inv×0.25 + KD_inv×0.25 + Opp×0.20
-                    </Text>
-                  </div>
-                </Card>
-              </Col>
-              <Col span={8}>
-                <Card
-                  className="!bg-white !border-slate-200 !shadow-sm"
-                  bodyStyle={{ padding: 20 }}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <Text type="secondary" className="text-sm">趋势方向</Text>
-                    {trendIcon(result.trend_direction)}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Tag
-                      color={trendTagColor(result.trend_direction)}
-                      className="text-lg px-4 py-1"
-                    >
-                      {trendLabel(result.trend_direction)}
-                    </Tag>
-                    <div>
-                      <Text strong style={{ fontSize: 20 }}>
-                        {result.trend_direction === "rising" ? "↑" : result.trend_direction === "declining" ? "↓" : "→"}
-                      </Text>
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <Text type="secondary" className="text-xs">
-                      {result.trend_direction === "rising"
-                        ? "该关键词近期搜索活跃度上升，值得投入"
-                        : result.trend_direction === "declining"
-                        ? "该关键词热度正在下降，需谨慎投入"
-                        : "该关键词热度稳定，可持续关注"}
-                    </Text>
-                  </div>
-                </Card>
-              </Col>
-              <Col span={8}>
-                <Card
-                  className="!bg-white !border-slate-200 !shadow-sm"
-                  bodyStyle={{ padding: 20 }}
-                >
-                  <Statistic
-                    title="机会得分"
-                    value={result.opportunity_score}
-                    suffix="/ 100"
-                    valueStyle={{ color: opportunityColor(result.opportunity_score), fontSize: 32 }}
-                    prefix={<BulbOutlined />}
-                  />
-                  <Progress
-                    percent={result.opportunity_score}
-                    strokeColor={opportunityColor(result.opportunity_score)}
-                    showInfo={false}
-                    className="mt-2"
-                  />
-                  <div className="mt-2 flex items-center gap-2">
-                    <Text type="secondary" className="text-xs">
-                      内容缺口比率：{(result.content_gap_ratio * 100).toFixed(0)}%
-                    </Text>
-                    {result.content_gap_ratio > 0.3 && (
-                      <Tag color="green" className="text-xs">缺口较大</Tag>
-                    )}
-                  </div>
-                </Card>
-              </Col>
-            </Row>
-
-            {/* 四维评分 */}
-            <Row gutter={16}>
-              <Col span={6}>
-                <Card
-                  className="!bg-white !border-slate-200 !shadow-sm"
-                  bodyStyle={{ padding: 16 }}
-                >
-                  <div className="text-center">
-                    <Text type="secondary" className="text-xs block mb-1">搜索量评分</Text>
-                    <Progress
-                      type="dashboard"
-                      percent={result.search_volume_score}
-                      size={90}
-                      strokeColor={volumeColor(result.search_volume_score)}
-                      format={(p) => <span style={{ fontSize: 18, fontWeight: 600 }}>{p}</span>}
-                    />
-                    <Text type="secondary" className="text-xs block mt-1">
-                      估算 {result.total_results.toLocaleString()} 结果
-                    </Text>
-                  </div>
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card
-                  className="!bg-white !border-slate-200 !shadow-sm"
-                  bodyStyle={{ padding: 16 }}
-                >
-                  <div className="text-center">
-                    <Text type="secondary" className="text-xs block mb-1">竞争度</Text>
-                    <Progress
-                      type="dashboard"
-                      percent={result.competition_score}
-                      size={90}
-                      strokeColor={competitionColor(result.competition_score)}
-                      format={(p) => <span style={{ fontSize: 18, fontWeight: 600 }}>{p}</span>}
-                    />
-                    <Text type="secondary" className="text-xs block mt-1">
-                      均订阅 {result.avg_channel_subscribers.toLocaleString()}
-                    </Text>
-                  </div>
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card
-                  className="!bg-white !border-slate-200 !shadow-sm"
-                  bodyStyle={{ padding: 16 }}
-                >
-                  <div className="text-center">
-                    <Text type="secondary" className="text-xs block mb-1">关键词难度 (KD)</Text>
-                    <Progress
-                      type="dashboard"
-                      percent={result.keyword_difficulty}
-                      size={90}
-                      strokeColor={difficultyColor(result.keyword_difficulty)}
-                      format={(p) => <span style={{ fontSize: 18, fontWeight: 600 }}>{p}</span>}
-                    />
-                    <Text type="secondary" className="text-xs block mt-1">
-                      {difficultyLabel(result.keyword_difficulty)}
-                    </Text>
-                  </div>
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card
-                  className="!bg-white !border-slate-200 !shadow-sm"
-                  bodyStyle={{ padding: 16 }}
-                >
-                  <div className="text-center">
-                    <Text type="secondary" className="text-xs block mb-1">内容缺口</Text>
-                    <Progress
-                      type="dashboard"
-                      percent={Math.round(result.content_gap_ratio * 100)}
-                      size={90}
-                      strokeColor={result.content_gap_ratio > 0.3 ? "#22c55e" : result.content_gap_ratio > 0.15 ? "#f59e0b" : "#94a3b8"}
-                      format={(p) => <span style={{ fontSize: 18, fontWeight: 600 }}>{p}%</span>}
-                    />
-                    <Text type="secondary" className="text-xs block mt-1">
-                      {result.content_gap_ratio > 0.3 ? "缺口大，机会多" : result.content_gap_ratio > 0.15 ? "有一定缺口" : "供给充足"}
-                    </Text>
-                  </div>
-                </Card>
-              </Col>
-            </Row>
-
-            {/* 趋势数据 */}
-            <Card className="!bg-white !border-slate-200 !shadow-sm" title="趋势数据" bodyStyle={{ padding: 20 }}>
-              <div className="grid grid-cols-4 gap-4">
-                {result.trend_data.map((t) => {
-                  const maxCount = Math.max(...result.trend_data.map((x) => x.result_count), 1);
-                  const pct = Math.round((t.result_count / maxCount) * 100);
-                  return (
-                    <div key={t.period} className="text-center">
-                      <Text type="secondary" className="text-xs block mb-1">{t.period}内</Text>
-                      <Progress
-                        type="dashboard"
-                        percent={pct}
-                        size={80}
-                        strokeColor="#3b82f6"
-                        format={() => (
-                          <span className="text-xs">
-                            {t.result_count > 1000000
-                              ? `${(t.result_count / 1000000).toFixed(1)}M`
-                              : t.result_count > 1000
-                              ? `${(t.result_count / 1000).toFixed(0)}K`
-                              : t.result_count}
-                          </span>
-                        )}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-
-            {/* 相关关键词（带评分表格） */}
-            {result.related_keywords_with_scores.length > 0 && (
-              <Card
-                className="!bg-white !border-slate-200 !shadow-sm"
-                title="相关关键词"
-                extra={<Text type="secondary" className="text-xs">点击关键词可重新搜索</Text>}
-                bodyStyle={{ padding: 20 }}
-              >
-                <Table<RelatedKeywordItem>
-                  rowKey="keyword"
-                  columns={relatedColumns}
-                  dataSource={result.related_keywords_with_scores}
-                  size="small"
-                  pagination={{ pageSize: 10 }}
+      {result && (
+        <>
+          {/* 搜索概览 */}
+          <Row gutter={16} style={{ marginBottom: 24 }}>
+            <Col span={6}>
+              <Card>
+                <Statistic
+                  title="搜索量"
+                  value={result.search_volume || 0}
+                  prefix={<SearchOutlined />}
                 />
               </Card>
-            )}
-
-            {/* 热门视频 */}
-            {result.top_videos.length > 0 && (
-              <Card className="!bg-white !border-slate-200 !shadow-sm" title="热门视频" bodyStyle={{ padding: 20 }}>
-                <Table<TopVideoItem>
-                  rowKey={(_, i) => String(i)}
-                  columns={videoColumns}
-                  dataSource={result.top_videos}
-                  size="small"
-                  pagination={{ pageSize: 5 }}
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic
+                  title="竞争度"
+                  value={result.competition || 0}
+                  prefix={<RiseOutlined />}
                 />
               </Card>
-            )}
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic
+                  title="相关关键词"
+                  value={result.related_keywords?.length || 0}
+                  prefix={<GlobalOutlined />}
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic
+                  title="热门视频"
+                  value={result.popular_videos?.length || 0}
+                  prefix={<EyeOutlined />}
+                />
+              </Card>
+            </Col>
+          </Row>
 
-            {/* 导入蓝海雷达 */}
-            <Card className="!bg-blue-50/50 !border-blue-200 !shadow-sm" bodyStyle={{ padding: 20 }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Text strong className="text-blue-700">将此关键词导入蓝海雷达深度扫描</Text>
-                  <br />
-                  <Text type="secondary" className="text-xs">
-                    蓝海雷达将搜索该关键词下的低粉丝高爆款频道，验证品类机会
-                  </Text>
-                </div>
-                <Space>
-                  <Tag color="blue">API 调用 {result.search_calls} 次</Tag>
-                  <Tag color="purple">相关频道 {result.channel_count} 个</Tag>
-                  <Button
-                    type="primary"
-                    size="large"
-                    icon={<ThunderboltOutlined />}
-                    onClick={() => importToRadar(result.keyword)}
-                    className="!rounded-lg"
+          {/* 相关关键词 */}
+          {result.related_keywords?.length > 0 && (
+            <Card title="相关关键词" style={{ marginBottom: 24 }} size="small">
+              <Space wrap>
+                {result.related_keywords.map((kw: any, i: number) => (
+                  <Tag
+                    key={i}
+                    color={kw.search_volume >= 10000 ? "red" : kw.search_volume >= 1000 ? "blue" : "default"}
+                    style={{ fontSize: 13, padding: "4px 10px", cursor: "pointer" }}
+                    onClick={() => {
+                      setKeyword(kw.keyword || kw);
+                      handleSearchWithKeyword(kw.keyword || kw);
+                    }}
                   >
-                    导入蓝海雷达
-                  </Button>
-                </Space>
+                    {kw.keyword || kw}
+                    {kw.search_volume && <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>({formatNumber(kw.search_volume)})</Text>}
+                  </Tag>
+                ))}
+              </Space>
+            </Card>
+          )}
+
+          {/* 热门视频 - 无限滚动 */}
+          {result.popular_videos?.length > 0 && (
+            <Card title="热门视频" size="small">
+              <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
+                {/* 表头 */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "48px 1fr 100px 90px 90px 100px",
+                    gap: 8,
+                    padding: "8px 0",
+                    borderBottom: "1px solid #f0f0f0",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: "#666",
+                  }}
+                >
+                  <div>#</div>
+                  <div>视频</div>
+                  <div>播放量</div>
+                  <div>点赞</div>
+                  <div>评论</div>
+                  <div>互动率</div>
+                </div>
+
+                {visibleVideos.map((record: any, idx: number) => (
+                  <div
+                    key={record.video_id || idx}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "48px 1fr 100px 90px 90px 100px",
+                      gap: 8,
+                      padding: "8px 0",
+                      borderBottom: "1px solid #f0f0f0",
+                      fontSize: 13,
+                      cursor: "pointer",
+                      alignItems: "center",
+                    }}
+                    onClick={() => window.open(`https://www.youtube.com/watch?v=${record.video_id}`, "_blank")}
+                  >
+                    <div style={{ color: "#999" }}>{idx + 1}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      {record.thumbnail_url && (
+                        <Image
+                          src={record.thumbnail_url}
+                          width={80}
+                          height={45}
+                          style={{ borderRadius: 4, objectFit: "cover" }}
+                          fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN88P/BfwAJhAPk2iMa1AAAAABJRU5ErkJggg=="
+                          preview={false}
+                        />
+                      )}
+                      <div style={{ minWidth: 0 }}>
+                        <Tooltip title={record.title}>
+                          <Text ellipsis style={{ maxWidth: 260, display: "block" }}>
+                            {record.title}
+                          </Text>
+                        </Tooltip>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          {record.channel_title}
+                        </Text>
+                      </div>
+                    </div>
+                    <div><Space size={4}><EyeOutlined />{formatNumber(record.view_count)}</Space></div>
+                    <div><Space size={4}><LikeOutlined />{formatNumber(record.like_count)}</Space></div>
+                    <div><Space size={4}><MessageOutlined />{formatNumber(record.comment_count)}</Space></div>
+                    <div>
+                      <Tag color={record.engagement_rate >= 5 ? "#52c41a" : record.engagement_rate >= 2 ? "#1890ff" : "#faad14"}>
+                        {record.engagement_rate?.toFixed(2) || "0.00"}%
+                      </Tag>
+                    </div>
+                  </div>
+                ))}
+
+                {result.popular_videos.length > displayCount && (
+                  <div ref={sentinelRef} style={{ textAlign: "center", padding: "16px 0" }}>
+                    <Spin size="small" />
+                    <Text type="secondary" style={{ marginLeft: 8 }}>加载更多...</Text>
+                  </div>
+                )}
+
+                {displayCount >= result.popular_videos.length && result.popular_videos.length > 0 && (
+                  <div style={{ textAlign: "center", padding: "16px 0", color: "#999" }}>
+                    共 {result.popular_videos.length} 条，已全部加载
+                  </div>
+                )}
               </div>
             </Card>
-          </>
-        )}
-      </div>
+          )}
+        </>
+      )}
+
+      {!result && !loading && (
+        <Card>
+          <Empty
+            description="输入关键词，点击「搜索」查看 YouTube 关键词分析"
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+          />
+        </Card>
+      )}
     </div>
   );
 }

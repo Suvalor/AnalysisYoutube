@@ -1,5 +1,5 @@
 import { Alert, Button, Checkbox, Form, Input, Space } from "antd";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "@/components/Layout/AuthLayout";
@@ -23,8 +23,9 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { setToken } = useAuth();
   const { t } = useTranslation("auth");
+  const fetchedRef = useRef(false);
 
-  const fetchCaptcha = async () => {
+  const fetchCaptcha = useCallback(async () => {
     setCaptchaLoading(true);
     try {
       const data = await getCaptchaApi();
@@ -36,16 +37,20 @@ export default function LoginPage() {
     } finally {
       setCaptchaLoading(false);
     }
-  };
+  }, [form, t]);
 
   useEffect(() => {
-    fetchCaptcha();
+    // 用 ref 防止 StrictMode 双重调用
+    if (!fetchedRef.current) {
+      fetchedRef.current = true;
+      fetchCaptcha();
+    }
     const storedEmail = localStorage.getItem("rememberedEmail") || "";
     if (storedEmail) {
       form.setFieldValue("email", storedEmail);
       setRememberMe(true);
     }
-  }, [form]);
+  }, [form, fetchCaptcha]);
 
   const onFinish = async (values: FormValues) => {
     setLoading(true);
