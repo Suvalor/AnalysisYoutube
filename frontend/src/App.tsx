@@ -1,8 +1,10 @@
+import { useEffect, useRef } from "react";
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import TabbedShell from "./components/Layout/TabbedShell";
+import { useAuth } from "@/store/authStore";
 
 /** 解码 JWT payload 并检查是否过期，无效 token 返回 null */
 function parseJwt(token: string): Record<string, unknown> | null {
@@ -16,12 +18,23 @@ function parseJwt(token: string): Record<string, unknown> | null {
 }
 
 function ProtectedLayout() {
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  const { token, setToken } = useAuth();
+  const clearedRef = useRef(false);
+
+  // token 过期时清除（用 ref 保证只执行一次，避免 StrictMode 双重调用）
+  useEffect(() => {
+    if (token && !clearedRef.current) {
+      const payload = parseJwt(token);
+      if (!payload || typeof payload.exp !== "number" || payload.exp * 1000 < Date.now()) {
+        clearedRef.current = true;
+        setToken(null);
+      }
+    }
+  }, [token, setToken]);
+
   if (!token) return <Navigate to="/login" replace />;
-  // 验证 JWT 未过期，过期则清除并跳转登录
   const payload = parseJwt(token);
   if (!payload || typeof payload.exp !== "number" || payload.exp * 1000 < Date.now()) {
-    localStorage.removeItem("access_token");
     return <Navigate to="/login" replace />;
   }
   return <Outlet />;

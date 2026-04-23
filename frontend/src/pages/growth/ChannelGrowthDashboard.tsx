@@ -24,6 +24,7 @@ import {
   MinusOutlined,
   ReloadOutlined,
   TrophyOutlined,
+  SearchOutlined,
 } from "@ant-design/icons";
 import {
   LineChart,
@@ -37,6 +38,7 @@ import {
 } from "recharts";
 import { channelGrowthApi } from "@/services/authApi";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 const { Title } = Typography;
 
@@ -120,6 +122,7 @@ function scoreColor(score: number): string {
 
 export default function ChannelGrowthDashboard() {
   const { t } = useTranslation("nav");
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<GrowthResponse | null>(null);
   const [days, setDays] = useState(30);
@@ -213,6 +216,21 @@ export default function ChannelGrowthDashboard() {
       dataIndex: "growth_trend",
       key: "trend",
       render: (v: string) => <TrendTag trend={v} />,
+    },
+    {
+      title: "操作",
+      key: "action",
+      width: 100,
+      render: (_: unknown, record: ChannelMetrics) => (
+        <Button
+          type="link"
+          size="small"
+          icon={<SearchOutlined />}
+          onClick={() => navigate(`/keyword-research?keyword=${encodeURIComponent(record.title)}`)}
+        >
+          关键词
+        </Button>
+      ),
     },
   ];
 

@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Card,
   Select,
   Button,
-  Table,
   Tag,
   Statistic,
   Row,
@@ -14,6 +13,8 @@ import {
   Tooltip,
   Empty,
   message,
+  Modal,
+  Spin,
 } from "antd";
 import {
   FireOutlined,
@@ -22,8 +23,18 @@ import {
   LikeOutlined,
   MessageOutlined,
   RiseOutlined,
+  PlusOutlined,
+  HistoryOutlined,
+  CaretUpOutlined,
+  CaretDownOutlined,
 } from "@ant-design/icons";
-import { trendDiscoveryApi } from "@/services/authApi";
+import {
+  trendDiscoveryApi,
+  trendHistoryApi,
+  addChannelByIdApi,
+  type TrendHistoryItem,
+  type TrendDiscoveryResponse,
+} from "@/services/authApi";
 
 const { Title, Text } = Typography;
 
@@ -63,11 +74,87 @@ function formatNumber(n: number): string {
   return String(n);
 }
 
+function getRegionLabel(region: string): string {
+  const found = REGION_OPTIONS.find((o) => o.value === region);
+  return found ? found.label.replace(/^🇺🇸|^🇬🇧|^🇯🇵|^🇰🇷|^🇩🇪|^🇫🇷|^🇧🇷|^🇮🇳|^🇨🇦|^🇦🇺/, "").trim() : region;
+}
+
+function getCategoryLabel(categoryId: string): string {
+  const found = CATEGORY_OPTIONS.find((o) => o.value === categoryId);
+  return found ? found.label : categoryId || "全部品类";
+}
+
+function SortHeader({
+  label,
+  field,
+  current,
+  order,
+  onSort,
+}: {
+  label: string;
+  field: string;
+  current: string;
+  order: "asc" | "desc";
+  onSort: (f: any) => void;
+}) {
+  const active = current === field;
+  return (
+    <div
+      onClick={() => onSort(field)}
+      style={{ cursor: "pointer", userSelect: "none", display: "flex", alignItems: "center", gap: 2 }}
+    >
+      {label}
+      <span style={{ fontSize: 10, display: "inline-flex", flexDirection: "column", lineHeight: 1 }}>
+        <CaretUpOutlined style={{ color: active && order === "asc" ? "#1890ff" : "#bbb", fontSize: 9 }} />
+        <CaretDownOutlined style={{ color: active && order === "desc" ? "#1890ff" : "#bbb", fontSize: 9, marginTop: -3 }} />
+      </span>
+    </div>
+  );
+}
+
 export default function TrendDiscovery() {
   const [region, setRegion] = useState("US");
   const [categoryId, setCategoryId] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<TrendDiscoveryResponse | null>(null);
+  const [history, setHistory] = useState<TrendHistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  // 无限滚动状态
+  const [displayCount, setDisplayCount] = useState(20);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // 排序状态
+  type SortField = "view_count" | "like_count" | "comment_count" | "engagement_rate" | "channel_subscribers";
+  type SortOrder = "asc" | "desc";
+  const [sortField, setSortField] = useState<SortField>("view_count");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortOrder("desc");
+    }
+  };
+
+  const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await trendHistoryApi(10);
+      setHistory(res.items);
+    } catch {
+      // 静默失败
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
 
   const handleFetch = async () => {
     setLoading(true);
@@ -76,8 +163,13 @@ export default function TrendDiscovery() {
         region,
         category_id: categoryId || undefined,
         max_results: 50,
+        region_label: getRegionLabel(region),
+        category_label: getCategoryLabel(categoryId),
       });
       setResult(res);
+      setDisplayCount(20);
+      // 刷新历史
+      await fetchHistory();
     } catch (e: any) {
       message.error(e?.response?.data?.detail || "获取趋势数据失败");
     } finally {
@@ -85,100 +177,79 @@ export default function TrendDiscovery() {
     }
   };
 
-  const videoColumns = [
-    {
-      title: "#",
-      width: 48,
-      render: (_: any, __: any, idx: number) => idx + 1,
-    },
-    {
-      title: "视频",
-      dataIndex: "title",
-      key: "title",
-      ellipsis: true,
-      render: (title: string, record: any) => (
-        <Space>
-          {record.thumbnail_url && (
-            <Image
-              src={record.thumbnail_url}
-              width={80}
-              height={45}
-              style={{ borderRadius: 4, objectFit: "cover" }}
-              fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN88P/BfwAJhAPk2iMa1AAAAABJRU5ErkJggg=="
-              preview={false}
-            />
-          )}
-          <div>
-            <Tooltip title={title}>
-              <Text ellipsis style={{ maxWidth: 260, display: "block" }}>
-                {title}
-              </Text>
-            </Tooltip>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {record.channel_title}
-            </Text>
-          </div>
-        </Space>
-      ),
-    },
-    {
-      title: "播放量",
-      dataIndex: "view_count",
-      key: "view_count",
-      width: 100,
-      sorter: (a: any, b: any) => a.view_count - b.view_count,
-      render: (v: number) => (
-        <Space size={4}>
-          <EyeOutlined />
-          {formatNumber(v)}
-        </Space>
-      ),
-    },
-    {
-      title: "点赞",
-      dataIndex: "like_count",
-      key: "like_count",
-      width: 90,
-      sorter: (a: any, b: any) => a.like_count - b.like_count,
-      render: (v: number) => (
-        <Space size={4}>
-          <LikeOutlined />
-          {formatNumber(v)}
-        </Space>
-      ),
-    },
-    {
-      title: "评论",
-      dataIndex: "comment_count",
-      key: "comment_count",
-      width: 90,
-      render: (v: number) => (
-        <Space size={4}>
-          <MessageOutlined />
-          {formatNumber(v)}
-        </Space>
-      ),
-    },
-    {
-      title: "互动率",
-      dataIndex: "engagement_rate",
-      key: "engagement_rate",
-      width: 100,
-      sorter: (a: any, b: any) => a.engagement_rate - b.engagement_rate,
-      render: (v: number) => {
-        const color = v >= 5 ? "#52c41a" : v >= 2 ? "#1890ff" : "#faad14";
-        return <Tag color={color}>{v.toFixed(2)}%</Tag>;
+  // 入库确认
+  const handleAddChannel = (record: any) => {
+    Modal.confirm({
+      title: `将「${record.channel_title}」入库到频道管理？`,
+      content: `频道ID: ${record.channel_id}，订阅数: ${formatNumber(record.channel_subscribers)}`,
+      okText: "确认入库",
+      cancelText: "取消",
+      okButtonProps: { style: { background: "#ff4d4f", borderColor: "#ff4d4f" } },
+      onOk: async () => {
+        try {
+          const res = await addChannelByIdApi({
+            channel_id: record.channel_id,
+            channel_title: record.channel_title,
+            thumbnail_url: record.thumbnail_url,
+            subscriber_count: record.channel_subscribers,
+          });
+          message.success(res.message);
+        } catch (e: any) {
+          message.error(e?.response?.data?.detail || "入库失败");
+        }
       },
-    },
-    {
-      title: "频道订阅",
-      dataIndex: "channel_subscribers",
-      key: "channel_subscribers",
-      width: 110,
-      sorter: (a: any, b: any) => a.channel_subscribers - b.channel_subscribers,
-      render: (v: number) => formatNumber(v),
-    },
-  ];
+    });
+  };
+
+  // 排序后的视频列表
+  const sortedVideos = result
+    ? [...result.trending_videos].sort((a, b) => {
+        const va = a[sortField] ?? 0;
+        const vb = b[sortField] ?? 0;
+        return sortOrder === "asc" ? va - vb : vb - va;
+      })
+    : [];
+  const visibleVideos = sortedVideos.slice(0, displayCount);
+
+  // 无限滚动：Intersection Observer
+  useEffect(() => {
+    if (!result || !sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          const total = sortedVideos.length;
+          if (displayCount < total) {
+            setDisplayCount((prev) => Math.min(prev + 20, total));
+          }
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [result, displayCount, sortedVideos.length]);
+
+  // 点击历史记录回溯
+  const handleHistoryClick = async (item: TrendHistoryItem) => {
+    setLoading(true);
+    try {
+      const res = await trendDiscoveryApi({
+        region: item.region,
+        category_id: item.category_id || undefined,
+        max_results: 50,
+        region_label: getRegionLabel(item.region),
+        category_label: getCategoryLabel(item.category_id),
+      });
+      setResult(res);
+      setRegion(item.region);
+      setCategoryId(item.category_id);
+      setDisplayCount(20);
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || "获取趋势数据失败");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: "0 auto" }}>
@@ -227,6 +298,32 @@ export default function TrendDiscovery() {
           </Col>
         </Row>
       </Card>
+
+      {/* 趋势历史 */}
+      {history.length > 0 && (
+        <Card
+          title={<><HistoryOutlined style={{ marginRight: 8 }} />最近查阅</>}
+          style={{ marginBottom: 24 }}
+          size="small"
+          loading={historyLoading}
+        >
+          <Space wrap>
+            {history.map((item) => (
+              <Tag
+                key={item.id}
+                color="blue"
+                style={{ fontSize: 13, padding: "4px 10px", cursor: "pointer" }}
+                onClick={() => handleHistoryClick(item)}
+              >
+                {item.region_label} → {item.category_label}
+                <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>
+                  {item.cache_date}
+                </Text>
+              </Tag>
+            ))}
+          </Space>
+        </Card>
+      )}
 
       {result && (
         <>
@@ -299,16 +396,111 @@ export default function TrendDiscovery() {
             </Card>
           )}
 
-          {/* 视频列表 */}
+          {/* 趋势视频排行 - 无限滚动 */}
           <Card title="趋势视频排行" size="small">
-            <Table
-              dataSource={result.trending_videos}
-              columns={videoColumns}
-              rowKey="video_id"
-              pagination={{ pageSize: 10, showSizeChanger: false }}
-              scroll={{ x: 900 }}
-              size="small"
-            />
+            <div ref={scrollContainerRef} style={{ maxHeight: "70vh", overflowY: "auto" }}>
+              {/* 表头 */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "48px 1fr 100px 90px 90px 100px 110px 80px",
+                  gap: 8,
+                  padding: "8px 0",
+                  borderBottom: "1px solid #f0f0f0",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  color: "#666",
+                }}
+              >
+                <div>#</div>
+                <div>视频</div>
+                <SortHeader label="播放量" field="view_count" current={sortField} order={sortOrder} onSort={handleSort} />
+                <SortHeader label="点赞" field="like_count" current={sortField} order={sortOrder} onSort={handleSort} />
+                <SortHeader label="评论" field="comment_count" current={sortField} order={sortOrder} onSort={handleSort} />
+                <SortHeader label="互动率" field="engagement_rate" current={sortField} order={sortOrder} onSort={handleSort} />
+                <SortHeader label="频道订阅" field="channel_subscribers" current={sortField} order={sortOrder} onSort={handleSort} />
+                <div>操作</div>
+              </div>
+
+              {/* 视频行 */}
+              {visibleVideos.map((record, idx) => (
+                <div
+                  key={record.video_id}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "48px 1fr 100px 90px 90px 100px 110px 80px",
+                    gap: 8,
+                    padding: "8px 0",
+                    borderBottom: "1px solid #f0f0f0",
+                    fontSize: 13,
+                    cursor: "pointer",
+                    alignItems: "center",
+                  }}
+                  onClick={() => window.open(`https://www.youtube.com/watch?v=${record.video_id}`, "_blank")}
+                >
+                  <div style={{ color: "#999" }}>{idx + 1}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    {record.thumbnail_url && (
+                      <Image
+                        src={record.thumbnail_url}
+                        width={80}
+                        height={45}
+                        style={{ borderRadius: 4, objectFit: "cover" }}
+                        fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN88P/BfwAJhAPk2iMa1AAAAABJRU5ErkJggg=="
+                        preview={false}
+                      />
+                    )}
+                    <div style={{ minWidth: 0 }}>
+                      <Tooltip title={record.title}>
+                        <Text ellipsis style={{ maxWidth: 260, display: "block" }}>
+                          {record.title}
+                        </Text>
+                      </Tooltip>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {record.channel_title}
+                      </Text>
+                    </div>
+                  </div>
+                  <div><Space size={4}><EyeOutlined />{formatNumber(record.view_count)}</Space></div>
+                  <div><Space size={4}><LikeOutlined />{formatNumber(record.like_count)}</Space></div>
+                  <div><Space size={4}><MessageOutlined />{formatNumber(record.comment_count)}</Space></div>
+                  <div>
+                    <Tag color={record.engagement_rate >= 5 ? "#52c41a" : record.engagement_rate >= 2 ? "#1890ff" : "#faad14"}>
+                      {record.engagement_rate.toFixed(2)}%
+                    </Tag>
+                  </div>
+                  <div>{formatNumber(record.channel_subscribers)}</div>
+                  <div>
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<PlusOutlined />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddChannel(record);
+                      }}
+                      style={{ background: "#ff4d4f", borderColor: "#ff4d4f" }}
+                    >
+                      入库
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {/* 加载更多哨兵 */}
+              {sortedVideos.length > displayCount && (
+                <div ref={sentinelRef} style={{ textAlign: "center", padding: "16px 0" }}>
+                  <Spin size="small" />
+                  <Text type="secondary" style={{ marginLeft: 8 }}>加载更多...</Text>
+                </div>
+              )}
+
+              {displayCount >= sortedVideos.length && sortedVideos.length > 0 && (
+                <div style={{ textAlign: "center", padding: "16px 0", color: "#999" }}>
+                  共 {sortedVideos.length} 条，已全部加载
+                </div>
+              )}
+            </div>
           </Card>
         </>
       )}

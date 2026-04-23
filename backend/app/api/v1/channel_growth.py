@@ -1,8 +1,12 @@
 """频道增长仪表盘 API 路由。"""
 
-from fastapi import APIRouter
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import select, func
 
 from app.api.deps import CurrentUserDep, DBSessionDep
+from app.models.youtube import YouTubeChannelHistory, UserCompetitorPool
 from app.schemas.channel_growth import (
     ChannelGrowthRequest,
     ChannelGrowthMetrics,
@@ -15,6 +19,39 @@ from app.services.config_manager import resolve_integration_config
 from app.services.quota_service import record_api_quota_usage
 
 router = APIRouter()
+
+CHANNEL_GROWTH_CACHE_TTL = timedelta(hours=12)
+
+
+async def _is_channel_growth_cache_valid(db, user_id: int) -> bool:
+    """检查频道增长数据是否在12小时内已更新（基于今日历史记录的 created_at）。"""
+    from app.models.youtube import YouTubeChannel, YouTubeChannelHistory as Hist
+
+    # 获取用户监控池中的频道
+    pool_stmt = select(UserCompetitorPool.channel_id).where(
+        UserCompetitorPool.user_id == user_id
+    )
+    pool_result = await db.execute(pool_stmt)
+    channel_ids = [r[0] for r in pool_result.all()]
+
+    if not channel_ids:
+        return False
+
+    # 检查今日是否有历史记录，且 created_at 在12小时内
+    from datetime import date
+    today = date.today()
+    hist_stmt = select(func.max(YouTubeChannelHistory.created_at)).where(
+        YouTubeChannelHistory.channel_id.in_(channel_ids),
+        YouTubeChannelHistory.record_date == today,
+    )
+    result = await db.execute(hist_stmt)
+    latest_created = result.scalar_one_or_none()
+    if latest_created is None:
+        return False
+    now = datetime.now(timezone.utc)
+    if latest_created.tzinfo is None:
+        latest_created = latest_created.replace(tzinfo=timezone.utc)
+    return (now - latest_created) < CHANNEL_GROWTH_CACHE_TTL
 
 
 @router.post(
@@ -29,27 +66,24 @@ async def channel_growth_dashboard(
 ) -> ChannelGrowthResponse:
     """
     获取频道增长仪表盘数据。
-
-    - 从监控池获取频道信息
-    - 从 YouTubeChannelHistory 获取历史趋势
-    - 调用 YouTube Data API 获取最新统计
-    - 计算增长率、趋势、互动得分
+    12小时内复用缓存，不重复调用 YouTube API。
     """
-    # 解析 YouTube API Key
+    # 检查缓存
+    cache_valid = await _is_channel_growth_cache_valid(db, current_user.id)
     icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    youtube_api_key = icfg.youtube_api_key if not cache_valid else None
 
     result = await get_channel_growth_data(
         db,
         user_id=current_user.id,
         channel_ids=body.channel_ids,
         days=body.days,
-        youtube_api_key=icfg.youtube_api_key,
+        youtube_api_key=youtube_api_key,
     )
 
-    # 记录配额消耗
-    quota_used = result.get("quota_used", 0)
-    if quota_used > 0:
-        await record_api_quota_usage(db, "channels", times=quota_used, part_count=1)
+    # 仅在非缓存命中时记录配额
+    if not cache_valid and result.get("quota_used", 0) > 0:
+        await record_api_quota_usage(db, "channels", times=result["quota_used"], part_count=1)
         await db.commit()
 
     # 构建响应
@@ -85,5 +119,5 @@ async def channel_growth_dashboard(
     return ChannelGrowthResponse(
         channels=channels,
         summary=summary,
-        quota_used=quota_used,
+        quota_used=result.get("quota_used", 0),
     )

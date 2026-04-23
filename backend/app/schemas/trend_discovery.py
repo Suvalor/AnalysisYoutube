@@ -11,6 +11,8 @@ class TrendDiscoveryRequest(BaseModel):
     region: str = Field("US", max_length=5, description="地区代码，如 US/GB/JP/KR")
     category_id: str | None = Field(None, description="YouTube 品类 ID（可选，如 20=游戏）")
     max_results: int = Field(50, ge=1, le=50, description="最大返回数量")
+    region_label: str = Field("", description="地区中文名（如 美国），用于历史记录")
+    category_label: str = Field("全部品类", description="品类中文名，用于历史记录")
 
 
 class TrendingVideoItem(BaseModel):

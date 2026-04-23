@@ -694,7 +694,10 @@ export default function ConfigCenter() {
             onChange={(k) => {
               const tab = k as ActiveTabKey;
               setActiveTab(tab);
-              navigate(`/config-center?tab=${tab}`, { replace: true });
+              // 仅在当前路径为 config-center 时同步 URL，避免跳转到 agent-edit 时被拉回
+              if (location.pathname === "/config-center") {
+                navigate(`/config-center?tab=${tab}`, { replace: true });
+              }
             }}
             items={[
               {

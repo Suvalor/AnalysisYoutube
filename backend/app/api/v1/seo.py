@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.models.seo_score import SeoScoreRecord
 from app.models.library import ModelLibrary
+from app.models.trend_cache import TrendHistory
 from app.crud.library import get_by_user
 from app.schemas.seo_scoring import (
     SeoScoringRequest,
@@ -17,9 +18,11 @@ from app.schemas.seo_scoring import (
     ScoreBreakdown,
 )
 from app.schemas.trend_discovery import TrendDiscoveryRequest, TrendDiscoveryResponse
+from app.schemas.trend_cache import TrendHistoryItem, TrendHistoryListResponse
 from app.services.config_manager import resolve_integration_config
 from app.services.seo_scoring_service import calculate_seo_score
 from app.services.trend_discovery_service import fetch_trending
+from app.services.trend_cache_service import get_cached_trend, save_trend_cache, add_trend_history, list_trend_history
 from app.services.quota_service import record_api_quota_usage
 
 router = APIRouter()
@@ -268,8 +271,25 @@ async def trend_discovery_endpoint(
 ) -> TrendDiscoveryResponse:
     """
     获取指定地区的 YouTube 热门趋势视频。
-    消耗 YouTube API 配额（1 次 videos.list + 1 次 channels.list）。
+    相同地区+品类+1小时内复用缓存，不重复调用 YouTube API。
     """
+    category_id = body.category_id or ""
+
+    # 检查缓存
+    cached = await get_cached_trend(db, region=body.region, category_id=category_id)
+    if cached is not None:
+        # 缓存命中，仅记录历史
+        await add_trend_history(
+            db,
+            user_id=current_user.id,
+            region=body.region,
+            category_id=category_id,
+            region_label=body.region_label,
+            category_label=body.category_label,
+        )
+        await db.commit()
+        return TrendDiscoveryResponse(**cached)
+
     icfg = await resolve_integration_config(db, org_id=current_user.org_id)
     if not icfg.youtube_api_key:
         raise HTTPException(
@@ -287,6 +307,51 @@ async def trend_discovery_endpoint(
     # 记录配额消耗
     await record_api_quota_usage(db, "videos", times=1, part_count=3)
     await record_api_quota_usage(db, "channels", times=result.get("channels_list_calls", 1), part_count=2)
+
+    # 保存缓存
+    await save_trend_cache(db, region=body.region, category_id=category_id, data=result)
+
+    # 记录历史
+    await add_trend_history(
+        db,
+        user_id=current_user.id,
+        region=body.region,
+        category_id=category_id,
+        region_label=body.region_label,
+        category_label=body.category_label,
+    )
     await db.commit()
 
     return TrendDiscoveryResponse(**result)
+
+
+# ── 趋势历史 ──
+
+
+@router.get(
+    "/trend-history",
+    response_model=TrendHistoryListResponse,
+    summary="趋势查阅历史",
+)
+async def trend_history_list(
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    limit: int = Query(10, ge=1, le=50, description="返回条数"),
+) -> TrendHistoryListResponse:
+    """获取当前用户最近的趋势查阅历史。"""
+    items = await list_trend_history(db, user_id=current_user.id, limit=limit)
+    return TrendHistoryListResponse(
+        items=[
+            TrendHistoryItem(
+                id=h.id,
+                cache_date=h.cache_date.strftime("%Y/%m/%d"),
+                region=h.region,
+                category_id=h.category_id,
+                region_label=h.region_label,
+                category_label=h.category_label,
+                created_at=h.created_at.isoformat(),
+            )
+            for h in items
+        ],
+        total=len(items),
+    )

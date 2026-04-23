@@ -11,6 +11,8 @@ class KeywordResearchRequest(BaseModel):
     keyword: str = Field(..., min_length=1, max_length=200, description="研究关键词")
     region: str = Field(default="US", description="地区代码，如 US/GB/JP/KR")
     language: str = Field(default="zh", description="语言代码，如 zh/en/ja")
+    region_label: str = Field(default="", description="地区中文名，用于历史记录")
+    language_label: str = Field(default="", description="语言中文名，用于历史记录")
 
     @field_validator("keyword")
     @classmethod
