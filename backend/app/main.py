@@ -66,20 +66,24 @@ def create_app() -> FastAPI:
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data: https:; "
         "connect-src 'self' https://ark.cn-beijing.volces.com https://*.aliyuncs.com https://*.myqcloud.com; "
-        "frame-src https://*.feishu.cn https://*.larkoffice.com; "
+        "frame-src https://*.feishu.cn https://*.larkoffice.com https://www.youtube-nocookie.com; "
         "font-src 'self'; "
         "object-src 'none'; "
         "base-uri 'self'; "
         "form-action 'self'"
     )
 
-    class CSPMiddleware(BaseHTTPMiddleware):
+    class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         async def dispatch(self, request: Request, call_next):
             response = await call_next(request)
             response.headers["Content-Security-Policy"] = CSP_HEADER
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-Frame-Options"] = "DENY"
+            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+            response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
             return response
 
-    app.add_middleware(CSPMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
 
     app.include_router(api_router_v1, prefix="/api")
     # 部分网关会把 /api 前缀剥掉再转发到后端，补挂 /users/... 以免集成配置与域名校验 404

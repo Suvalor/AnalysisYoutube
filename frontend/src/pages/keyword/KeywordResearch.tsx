@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { buildYouTubeWatchUrl } from "@/utils/youtubeLinks";
 import {
   Card,
   Select,
@@ -385,7 +386,7 @@ export default function KeywordResearch() {
                       cursor: "pointer",
                       alignItems: "center",
                     }}
-                    onClick={() => window.open(`https://www.youtube.com/watch?v=${record.video_id}`, "_blank")}
+                    onClick={() => { const u = buildYouTubeWatchUrl(record.video_id); if (u) window.open(u, "_blank"); }}
                   >
                     <div style={{ color: "#999" }}>{idx + 1}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>

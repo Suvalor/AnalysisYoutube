@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 
 from app.api.deps import CurrentUserDep, DBSessionDep
@@ -24,6 +26,14 @@ class AddChannelByIdRequest(BaseModel):
     thumbnail_url: str | None = Field(None, description="缩略图 URL")
     subscriber_count: int = Field(0, description="订阅数")
     group_name: str = Field("默认分组", max_length=100, description="分组名称")
+
+    @field_validator("channel_id")
+    @classmethod
+    def validate_channel_id_format(cls, v: str) -> str:
+        v = v.strip()
+        if not re.match(r"^[a-zA-Z0-9_-]+$", v):
+            raise ValueError("channel_id 仅允许字母、数字、下划线和连字符")
+        return v
 
 
 class AddChannelByIdResponse(BaseModel):
