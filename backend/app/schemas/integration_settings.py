@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.ssrf_guard import validate_url_against_ssrf
 
 
 class IntegrationSettingsRead(BaseModel):

@@ -2,7 +2,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.core.ssrf_guard import validate_url_against_ssrf
 
 
 class AssetFileTypeEnum(str, Enum):
@@ -64,6 +66,11 @@ class ModelCreate(BaseModel):
         description="chat=对话与脚本工坊；image_inpaint=去水印等 OpenAI 兼容 images.edit",
     )
 
+    @field_validator("api_base_url")
+    @classmethod
+    def _validate_base_url(cls, v: str) -> str:
+        return validate_url_against_ssrf(v)
+
 
 class ModelUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
@@ -71,6 +78,13 @@ class ModelUpdate(BaseModel):
     api_key: str | None = Field(None, min_length=1, max_length=2048)
     supported_models_json: str | list[str | dict[str, str]] | None = None
     library_kind: str | None = Field(None, max_length=32)
+
+    @field_validator("api_base_url")
+    @classmethod
+    def _validate_base_url(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return validate_url_against_ssrf(v)
 
 
 class ModelRead(BaseModel):
