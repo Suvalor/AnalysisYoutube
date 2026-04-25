@@ -213,7 +213,6 @@ async def generate_niche_recommendations(
 ) -> dict:
     """调用 LLM 生成深度品类推荐，含重试机制。"""
     from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig
-    from app.services.config_manager import resolve_integration_config
     from app.services.field_encryption import try_decrypt
     from app.crud.library import get_by_user
     from app.models.library import ModelLibrary
@@ -225,16 +224,16 @@ async def generate_niche_recommendations(
     if not ml:
         return {"recommendations": [], "avoid_niche": None, "error": "模型配置不存在"}
 
-    # 优先使用模型库自带的 API Key，回退到组织级火山引擎配置
+    # 优先使用模型库自带的 API Key
     ml_api_key = try_decrypt(ml.api_key_encrypted) or ""
     ml_base_url = (ml.api_base_url or "").strip().rstrip("/")
-    icfg = await resolve_integration_config(db, org_id=org_id)
-    api_key = ml_api_key or icfg.volcengine_api_key or ""
-    base_url = ml_base_url or ""
+    api_key = ml_api_key
+    base_url = ml_base_url
     cfg = LLMClientConfig(
         api_key=api_key,
         base_url=base_url,
         model_name=llm_model_name,
+        protocol=getattr(ml, "protocol", "anthropic") or "anthropic",
     )
     factory = LLMClientFactory()
 
@@ -629,7 +628,6 @@ async def navigation_chat(
 ) -> dict:
     """出海导航多轮对话追问。"""
     from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig
-    from app.services.config_manager import resolve_integration_config
     from app.services.field_encryption import try_decrypt
     from app.crud.library import get_by_user
     from app.models.library import ModelLibrary
@@ -645,16 +643,16 @@ async def navigation_chat(
     if not ml:
         return {"assistant_message": "模型配置不存在", "conversation_id": conversation_id}
 
-    # 优先使用模型库自带的 API Key，回退到组织级火山引擎配置
+    # 优先使用模型库自带的 API Key
     ml_api_key = try_decrypt(ml.api_key_encrypted) or ""
     ml_base_url = (ml.api_base_url or "").strip().rstrip("/")
-    icfg = await resolve_integration_config(db, org_id=org_id)
-    api_key = ml_api_key or icfg.volcengine_api_key or ""
-    base_url = ml_base_url or ""
+    api_key = ml_api_key
+    base_url = ml_base_url
     cfg = LLMClientConfig(
         api_key=api_key,
         base_url=base_url,
         model_name=llm_model_name,
+        protocol=getattr(ml, "protocol", "anthropic") or "anthropic",
     )
     factory = LLMClientFactory()
 

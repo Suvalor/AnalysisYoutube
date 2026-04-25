@@ -1,4 +1,4 @@
-"""组织级集成配置：云存储、YouTube、火山等；同组织成员共享 org_settings。"""
+"""组织级集成配置：云存储、YouTube、CV 等；同组织成员共享 org_settings。"""
 
 from __future__ import annotations
 
@@ -14,8 +14,6 @@ from app.models.organization import Organization
 from app.schemas.integration_settings import (
     IntegrationSettingsRead,
     IntegrationSettingsUpdate,
-    IntegrationTestResult,
-    ValidateStorageCustomDomainRequest,
 )
 from app.services.config_manager import (
     INTEGRATION_PAYLOAD_KEYS,
@@ -45,38 +43,27 @@ async def _to_read(session, org_id: int, stored: dict[str, str]) -> IntegrationS
     org = await session.get(Organization, org_id)
     org_name = org.name if org else ""
     return IntegrationSettingsRead(
-        org_id=org_id,
-        org_name=org_name,
+        youtube_api_key=merged.youtube_api_key,
         active_storage_provider=merged.active_storage_provider,
         aliyun_access_key_id=merged.aliyun_access_key_id,
+        aliyun_access_key_secret=merged.aliyun_access_key_secret,
         aliyun_role_arn=merged.aliyun_role_arn,
         aliyun_region_id=merged.aliyun_region_id,
         aliyun_oss_bucket_name=merged.aliyun_oss_bucket_name,
         aliyun_oss_endpoint=merged.aliyun_oss_endpoint,
         aliyun_custom_domain=merged.aliyun_custom_domain,
         tencent_cos_secret_id=merged.tencent_cos_secret_id,
+        tencent_cos_secret_key=merged.tencent_cos_secret_key,
         tencent_cos_region=merged.tencent_cos_region,
         tencent_cos_bucket=merged.tencent_cos_bucket,
         tencent_custom_domain=merged.tencent_custom_domain,
-        volcengine_endpoint_id=merged.volcengine_endpoint_id,
-        volcengine_base_url=merged.volcengine_base_url,
-        volcengine_model_gemini=merged.volcengine_model_gemini,
         volc_cv_access_key_id=merged.volc_cv_access_key_id,
+        volc_cv_secret_access_key=merged.volc_cv_secret_access_key,
         volc_cv_region=merged.volc_cv_region,
         volc_cv_host=merged.volc_cv_host,
         volc_cv_inpaint_req_key=merged.volc_cv_inpaint_req_key,
         watermark_video_ai_max_frames=merged.watermark_video_ai_max_frames,
         watermark_inpaint_prompt=merged.watermark_inpaint_prompt,
-        has_youtube_api_key=bool(merged.youtube_api_key),
-        has_aliyun_access_key_secret=bool(merged.aliyun_access_key_secret),
-        has_tencent_cos_secret_key=bool(merged.tencent_cos_secret_key),
-        has_volcengine_api_key=bool(merged.volcengine_api_key),
-        has_volc_cv_secret_access_key=bool(merged.volc_cv_secret_access_key),
-        youtube_api_key_display=_secret_display(bool(merged.youtube_api_key)),
-        aliyun_access_key_secret_display=_secret_display(bool(merged.aliyun_access_key_secret)),
-        tencent_cos_secret_key_display=_secret_display(bool(merged.tencent_cos_secret_key)),
-        volcengine_api_key_display=_secret_display(bool(merged.volcengine_api_key)),
-        volc_cv_secret_access_key_display=_secret_display(bool(merged.volc_cv_secret_access_key)),
     )
 
 
@@ -150,44 +137,43 @@ async def delete_org_integration_settings_route(db: DBSessionDep, current_user: 
 
 @router.post(
     "/me/integration-settings/test-youtube",
-    response_model=IntegrationTestResult,
-    summary="测试 YouTube Data API Key（合并后的有效 Key）",
+    summary="测试 YouTube Data API Key",
 )
-async def test_youtube_integration(db: DBSessionDep, current_user: CurrentUserDep) -> IntegrationTestResult:
+async def test_youtube_integration(db: DBSessionDep, current_user: CurrentUserDep) -> dict[str, str]:
     org_id = _require_org_id(current_user)
     cfg = await resolve_integration_config(db, org_id=org_id)
     ok, msg = await test_youtube_api_key(cfg.youtube_api_key)
-    return IntegrationTestResult(ok=ok, message=msg)
+    return {"ok": str(ok), "message": msg}
 
 
 @router.post(
     "/me/integration-settings/test-storage",
-    response_model=IntegrationTestResult,
-    summary="测试当前默认云存储（按 ACTIVE_STORAGE_PROVIDER 选阿里云或腾讯云）",
+    summary="测试当前默认云存储",
 )
-async def test_storage_integration(db: DBSessionDep, current_user: CurrentUserDep) -> IntegrationTestResult:
+async def test_storage_integration(db: DBSessionDep, current_user: CurrentUserDep) -> dict[str, str]:
     org_id = _require_org_id(current_user)
     cfg = await resolve_integration_config(db, org_id=org_id)
     ok, msg = test_active_storage(cfg)
-    return IntegrationTestResult(ok=ok, message=msg)
+    return {"ok": str(ok), "message": msg}
 
 
 @router.post(
     "/me/integration-settings/validate-storage-custom-domain",
-    response_model=IntegrationTestResult,
-    summary="校验云存储自定义访问域名（格式 + HEAD/GET 可达性）",
+    summary="校验云存储自定义访问域名",
 )
 async def validate_storage_custom_domain(
-    body: ValidateStorageCustomDomainRequest,
+    body: dict[str, str],
     current_user: CurrentUserDep,
-) -> IntegrationTestResult:
+) -> dict[str, str]:
     _require_org_id(current_user)
+    domain = body.get("domain", "").strip()
+    platform = body.get("platform", "aliyun")
     try:
-        norm = normalize_custom_domain(body.domain)
+        norm = normalize_custom_domain(domain)
     except ValueError as exc:
-        return IntegrationTestResult(ok=False, message=str(exc))
+        return {"ok": "false", "message": str(exc)}
     if not norm:
-        return IntegrationTestResult(ok=False, message="域名为空")
+        return {"ok": "false", "message": "域名为空"}
     ok, msg = await probe_domain_reachable(norm)
-    label = "阿里云 OSS" if body.platform == "aliyun" else "腾讯云 COS"
-    return IntegrationTestResult(ok=ok, message=f"【{label}】{msg}")
+    label = "阿里云 OSS" if platform == "aliyun" else "腾讯云 COS"
+    return {"ok": str(ok), "message": f"【{label}】{msg}"}

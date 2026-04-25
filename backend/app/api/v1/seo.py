@@ -1,5 +1,7 @@
 """SEO 评分 + 热门趋势 API。"""
 
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
 
@@ -22,7 +24,7 @@ from app.schemas.trend_cache import TrendHistoryItem, TrendHistoryListResponse
 from app.services.config_manager import resolve_integration_config
 from app.services.seo_scoring_service import calculate_seo_score
 from app.services.trend_discovery_service import fetch_trending
-from app.services.trend_cache_service import get_cached_trend, save_trend_cache, add_trend_history, list_trend_history
+from app.services.trend_cache_service import get_cached_trend, get_saved_trend, save_trend_cache, add_trend_history, list_trend_history
 from app.services.quota_service import record_api_quota_usage
 
 router = APIRouter()
@@ -323,6 +325,44 @@ async def trend_discovery_endpoint(
     await db.commit()
 
     return TrendDiscoveryResponse(**result)
+
+
+# ── 趋势缓存回溯 ──
+
+
+@router.get(
+    "/trend-cache",
+    response_model=TrendDiscoveryResponse,
+    summary="获取已缓存的趋势数据（历史回溯，不检查 TTL）",
+)
+async def get_trend_cache_endpoint(
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    region: str = Query(..., max_length=5, description="地区代码，如 US/GB/JP/KR"),
+    category_id: str = Query("", max_length=20, description="YouTube 品类 ID（空字符串表示全部品类）"),
+    cache_date: str | None = Query(None, description="缓存日期 YYYY-MM-DD，不传则查当天"),
+) -> TrendDiscoveryResponse:
+    """
+    获取已缓存的趋势数据，不检查 TTL。
+    适用于历史记录回溯场景，避免因缓存过期而重复调用 YouTube API。
+    如果没有对应缓存记录则返回 404。
+    """
+    parsed_date = None
+    if cache_date:
+        try:
+            parsed_date = datetime.strptime(cache_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="cache_date 格式错误，应为 YYYY-MM-DD",
+            )
+    data = await get_saved_trend(db, region=region, category_id=category_id, cache_date=parsed_date)
+    if data is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="该趋势数据尚未缓存，请先执行获取趋势查询",
+        )
+    return TrendDiscoveryResponse(**data)
 
 
 # ── 趋势历史 ──

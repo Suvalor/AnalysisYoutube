@@ -23,6 +23,7 @@ export type ModelItem = {
   user_id: number;
   /** chat=对话；image_inpaint=去水印等 OpenAI 兼容 images.edit */
   library_kind?: string;
+  protocol?: string;
   name: string;
   api_base_url: string;
   supported_models_json: string | null;
@@ -151,6 +152,7 @@ export async function createModelApi(payload: {
   api_key?: string;
   supported_models_json?: string | null;
   library_kind?: string;
+  protocol?: string;
 }) {
   const res = await apiClient.post("/api/libraries/models", payload);
   return res.data as ModelItem;
@@ -164,6 +166,7 @@ export async function updateModelApi(
     api_key?: string;
     supported_models_json?: string | null;
     library_kind?: string;
+    protocol?: string;
   }
 ) {
   const res = await apiClient.put(`/api/libraries/models/${modelId}`, payload);

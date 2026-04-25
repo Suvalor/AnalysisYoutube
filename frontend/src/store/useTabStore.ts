@@ -15,7 +15,6 @@ export type TabType =
   | "video-board"
   | "feishu-workspace"
   | "feishu-viewer"
-  | "ai-model-settings"
   | "config-center"
   | "sop-workflow"
   | "agent-edit"

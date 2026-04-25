@@ -123,12 +123,8 @@ async def auto_retrospective_for_user(
     返回新创建的迭代记录，失败返回 None。
     """
     from app.services.youtube_ai_service import analyze_radar_retrospective
-    from app.crud.library import get_by_user
     from app.models.library import ModelLibrary, PromptLibrary
-    from app.services.config_manager import resolve_integration_config
 
-    # 查找用户默认的模型配置和智能体
-    icfg = await resolve_integration_config(session, org_id=org_id)
     # 使用默认模型配置（取用户第一个 chat 模型库）
     ml_q = (
         select(ModelLibrary)
@@ -153,13 +149,6 @@ async def auto_retrospective_for_user(
         return None
 
     from app.services.field_encryption import try_decrypt
-    from app.services.llm_openai_factory import (
-        LLMClientFactory,
-        LLMClientConfig,
-        normalize_openai_base_url,
-        resolve_openai_chat_model_parameter,
-    )
-    from app.services.config_manager import resolve_model_alias_for_volcengine
 
     api_key = try_decrypt(ml.api_key_encrypted)
     base_url = (ml.api_base_url or "").strip().rstrip("/")

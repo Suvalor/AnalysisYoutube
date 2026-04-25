@@ -49,6 +49,31 @@ async def get_cached_trend(
         return None
 
 
+async def get_saved_trend(
+    db: AsyncSession,
+    *,
+    region: str,
+    category_id: str,
+    cache_date: date | None = None,
+) -> dict | None:
+    """获取趋势缓存，不检查 TTL，直接返回已保存的数据。用于历史回溯场景。"""
+    target_date = cache_date or date.today()
+    stmt = select(TrendCache).where(
+        TrendCache.cache_date == target_date,
+        TrendCache.region == region,
+        TrendCache.category_id == category_id,
+    )
+    result = await db.execute(stmt)
+    cache = result.scalar_one_or_none()
+    if cache is None:
+        return None
+    try:
+        return json.loads(cache.data)
+    except json.JSONDecodeError:
+        logger.warning("趋势缓存数据损坏: region=%s, category_id=%s", region, category_id)
+        return None
+
+
 async def save_trend_cache(
     db: AsyncSession,
     *,

@@ -1,6 +1,5 @@
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import {
-  Alert,
   Button,
   Card,
   Form,
@@ -50,32 +49,6 @@ import {
 
 const SECRET_MASK = "********";
 
-/** 与后端 llm_openai_factory.VOLCENGINE_CODING_OPENAI_BASE_URL_CANONICAL 一致 */
-const VOLCENGINE_CODING_BASE_URL_CANONICAL = "https://ark.cn-beijing.volces.com/api/coding/v3";
-
-function normalizeBaseUrlForCompare(raw: string): string {
-  return raw.trim().replace(/\/+$/, "");
-}
-
-/** 保存前校验：火山相关域名下路径是否含 /v3，减少 404 */
-function validateVolcengineLikeBaseUrl(url: string): string | null {
-  const u = url.trim();
-  if (!u) return null;
-  const lower = u.toLowerCase();
-  if (!lower.includes("volces.com") && !lower.includes("volcengineapi.com")) return null;
-  if (lower.includes("/api/coding/")) {
-    const core = normalizeBaseUrlForCompare(u);
-    if (!/\/v3$/i.test(core)) {
-      return "Coding Plan 地址须以 /v3 结尾，例如：https://ark.cn-beijing.volces.com/api/coding/v3";
-    }
-    return null;
-  }
-  if (!lower.includes("/v3")) {
-    return "该火山域名下 OpenAI 兼容接口通常需包含路径 /v3，请对照控制台填写完整 Base URL。";
-  }
-  return null;
-}
-
 /** 与后端 is_secret_placeholder 对齐：勿把占位符当新密钥提交 */
 function looksLikeMaskedSecret(s: string | undefined): boolean {
   const t = (s ?? "").trim();
@@ -98,6 +71,7 @@ type ModelFormValues = {
   library_kind?: string;
   api_base_url: string;
   api_key?: string;
+  protocol?: string;
   supported_models?: Array<{ label: string; value: string }>;
 };
 
@@ -126,11 +100,7 @@ type YoutubeFormValues = {
   youtube_api_key: string;
 };
 
-type VolcFormValues = {
-  volcengine_api_key: string;
-  volcengine_endpoint_id: string;
-  volcengine_base_url: string;
-  volcengine_model_gemini: string;
+type CVFormValues = {
   volc_cv_access_key_id: string;
   volc_cv_secret_access_key: string;
   volc_cv_region: string;
@@ -160,20 +130,14 @@ export default function ConfigCenter() {
   const [editingTextId, setEditingTextId] = useState<number | null>(null);
 
   const [modelForm] = Form.useForm<ModelFormValues>();
-  const watchedModelBaseUrl = Form.useWatch("api_base_url", modelForm);
-  const isVolcengineCodingPlanUrl = useMemo(() => {
-    const a = normalizeBaseUrlForCompare(watchedModelBaseUrl ?? "");
-    const b = normalizeBaseUrlForCompare(VOLCENGINE_CODING_BASE_URL_CANONICAL);
-    return a.length > 0 && a === b;
-  }, [watchedModelBaseUrl]);
   const [textForm] = Form.useForm<TextFormValues>();
   const [storageForm] = Form.useForm<StorageFormValues>();
   const [youtubeForm] = Form.useForm<YoutubeFormValues>();
-  const [volcForm] = Form.useForm<VolcFormValues>();
+  const [cvForm] = Form.useForm<CVFormValues>();
   const [integrationMeta, setIntegrationMeta] = useState<IntegrationSettingsRead | null>(null);
   const [integrationLoading, setIntegrationLoading] = useState(false);
   const [integrationSaving, setIntegrationSaving] = useState(false);
-  const [integrationSubTab, setIntegrationSubTab] = useState<"storage" | "youtube" | "volc">("storage");
+  const [integrationSubTab, setIntegrationSubTab] = useState<"storage" | "youtube" | "cv">("storage");
   const [testYoutubeLoading, setTestYoutubeLoading] = useState(false);
   const [testStorageLoading, setTestStorageLoading] = useState(false);
   const [domainCheckLoading, setDomainCheckLoading] = useState<null | "aliyun" | "tencent">(null);
@@ -241,11 +205,7 @@ export default function ConfigCenter() {
       tencent_custom_domain: data.tencent_custom_domain || "",
     });
     youtubeForm.setFieldsValue({ youtube_api_key: "" });
-    volcForm.setFieldsValue({
-      volcengine_api_key: "",
-      volcengine_endpoint_id: data.volcengine_endpoint_id || "",
-      volcengine_base_url: data.volcengine_base_url || "",
-      volcengine_model_gemini: data.volcengine_model_gemini || "",
+    cvForm.setFieldsValue({
       volc_cv_access_key_id: data.volc_cv_access_key_id || "",
       volc_cv_secret_access_key: "",
       volc_cv_region: data.volc_cv_region || "",
@@ -254,7 +214,7 @@ export default function ConfigCenter() {
       watermark_video_ai_max_frames: data.watermark_video_ai_max_frames ?? 180,
       watermark_inpaint_prompt: data.watermark_inpaint_prompt || "",
     });
-  }, [storageForm, youtubeForm, volcForm]);
+  }, [storageForm, youtubeForm, cvForm]);
 
   const loadIntegration = useCallback(async () => {
     setIntegrationLoading(true);
@@ -288,7 +248,7 @@ export default function ConfigCenter() {
     setModelMode("create");
     setEditingModel(null);
     modelForm.resetFields();
-    modelForm.setFieldsValue({ supported_models: [], library_kind: "chat" });
+    modelForm.setFieldsValue({ supported_models: [], library_kind: "chat", protocol: "anthropic" });
     setModelOpen(true);
   };
 
@@ -299,36 +259,17 @@ export default function ConfigCenter() {
       name: row.name,
       library_kind: row.library_kind ?? "chat",
       api_base_url: row.api_base_url,
+      protocol: row.protocol ?? "anthropic",
       supported_models: parseSupportedModels(row.supported_models_json),
       api_key: "",
     });
     setModelOpen(true);
   };
 
-  const applyCodingPlanModelSuggestion = () => {
-    const list = (modelForm.getFieldValue("supported_models") ?? []) as Array<{ label?: string; value?: string }>;
-    const next = [...list];
-    const has = next.some((x) => (x?.value ?? "").trim() === "ark-code-latest");
-    if (has) {
-      message.info("列表中已包含 ark-code-latest，可直接编辑。");
-      return;
-    }
-    next.unshift({ label: "Coding 默认", value: "ark-code-latest" });
-    modelForm.setFieldsValue({ supported_models: next });
-    message.success("已添加建议模型 ID：ark-code-latest（可改名或删除）");
-  };
-
   const submitModel = async () => {
     try {
       const values = await modelForm.validateFields();
       const libKind = (values.library_kind ?? "chat").trim();
-      if (libKind !== "image_inpaint") {
-        const urlErr = validateVolcengineLikeBaseUrl(values.api_base_url ?? "");
-        if (urlErr) {
-          message.error(urlErr);
-          return;
-        }
-      }
       setSaving(true);
       const payload: {
         name?: string;
@@ -336,10 +277,12 @@ export default function ConfigCenter() {
         api_key?: string;
         supported_models_json?: string | null;
         library_kind?: string;
+        protocol?: string;
       } = {
         name: values.name.trim(),
         api_base_url: values.api_base_url.trim(),
         library_kind: libKind,
+        protocol: (values.protocol ?? "anthropic").trim(),
       };
       const supportedModels = (values.supported_models ?? []).map((x) => ({
         label: String(x?.label ?? "").trim(),
@@ -573,14 +516,11 @@ export default function ConfigCenter() {
     }
   };
 
-  const submitVolcSettings = async () => {
+  const submitCVSettings = async () => {
     try {
-      const values = await volcForm.validateFields();
+      const values = await cvForm.validateFields();
       setIntegrationSaving(true);
       const payload: IntegrationSettingsUpdatePayload = {
-        volcengine_endpoint_id: trimOrNull(values.volcengine_endpoint_id),
-        volcengine_base_url: trimOrNull(values.volcengine_base_url),
-        volcengine_model_gemini: trimOrNull(values.volcengine_model_gemini),
         volc_cv_access_key_id: trimOrNull(values.volc_cv_access_key_id),
         volc_cv_region: trimOrNull(values.volc_cv_region),
         volc_cv_host: trimOrNull(values.volc_cv_host),
@@ -594,13 +534,11 @@ export default function ConfigCenter() {
       }
       const wp = (values.watermark_inpaint_prompt ?? "").trim();
       payload.watermark_inpaint_prompt = wp.length ? wp : null;
-      const vk = (values.volcengine_api_key ?? "").trim();
-      if (vk && !looksLikeMaskedSecret(vk)) payload.volcengine_api_key = vk;
       const vcsk = (values.volc_cv_secret_access_key ?? "").trim();
       if (vcsk && !looksLikeMaskedSecret(vcsk)) payload.volc_cv_secret_access_key = vcsk;
       const updated = await updateIntegrationSettingsApi(payload);
       applyIntegrationReadToForms(updated);
-      message.success("火山引擎配置已保存");
+      message.success("智能视觉配置已保存");
     } catch (e: any) {
       if (e?.errorFields) return;
       message.error(e?.response?.data?.detail ?? e?.message ?? "保存失败");
@@ -772,7 +710,7 @@ export default function ConfigCenter() {
                     </div>
                     <Tabs
                       activeKey={integrationSubTab}
-                      onChange={(k) => setIntegrationSubTab(k as "storage" | "youtube" | "volc")}
+                      onChange={(k) => setIntegrationSubTab(k as "storage" | "youtube" | "cv")}
                       items={[
                         {
                           key: "storage",
@@ -923,53 +861,21 @@ export default function ConfigCenter() {
                           ),
                         },
                         {
-                          key: "volc",
-                          label: "火山引擎（LLM / 视觉）",
+                          key: "cv",
+                          label: "智能视觉（CV）",
                           children: (
                             <div className="pt-2 max-w-xl">
                               <div className="mb-3">
-                                <Button type="primary" loading={integrationSaving} onClick={() => void submitVolcSettings()}>
-                                  保存火山配置
+                                <Button type="primary" loading={integrationSaving} onClick={() => void submitCVSettings()}>
+                                  保存智能视觉配置
                                 </Button>
                               </div>
-                              <Form form={volcForm} layout="vertical" disabled={integrationLoading}>
-                                <Form.Item
-                                  name="volcengine_api_key"
-                                  label="API Key"
-                                  extra={
-                                    integrationMeta?.has_volcengine_api_key
-                                      ? `已配置（${SECRET_MASK}），留空不修改`
-                                      : undefined
-                                  }
-                                >
-                                  <Input.Password placeholder="留空不修改" autoComplete="new-password" />
-                                </Form.Item>
-                                <Form.Item
-                                  name="volcengine_endpoint_id"
-                                  label="Endpoint / 默认模型 ID"
-                                  extra="支持 ark-code-latest 或控制台推理接入点 ID（ep- 开头）。未填且 Base URL 为 Coding Plan 时，服务端可默认 ark-code-latest。"
-                                >
-                                  <Input placeholder="ark-code-latest 或 ep-xxxx" />
-                                </Form.Item>
-                                <Form.Item
-                                  name="volcengine_base_url"
-                                  label="Base URL"
-                                  extra={`建议（Coding Plan）：${VOLCENGINE_CODING_BASE_URL_CANONICAL}；须含 /v3 路径段。`}
-                                >
-                                  <Input placeholder="https://ark.cn-beijing.volces.com/api/coding/v3" />
-                                </Form.Item>
-                                <Form.Item
-                                  name="volcengine_model_gemini"
-                                  label="Gemini 别名（gemini-1.5-pro）"
-                                  tooltip="Claude 别名使用 Endpoint ID"
-                                >
-                                  <Input />
-                                </Form.Item>
-                                <div className="text-slate-600 text-sm font-medium mt-4 mb-2">
+                              <Form form={cvForm} layout="vertical" disabled={integrationLoading}>
+                                <div className="text-slate-600 text-sm font-medium mb-2">
                                   智能视觉 CV（去水印 / 图像修补）
                                 </div>
                                 <p className="text-slate-500 text-xs mb-2">
-                                  与上方方舟 API Key 不同：此处为 AccessKey（ID）+ SecretAccessKey，用于火山 CV Img2ImgInpainting。
+                                  AccessKey（ID）+ SecretAccessKey，用于火山 CV Img2ImgInpainting。
                                   配置后将优先于 OpenAI 兼容通道；未配置时可仅用「图像修复」模型库。
                                 </p>
                                 <Form.Item name="volc_cv_access_key_id" label="CV AccessKey ID">
@@ -1047,7 +953,7 @@ export default function ConfigCenter() {
         confirmLoading={saving}
         destroyOnHidden
       >
-        <Form form={modelForm} layout="vertical" initialValues={{ library_kind: "chat" }}>
+        <Form form={modelForm} layout="vertical" initialValues={{ library_kind: "chat", protocol: "anthropic" }}>
           <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入名称" }]}>
             <Input />
           </Form.Item>
@@ -1068,19 +974,22 @@ export default function ConfigCenter() {
             name="api_base_url"
             label="Base URL"
             rules={[{ required: true, message: "请输入 Base URL" }]}
-            extra="标准 OpenAI 兼容网关直接填写完整根路径。火山 Coding Plan 建议：将本字段填为控制台提供的地址（通常含 /api/coding/v3）。"
+            extra="标准 OpenAI 兼容网关直接填写完整根路径。"
           >
-            <Input placeholder="例如 https://api.openai.com/v1 或火山控制台地址" />
+            <Input placeholder="例如 https://api.openai.com/v1" />
           </Form.Item>
-          {isVolcengineCodingPlanUrl ? (
-            <Alert
-              type="info"
-              showIcon
-              className="mb-3"
-              message="检测到火山引擎 Coding Plan 接口"
-              description="将按该 Base URL 由服务端适配非标准协议（未指定模型时可使用 ark-code-latest）。你可继续手动修改下方「模型 ID」。"
+          <Form.Item
+            name="protocol"
+            label="协议"
+            extra="Anthropic：使用 Messages API 格式；OpenAI 兼容：使用 Chat Completions 格式。"
+          >
+            <Select
+              options={[
+                { value: "anthropic", label: "Anthropic" },
+                { value: "openai", label: "OpenAI 兼容" },
+              ]}
             />
-          ) : null}
+          </Form.Item>
           <Form.Item
             name="api_key"
             label="Key"
@@ -1091,18 +1000,7 @@ export default function ConfigCenter() {
               autoComplete="new-password"
             />
           </Form.Item>
-          <Form.Item
-            label={
-              <span className="flex flex-wrap items-center gap-2">
-                <span>支持的模型列表</span>
-                {isVolcengineCodingPlanUrl ? (
-                  <Button type="link" size="small" className="!p-0" onClick={applyCodingPlanModelSuggestion}>
-                    建议填入 ark-code-latest
-                  </Button>
-                ) : null}
-              </span>
-            }
-          >
+          <Form.Item label="支持的模型列表">
             <Form.List name="supported_models">
               {(fields, { add, remove }) => (
                 <div className="space-y-2">

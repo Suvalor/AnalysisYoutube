@@ -817,6 +817,15 @@ export async function trendDiscoveryApi(payload: {
   return res.data as TrendDiscoveryResponse;
 }
 
+// ── 趋势缓存回溯 API ──
+
+export async function trendCacheApi(region: string, category_id: string, cache_date?: string) {
+  const res = await apiClient.get("/api/seo/trend-cache", {
+    params: { region, category_id, cache_date },
+  });
+  return res.data as TrendDiscoveryResponse;
+}
+
 // ── 趋势历史 API ──
 
 export type TrendHistoryItem = {

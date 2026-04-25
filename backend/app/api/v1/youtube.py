@@ -169,7 +169,7 @@ async def analyze_youtube_channel(
     await db.commit()
     await db.refresh(channel)
 
-    if await enrich_youtube_channel_ai(db, channel, integration=icfg):
+    if await enrich_youtube_channel_ai(db, channel):
         await db.commit()
         await db.refresh(channel)
 
@@ -234,7 +234,7 @@ async def _process_analyze_youtube_batch_task(
 
                 # AI 非流式打标签：失败也不应中断该 URL
                 try:
-                    await enrich_youtube_channel_info_ai_sync(session, channel, integration=icfg)
+                    await enrich_youtube_channel_info_ai_sync(session, channel, user_id=user_id)
                 except Exception:  # noqa: BLE001
                     await session.rollback()
                     logger.exception("后台批量添加：AI 打标签失败 raw_url=%r", raw_url)
@@ -368,7 +368,7 @@ async def _process_batch_update_channels_task(
                 if not channel_needs_ai_tag_fill(ch):
                     continue
                 try:
-                    await enrich_youtube_channel_info_ai_sync(session, ch, integration=icfg)
+                    await enrich_youtube_channel_info_ai_sync(session, ch, user_id=user_id)
                     ch.updated_at = datetime.now(timezone.utc)
                     await session.commit()
                 except Exception:  # noqa: BLE001
