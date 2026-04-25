@@ -99,7 +99,7 @@ async def add_trend_history(
         TrendHistory.category_id == category_id,
     )
     result = await db.execute(stmt)
-    existing = result.scalar_one_or_none()
+    existing = result.scalars().first()
     if existing:
         # 已存在则更新时间
         existing.created_at = datetime.now(timezone.utc)
