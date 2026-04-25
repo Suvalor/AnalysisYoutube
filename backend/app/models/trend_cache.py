@@ -22,6 +22,9 @@ class TrendCache(Base):
 
 class TrendHistory(Base):
     __tablename__ = "trend_history"
+    __table_args__ = (
+        UniqueConstraint("user_id", "cache_date", "region", "category_id", name="uq_trend_history"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
