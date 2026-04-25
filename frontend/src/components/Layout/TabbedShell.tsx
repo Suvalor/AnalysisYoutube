@@ -41,7 +41,6 @@ import GlobalVideoList from "@/pages/youtube/GlobalVideoList";
 import ChannelDetail from "@/pages/youtube/ChannelDetail";
 import FeishuDocList from "@/pages/feishu/FeishuDocList";
 import FeishuDocViewer from "@/pages/feishu/FeishuDocViewer";
-import AiModelSettings from "@/pages/settings/AiModelSettings";
 import ConfigCenter from "@/pages/settings/ConfigCenter";
 import PersonalSettings from "@/pages/settings/PersonalSettings";
 import AgentEditorPage from "@/pages/settings/AgentEditorPage";
@@ -155,8 +154,6 @@ function renderTabPanel(tab: TabItem) {
       return <FeishuDocList />;
     case "feishu-viewer":
       return <FeishuDocViewer docId={tab.feishuDocId} />;
-    case "ai-model-settings":
-      return <AiModelSettings />;
     case "config-center":
       return <ConfigCenter />;
     case "personal-settings":

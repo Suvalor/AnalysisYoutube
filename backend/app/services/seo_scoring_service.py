@@ -25,7 +25,7 @@ import httpx
 from app.services.llm_openai_factory import (
     LLMClientConfig,
     LLMClientFactory,
-    normalize_openai_base_url,
+    normalize_base_url,
 )
 from app.services.field_encryption import try_decrypt
 from app.models.library import ModelLibrary
@@ -272,7 +272,7 @@ async def _ai_competitor_benchmark(
 ) -> dict[str, Any]:
     """调用 LLM 进行竞品对标分析。"""
     api_key = try_decrypt(model_library.api_key_encrypted)
-    base_url = normalize_openai_base_url((model_library.api_base_url or "").strip())
+    base_url = normalize_base_url((model_library.api_base_url or "").strip())
     if not api_key or not base_url:
         logger.warning("SEO AI 分析：模型配置缺少 API Key 或 Base URL，跳过 AI 分析")
         return _default_ai_result()
@@ -305,7 +305,7 @@ async def _ai_competitor_benchmark(
     )
 
     factory = LLMClientFactory()
-    cfg = LLMClientConfig(api_key=api_key, base_url=base_url, model_name=model_name)
+    cfg = LLMClientConfig(api_key=api_key, base_url=base_url, model_name=model_name, protocol=getattr(model_library, "protocol", "anthropic") or "anthropic")
 
     try:
         raw_content = await factory.chat_completions_content(

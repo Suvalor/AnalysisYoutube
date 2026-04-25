@@ -23,11 +23,7 @@ class Settings(BaseSettings):
     algorithm: str = Field("HS256", alias="ALGORITHM")
     access_token_expire_minutes: int = Field(1440, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     youtube_api_key: str = Field("", alias="YOUTUBE_API_KEY")
-    volcengine_api_key: str = Field("", alias="VOLCENGINE_API_KEY")
-    volcengine_endpoint_id: str = Field("", alias="VOLCENGINE_ENDPOINT_ID")
-    volcengine_base_url: str = Field("", alias="VOLCENGINE_BASE_URL")
-    volcengine_model_gemini: str = Field("", alias="VOLCENGINE_MODEL_GEMINI")
-    # 智能视觉 CV（图像修补 Inpaint）：与方舟 LLM API Key 不同，一般为 AccessKey + SecretKey
+    # 智能视觉 CV（图像修补 Inpaint）：AccessKey + SecretKey
     volc_cv_access_key_id: str = Field("", alias="VOLC_CV_ACCESS_KEY_ID")
     volc_cv_secret_access_key: str = Field("", alias="VOLC_CV_SECRET_ACCESS_KEY")
     volc_cv_region: str = Field("cn-north-1", alias="VOLC_CV_REGION")

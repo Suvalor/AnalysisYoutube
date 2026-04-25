@@ -47,6 +47,7 @@ def _to_read(row: ModelLibrary) -> ModelRead:
         id=row.id,
         user_id=row.user_id,
         library_kind=getattr(row, "library_kind", None) or "chat",
+        protocol=getattr(row, "protocol", None) or "anthropic",
         name=row.name,
         api_base_url=row.api_base_url,
         supported_models_json=row.supported_models_json,
@@ -73,6 +74,9 @@ async def create_model(payload: ModelCreate, db: DBSessionDep, current_user: Cur
     kind = (payload.library_kind or "chat").strip()
     if kind not in {"chat", "image_inpaint"}:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="library_kind 仅支持 chat 或 image_inpaint")
+    proto = (payload.protocol or "anthropic").strip()
+    if proto not in {"anthropic", "openai"}:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="protocol 仅支持 anthropic 或 openai")
     row = await create_with_user(
         db,
         ModelLibrary,
@@ -80,6 +84,7 @@ async def create_model(payload: ModelCreate, db: DBSessionDep, current_user: Cur
         {
             "name": payload.name.strip(),
             "library_kind": kind,
+            "protocol": proto,
             "api_base_url": payload.api_base_url.strip(),
             "api_key_encrypted": encrypt_plaintext(payload.api_key.strip()) if payload.api_key and payload.api_key.strip() else None,
             "supported_models_json": _normalize_supported_models_json(payload.supported_models_json),
@@ -113,6 +118,14 @@ async def update_model(
                 detail="library_kind 仅支持 chat 或 image_inpaint",
             )
         patch["library_kind"] = k
+    if "protocol" in incoming and incoming["protocol"] is not None:
+        p = str(incoming["protocol"]).strip()
+        if p not in {"anthropic", "openai"}:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="protocol 仅支持 anthropic 或 openai",
+            )
+        patch["protocol"] = p
     if "api_key" in incoming:
         raw_key = incoming["api_key"]
         if raw_key is not None and str(raw_key).strip():

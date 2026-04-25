@@ -32,6 +32,7 @@ import {
 import {
   trendDiscoveryApi,
   trendHistoryApi,
+  trendCacheApi,
   addChannelByIdApi,
   type TrendHistoryItem,
   type TrendDiscoveryResponse,
@@ -234,20 +235,27 @@ export default function TrendDiscovery() {
   const handleHistoryClick = async (item: TrendHistoryItem) => {
     setLoading(true);
     try {
-      const res = await trendDiscoveryApi({
-        region: item.region,
-        category_id: item.category_id || undefined,
-        max_results: 50,
-        region_label: getRegionLabel(item.region),
-        category_label: getCategoryLabel(item.category_id),
-      });
+      // 优先从缓存读取已保存的趋势数据（不消耗 YouTube 配额）
+      const res = await trendCacheApi(item.region, item.category_id, item.cache_date);
       setResult(res);
-      setRegion(item.region);
-      setCategoryId(item.category_id);
-      setDisplayCount(20);
-    } catch (e: any) {
-      message.error(e?.response?.data?.detail || "获取趋势数据失败");
+    } catch {
+      // 缓存不存在（404），回退到完整趋势查询
+      try {
+        const res = await trendDiscoveryApi({
+          region: item.region,
+          category_id: item.category_id || undefined,
+          max_results: 50,
+          region_label: getRegionLabel(item.region),
+          category_label: getCategoryLabel(item.category_id),
+        });
+        setResult(res);
+      } catch (e: any) {
+        message.error(e?.response?.data?.detail || "获取趋势数据失败");
+      }
     } finally {
+      setRegion(item.region);
+      setCategoryId(item.category_id ?? "");
+      setDisplayCount(20);
       setLoading(false);
     }
   };

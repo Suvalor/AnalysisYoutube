@@ -11,17 +11,7 @@ from app.crud.youtube import list_radar_retrospective_channel_samples
 from app.models.library import ModelLibrary, PromptLibrary
 from app.models.youtube import YouTubeChannel
 from app.services.field_encryption import try_decrypt
-from app.services.config_manager import (
-    looks_like_volcengine_ark_base_url,
-    resolve_integration_config,
-    resolve_model_alias_for_volcengine,
-)
-from app.services.llm_openai_factory import (
-    resolve_openai_chat_model_parameter,
-    is_volcengine_coding_plan_openai_api,
-)
-from app.services.config_manager import ResolvedIntegrationConfig, merge_integration_config
-from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig, normalize_openai_base_url
+from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig, normalize_base_url
 
 
 def _extract_json_object(raw_text: str) -> dict[str, Any]:
@@ -143,22 +133,22 @@ async def analyze_channel_ai_insight(
     api_key: str | None = None,
     base_url: str | None = None,
     model: str | None = None,
-    integration: ResolvedIntegrationConfig | None = None,
+    protocol: str = "anthropic",
 ) -> dict[str, str | list[str]]:
     """
-    使用 OpenAI 兼容的 chat.completions 调用 LLM（适用于配置中心自建网关、火山 OpenAI 兼容端等）。
-    未传 api_key/base_url/model 时，使用 integration 合并结果（默认同 merge_integration_config({})，即仅环境变量）。
+    使用 OpenAI 兼容的 chat.completions 或 Anthropic Messages API 调用 LLM。
+    未传 api_key/base_url/model 时，默认为空（调用方应从 ModelLibrary 提供凭证）。
+    protocol 决定使用 OpenAI SDK 还是 Anthropic SDK。
     """
-    icfg = integration if integration is not None else merge_integration_config({})
-    key = (api_key or icfg.volcengine_api_key or "").strip()
-    base = normalize_openai_base_url(base_url or icfg.volcengine_base_url)
+    key = (api_key or "").strip()
+    base = normalize_base_url(base_url or "")
     factory = LLMClientFactory()
-    cfg = LLMClientConfig(api_key=key, base_url=base, model_name=model or "")
+    cfg = LLMClientConfig(api_key=key, base_url=base, model_name=model or "", protocol=protocol)
     resolved_model = factory.resolve_model_name(cfg)
     if not key or not base or not resolved_model:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="LLM 配置不完整：请检查 API Key、Base URL 与模型名（设置中心集成配置或环境变量 VOLCENGINE_*）",
+            detail="LLM 配置不完整：请检查 API Key、Base URL 与模型名（请在设置中心配置模型库）",
         )
 
     system_prompt = ""
@@ -204,11 +194,13 @@ async def analyze_channel_info_sync(
     top_video_titles: list[str],
     merged_tags: list[str],
     hot_comments: list[str],
-    integration: ResolvedIntegrationConfig,
-    model: str | None = None,
+    api_key: str = "",
+    base_url: str = "",
+    model: str = "",
+    protocol: str = "anthropic",
 ) -> dict[str, Any]:
     """
-    后台专用“频道信息打标签”分析器：强制非流式（non-stream）。
+    后台专用"频道信息打标签"分析器：强制非流式（non-stream）。
 
     物理隔离目标：
     - 不调用任何 stream_chat_completions_deltas / stream=True
@@ -217,20 +209,15 @@ async def analyze_channel_info_sync(
     # 降级默认值：不阻断入库流程
     fallback: dict[str, Any] = {"tags": [], "expertise": ""}
 
-    api_key = (integration.volcengine_api_key or "").strip()
-    base_url = normalize_openai_base_url(integration.volcengine_base_url)
+    api_key = (api_key or "").strip()
+    base_url = normalize_base_url(base_url or "")
     explicit = (model or "").strip()
-
-    # 性价比模型选取：如果没有显式模型，则优先使用集成中的 endpoint_id；
-    # 若是 Coding Plan 且 endpoint_id 为空，LLMClientFactory 将在该协议下提供默认 ark-code-latest。
-    if not explicit:
-        explicit = (integration.volcengine_endpoint_id or "").strip()
 
     if not api_key or not base_url:
         return fallback
 
     factory = LLMClientFactory()
-    cfg = LLMClientConfig(api_key=api_key, base_url=base_url, model_name=explicit)
+    cfg = LLMClientConfig(api_key=api_key, base_url=base_url, model_name=explicit, protocol=protocol)
 
     try:
         resolved_model = factory.resolve_model_name(cfg)
@@ -586,23 +573,12 @@ async def analyze_radar_retrospective(
     api_key = try_decrypt(ml.api_key_encrypted)
     base_url = (ml.api_base_url or "").strip().rstrip("/")
     name = llm_model_name.strip()
+    protocol = (ml.protocol or "anthropic").strip()
     if not api_key or not base_url:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该模型配置缺少 API Key 或 Base URL，请在设置中心补全")
     if not name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="模型名不能为空")
     _ensure_llm_allowed_for_radar(ml, name)
-
-    icfg = await resolve_integration_config(session, org_id=org_id)
-    alias_resolved = resolve_model_alias_for_volcengine(name, icfg)
-    upstream_model = resolve_openai_chat_model_parameter(base_url, alias_resolved, icfg)
-    if looks_like_volcengine_ark_base_url(base_url) and not is_volcengine_coding_plan_openai_api(base_url):
-        if not upstream_model.startswith("ep-"):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "当前模型库 Base URL 为火山方舟常规推理（OpenAI 兼容）时，model 必须是 ep- 开头的接入点 ID。"
-                ),
-            )
 
     messages = build_radar_retrospective_messages(
         agent_system_prompt=prompt.content,
@@ -617,7 +593,7 @@ async def analyze_radar_retrospective(
         messages = conversation_history + [{"role": "user", "content": user_prompt_text}]
 
     factory = LLMClientFactory()
-    cfg = LLMClientConfig(api_key=api_key, base_url=normalize_openai_base_url(base_url), model_name=upstream_model)
+    cfg = LLMClientConfig(api_key=api_key, base_url=normalize_base_url(base_url), model_name=name, protocol=protocol)
 
     try:
         raw_content = await factory.chat_completions_content(

@@ -4,15 +4,15 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 from app.api.deps import CurrentUserDep, DBSessionDep
-from app.services.config_manager import resolve_integration_config
-from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig, normalize_openai_base_url
+from app.crud.library import get_by_user
+from app.models.library import ModelLibrary, PromptLibrary, StyleLibrary
+from app.schemas.library import GenerateScriptStreamRequest
+from app.services.field_encryption import try_decrypt
+from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig, normalize_base_url
 from app.services.llm_conversation_service import (
     load_conversation_messages,
     save_conversation_turn,
 )
-from app.crud.library import get_by_user
-from app.models.library import PromptLibrary, StyleLibrary
-from app.schemas.library import GenerateScriptStreamRequest
 
 
 router = APIRouter()
@@ -36,20 +36,45 @@ async def generate_script_stream(
             detail="提示词或风格不存在",
         )
 
-    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
-    base = normalize_openai_base_url(icfg.volcengine_base_url)
-    factory = LLMClientFactory()
-    cfg = LLMClientConfig(
-        api_key=icfg.volcengine_api_key,
-        base_url=base,
-        model_name=icfg.volcengine_endpoint_id or "",
-    )
-    resolved_model = factory.resolve_model_name(cfg)
-    if not icfg.volcengine_api_key or not base or not resolved_model:
+    ml = await get_by_user(db, ModelLibrary, current_user.id, payload.model_library_id)
+    if ml is None:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="火山引擎配置不完整：请检查 API Key、Base URL；Coding 接口可仅填 Key+URL，模型可默认。",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="模型配置不存在或无权访问",
         )
+    api_key = try_decrypt(ml.api_key_encrypted)
+    base_url = normalize_base_url((ml.api_base_url or "").strip())
+    if not api_key or not base_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="该模型配置缺少 API Key 或 Base URL，请在设置中心补全",
+        )
+
+    # 解析模型名称：优先使用请求中指定的，否则取模型库默认首个
+    model_name = (payload.model_name or "").strip()
+    if not model_name:
+        supported = ml.supported_models_json
+        if supported:
+            try:
+                models = json.loads(supported)
+                if isinstance(models, list) and models:
+                    first = models[0]
+                    if isinstance(first, str):
+                        model_name = first.strip()
+                    elif isinstance(first, dict):
+                        model_name = str(first.get("value") or "").strip()
+            except (json.JSONDecodeError, TypeError):
+                pass
+    if not model_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="模型名不能为空，请在请求中指定或在模型库中维护支持模型列表",
+        )
+
+    protocol = (ml.protocol or "anthropic").strip()
+    factory = LLMClientFactory()
+    cfg = LLMClientConfig(api_key=api_key, base_url=base_url, model_name=model_name, protocol=protocol)
+    resolved_model = factory.resolve_model_name(cfg)
     system_prompt = (
         "你是一个专业的内容创作者。\n"
         f"【核心任务】: {prompt.content}\n"

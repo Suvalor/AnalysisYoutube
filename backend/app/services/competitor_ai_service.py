@@ -17,7 +17,7 @@ from app.services.field_encryption import try_decrypt
 from app.services.llm_openai_factory import (
     LLMClientFactory,
     LLMClientConfig,
-    normalize_openai_base_url,
+    normalize_base_url,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,7 +88,7 @@ async def generate_competitor_ai_insight(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模型配置不存在")
 
     api_key = try_decrypt(ml.api_key_encrypted)
-    base_url = normalize_openai_base_url((ml.api_base_url or "").strip())
+    base_url = normalize_base_url((ml.api_base_url or "").strip())
     if not api_key or not base_url:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="模型配置缺少 API Key 或 Base URL")
 
@@ -110,7 +110,12 @@ async def generate_competitor_ai_insight(
     )
 
     factory = LLMClientFactory()
-    cfg = LLMClientConfig(api_key=api_key, base_url=base_url, model_name=llm_model_name)
+    cfg = LLMClientConfig(
+        api_key=api_key,
+        base_url=base_url,
+        model_name=llm_model_name,
+        protocol=getattr(ml, "protocol", "anthropic") or "anthropic",
+    )
 
     try:
         raw_content = await factory.chat_completions_content(

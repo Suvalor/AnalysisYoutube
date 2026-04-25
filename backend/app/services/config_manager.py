@@ -28,14 +28,10 @@ INTEGRATION_PAYLOAD_KEYS: frozenset[str] = frozenset(
         "tencent_cos_region",
         "tencent_cos_bucket",
         "tencent_custom_domain",
-        "volcengine_api_key",
-        "volcengine_endpoint_id",
-        "volcengine_base_url",
-        "volcengine_model_gemini",
         # 去水印插件：组织级默认（可被 model_libraries 中 image_inpaint 条目覆盖密钥与 Base URL）
         "watermark_video_ai_max_frames",
         "watermark_inpaint_prompt",
-        # 火山智能视觉 CV（图像修补），与 volcengine_api_key（方舟/LLM）分离
+        # 火山智能视觉 CV（图像修补）
         "volc_cv_access_key_id",
         "volc_cv_secret_access_key",
         "volc_cv_region",
@@ -49,7 +45,6 @@ SECRET_PAYLOAD_KEYS: frozenset[str] = frozenset(
         "youtube_api_key",
         "aliyun_access_key_secret",
         "tencent_cos_secret_key",
-        "volcengine_api_key",
         "volc_cv_secret_access_key",
     }
 )
@@ -102,7 +97,7 @@ def _pick_int_clamped(db: dict[str, str], key: str, default: int, *, lo: int, hi
 
 @dataclass
 class ResolvedIntegrationConfig:
-    """合并后的有效配置，供对象存储、YouTube API、火山兼容调用等使用。"""
+    """合并后的有效配置，供对象存储、YouTube API、CV 调用等使用。"""
 
     youtube_api_key: str
     active_storage_provider: str
@@ -118,10 +113,6 @@ class ResolvedIntegrationConfig:
     tencent_cos_region: str
     tencent_cos_bucket: str
     tencent_custom_domain: str
-    volcengine_api_key: str
-    volcengine_endpoint_id: str
-    volcengine_base_url: str
-    volcengine_model_gemini: str
     volc_cv_access_key_id: str
     volc_cv_secret_access_key: str
     volc_cv_region: str
@@ -149,10 +140,6 @@ def merge_integration_config(db_payload: dict[str, str] | None, s: Settings | No
         tencent_cos_region=_pick_str(d, "tencent_cos_region", base.tencent_cos_region),
         tencent_cos_bucket=_pick_str(d, "tencent_cos_bucket", base.tencent_cos_bucket),
         tencent_custom_domain=_pick_str(d, "tencent_custom_domain", base.tencent_custom_domain),
-        volcengine_api_key=_pick_str(d, "volcengine_api_key", base.volcengine_api_key),
-        volcengine_endpoint_id=_pick_str(d, "volcengine_endpoint_id", base.volcengine_endpoint_id),
-        volcengine_base_url=_pick_str(d, "volcengine_base_url", base.volcengine_base_url),
-        volcengine_model_gemini=_pick_str(d, "volcengine_model_gemini", base.volcengine_model_gemini),
         volc_cv_access_key_id=_pick_str(d, "volc_cv_access_key_id", base.volc_cv_access_key_id),
         volc_cv_secret_access_key=_pick_str(d, "volc_cv_secret_access_key", base.volc_cv_secret_access_key),
         volc_cv_region=_pick_str(d, "volc_cv_region", base.volc_cv_region),
@@ -178,24 +165,3 @@ async def resolve_integration_config(
     if session is not None and org_id is not None:
         db_payload = await get_org_integration_payload_dict(session, org_id)
     return merge_integration_config(db_payload)
-
-
-def resolve_model_alias_for_volcengine(model_alias: str, cfg: ResolvedIntegrationConfig) -> str:
-    model_alias = (model_alias or "").strip()
-    if not model_alias:
-        return cfg.volcengine_endpoint_id
-    alias_map = {
-        "gemini-1.5-pro": cfg.volcengine_model_gemini or cfg.volcengine_endpoint_id,
-        "claude-3-5-sonnet": cfg.volcengine_endpoint_id,
-    }
-    return alias_map.get(model_alias, model_alias)
-
-
-def looks_like_volcengine_ark_base_url(api_base_url: str) -> bool:
-    """火山引擎方舟 OpenAI 兼容接口：chat.completions 的 model 须为推理接入点 ID（ep- 开头）。"""
-    u = (api_base_url or "").strip().lower()
-    if not u:
-        return False
-    return "volces.com" in u or "volcengineapi.com" in u
-
-
