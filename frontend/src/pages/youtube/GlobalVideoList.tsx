@@ -1,5 +1,5 @@
-import { CheckCircleOutlined } from "@ant-design/icons";
-import { Button, DatePicker, Input, InputNumber, Modal, Pagination, Select, Spin, Tag, message } from "antd";
+import { CheckCircleOutlined, CloudDownloadOutlined } from "@ant-design/icons";
+import { Button, Checkbox, DatePicker, Input, InputNumber, Modal, Pagination, Select, Spin, Tag, message } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { Eye, MessageCircle, ThumbsUp } from "lucide-react";
@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { listYouTubeChannelsApi, listYouTubeVideosAllApi, scrapeVideoCommentsApi, type VideoListItem } from "@/services/authApi";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
 import { analyzeYouTubeVideoApi, getYouTubeVideoAnalysisApi, type YouTubeVideoAnalysisResponse } from "@/services/videosApi";
+import { submitDownload } from "@/services/downloadApi";
 import MarkdownPreview from "@/components/MarkdownPreview";
 import { formatNumber } from "@/utils/format";
 import { buildYouTubeWatchUrl } from "@/utils/youtubeLinks";
@@ -119,6 +120,40 @@ export default function GlobalVideoList() {
   const [hasAnalysisOverride, setHasAnalysisOverride] = useState<Record<number, boolean>>({});
   const [selectedModelByVideoId, setSelectedModelByVideoId] = useState<Record<number, string>>({});
   const [selectedAgentByVideoId, setSelectedAgentByVideoId] = useState<Record<number, number | undefined>>({});
+  const [selectedVideoIds, setSelectedVideoIds] = useState<Set<string>>(new Set());
+  const [downloadLoading, setDownloadLoading] = useState(false);
+
+  const toggleVideoSelect = (ytVideoId: string) => {
+    setSelectedVideoIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(ytVideoId)) next.delete(ytVideoId);
+      else next.add(ytVideoId);
+      return next;
+    });
+  };
+
+  const handleBatchDownload = async () => {
+    if (selectedVideoIds.size === 0) {
+      message.warning('请选择至少一个视频');
+      return;
+    }
+    setDownloadLoading(true);
+    try {
+      const res = await submitDownload({ video_ids: Array.from(selectedVideoIds) });
+      message.success(res.message || `已提交 ${res.task_count} 个下载任务`);
+      if (res.skipped?.length) {
+        message.info(`${res.skipped.length} 个视频已在下载队列中，已跳过`);
+      }
+      setSelectedVideoIds(new Set());
+    } catch (err: unknown) {
+      const d = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : undefined;
+      message.error(typeof d === 'string' ? d : '批量下载提交失败');
+    } finally {
+      setDownloadLoading(false);
+    }
+  };
 
   const modelOptions = useMemo(() => toModelOptions(modelRows), [modelRows]);
 
@@ -170,6 +205,7 @@ export default function GlobalVideoList() {
       });
       setVideos(data.items);
       setHasAnalysisOverride({});
+      setSelectedVideoIds(new Set());
       setTotal(data.total);
       setPage(data.page);
       setPageSize(data.page_size);
@@ -216,18 +252,24 @@ export default function GlobalVideoList() {
     }
   };
 
-  const openVideoPanel = (videoId: number) => {
-    setPanelOpenVideoId(videoId);
-  };
-
   const handleViewAnalysis = async (videoId: number) => {
-    openVideoPanel(videoId);
+    // Toggle: if panel is already open for this video, close it
+    if (panelOpenVideoId === videoId) {
+      setPanelOpenVideoId(null);
+      return;
+    }
+    setPanelOpenVideoId(videoId);
+    // Skip fetch if content is already cached
+    if (panelContentByVideoId[videoId]) return;
     try {
       const res = await getYouTubeVideoAnalysisApi(videoId);
       setPanelContentByVideoId((prev) => ({ ...prev, [videoId]: res.content }));
       setHasAnalysisOverride((prev) => ({ ...prev, [videoId]: true }));
-    } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? "获取分析结果失败");
+    } catch (err: unknown) {
+      const d = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : undefined;
+      message.error(typeof d === 'string' ? d : "获取分析结果失败");
     }
   };
 
@@ -241,7 +283,7 @@ export default function GlobalVideoList() {
     }
 
     const agentId = selectedAgentByVideoId[videoId] ?? undefined;
-    openVideoPanel(videoId);
+    setPanelOpenVideoId(videoId);
     setPanelLoading((prev) => ({ ...prev, [videoId]: true }));
     try {
       const res = await analyzeYouTubeVideoApi({
@@ -251,8 +293,11 @@ export default function GlobalVideoList() {
       });
       setPanelContentByVideoId((prev) => ({ ...prev, [videoId]: res.content }));
       setHasAnalysisOverride((prev) => ({ ...prev, [videoId]: true }));
-    } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? "视频分析失败");
+    } catch (err: unknown) {
+      const d = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : undefined;
+      message.error(typeof d === 'string' ? d : "视频分析失败");
     } finally {
       setPanelLoading((prev) => ({ ...prev, [videoId]: false }));
     }
@@ -360,6 +405,27 @@ export default function GlobalVideoList() {
         </div>
       </div>
 
+      {selectedVideoIds.size > 0 && (
+        <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+          <CloudDownloadOutlined className="text-blue-500 text-lg" />
+          <span className="text-sm text-blue-700">已选 {selectedVideoIds.size} 个视频</span>
+          <Button
+            type="primary"
+            size="small"
+            loading={downloadLoading}
+            onClick={() => void handleBatchDownload()}
+          >
+            批量下载素材
+          </Button>
+          <Button
+            size="small"
+            onClick={() => setSelectedVideoIds(new Set())}
+          >
+            清除选择
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-2">
         {loading ? (
           <div className="text-slate-500">加载中...</div>
@@ -376,7 +442,14 @@ export default function GlobalVideoList() {
               window.open(watchUrl, "_blank", "noopener,noreferrer");
             };
             return (
-              <div key={video.id} className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+              <div key={video.id} className={`bg-white border rounded-lg p-3 shadow-sm relative ${selectedVideoIds.has(video.yt_video_id) ? 'border-blue-400 ring-2 ring-blue-400' : 'border-slate-200'}`}>
+                <div className="absolute top-2 left-2 z-10">
+                  <Checkbox
+                    checked={selectedVideoIds.has(video.yt_video_id)}
+                    onChange={() => toggleVideoSelect(video.yt_video_id)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="relative w-full md:w-64 shrink-0">
                     {watchUrl ? (
@@ -476,6 +549,7 @@ export default function GlobalVideoList() {
                             onClick={() => void handleViewAnalysis(video.id)}
                             disabled={Boolean(panelLoading[video.id])}
                             className="shrink-0"
+                            style={panelOpenVideoId !== video.id ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
                           >
                             查看结果
                           </Button>

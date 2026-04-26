@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     # 前端站点地址（用于生成密码重置等链接）
     frontend_base_url: str = Field("http://localhost:5173", alias="FRONTEND_BASE_URL")
 
+    # yt-dlp 下载代理（可选，如 http://127.0.0.1:7890）
+    download_proxy: str = Field("", alias="DOWNLOAD_PROXY")
+
     # 支持单个 URL、逗号分隔字符串，或 JSON 数组字符串
     backend_cors_origins: str = Field(
         "http://localhost:5173",

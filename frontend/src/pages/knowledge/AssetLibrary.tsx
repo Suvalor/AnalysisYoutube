@@ -21,6 +21,7 @@ import {
   DownloadOutlined,
   EyeOutlined,
   FileImageOutlined,
+  MergeOutlined,
   SoundOutlined,
   VideoCameraOutlined,
 } from "@ant-design/icons";
@@ -36,6 +37,7 @@ import {
   type ModelItem,
 } from "@/services/libraryApi";
 import useModelPreference from "@/hooks/useModelPreference";
+import MixConfigModal from "@/components/MixConfigModal";
 
 const { Text } = Typography;
 
@@ -103,6 +105,8 @@ export default function AssetLibraryPage() {
   const [sortPreset, setSortPreset] = useState<SortPreset>("time_desc");
   const [previewAsset, setPreviewAsset] = useState<AssetItem | null>(null);
   const [thumbErrorIds, setThumbErrorIds] = useState<Record<number, boolean>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [mixModalOpen, setMixModalOpen] = useState(false);
 
   const sortApi = useMemo(() => sortPresetToApi(sortPreset), [sortPreset]);
   const { value: watermarkPrefModelId, setValue: setWatermarkPrefModelId } =
@@ -192,6 +196,7 @@ export default function AssetLibraryPage() {
 
   useEffect(() => {
     setPage(1);
+    setSelectedIds(new Set());
   }, [typeFilter, dateRange, searchText, sortPreset]);
 
   const onConfirmUpload = async () => {
@@ -273,6 +278,25 @@ export default function AssetLibraryPage() {
     setThumbErrorIds((prev) => ({ ...prev, [id]: true }));
   };
 
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === items.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(items.map((a) => a.id)));
+    }
+  };
+
+  const selectedAssets = useMemo(() => items.filter((a) => selectedIds.has(a.id)), [items, selectedIds]);
+
   return (
     <div className="p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-5">
@@ -334,6 +358,26 @@ export default function AssetLibraryPage() {
           </Row>
         </Card>
 
+        {/* Batch action bar */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 shadow-sm">
+            <span className="text-sm text-blue-700 font-medium">
+              已选 {selectedIds.size} 项
+            </span>
+            <Button
+              size="small"
+              type="primary"
+              icon={<MergeOutlined />}
+              onClick={() => setMixModalOpen(true)}
+            >
+              一键 AI 混编
+            </Button>
+            <Button size="small" onClick={() => setSelectedIds(new Set())}>
+              清除选择
+            </Button>
+          </div>
+        )}
+
         <Spin spinning={listLoading}>
           {items.length === 0 && !listLoading ? (
             <Card className="!bg-slate-900/60 !border-slate-800">
@@ -341,6 +385,18 @@ export default function AssetLibraryPage() {
             </Card>
           ) : (
             <Row gutter={[16, 16]}>
+              {/* Select all row */}
+              {items.length > 0 && (
+                <Col span={24}>
+                  <Checkbox
+                    checked={selectedIds.size === items.length && items.length > 0}
+                    indeterminate={selectedIds.size > 0 && selectedIds.size < items.length}
+                    onChange={toggleSelectAll}
+                  >
+                    全选本页 ({items.length})
+                  </Checkbox>
+                </Col>
+              )}
               {items.map((asset) => {
                 const src = mediaSrc(asset);
                 const broken = thumbErrorIds[asset.id];
@@ -352,6 +408,12 @@ export default function AssetLibraryPage() {
                       styles={{ body: { padding: 12 } }}
                     >
                       <div className="mb-3 relative group rounded-lg overflow-hidden bg-slate-950/80 min-h-[160px]">
+                        <Checkbox
+                          checked={selectedIds.has(asset.id)}
+                          onChange={() => toggleSelect(asset.id)}
+                          className="absolute top-2 left-2 z-10"
+                          style={{ accentColor: '#3b82f6' }}
+                        />
                         {ft === "image" && (
                           <>
                             {!broken && src ? (
@@ -466,6 +528,7 @@ export default function AssetLibraryPage() {
               onChange={(p, ps) => {
                 setPage(p);
                 setPageSize(ps);
+                setSelectedIds(new Set());
               }}
             />
           </div>

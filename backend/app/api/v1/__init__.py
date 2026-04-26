@@ -13,6 +13,7 @@ from app.api.v1 import knowledge
 from app.api.v1 import knowledge_base
 from app.api.v1 import materials
 from app.api.v1 import model_library
+from app.api.v1 import downloads
 from app.api.v1 import feishu_docs
 from app.api.v1 import oss
 from app.api.v1 import prompt_library
@@ -56,5 +57,6 @@ api_router_v1.include_router(videos.router, prefix="/videos", tags=["videos"])
 api_router_v1.include_router(oss.router, prefix="/oss", tags=["oss"])
 api_router_v1.include_router(users.router, prefix="/users", tags=["users"])
 api_router_v1.include_router(integration_settings.router, prefix="/users", tags=["integration-settings"])
+api_router_v1.include_router(downloads.router, prefix="/downloads", tags=["downloads"])
 api_router_v1.include_router(feishu_docs.router, prefix="/feishu_docs", tags=["feishu-docs"])
 
