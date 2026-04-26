@@ -30,3 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Downloaded video materials
+backend/app/data/raw_materials/*.mp4
+backend/app/data/raw_materials/*.webm
+backend/app/data/raw_materials/*.mkv
+backend/app/data/raw_materials/*.ts
+

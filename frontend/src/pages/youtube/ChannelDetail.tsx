@@ -1,4 +1,4 @@
-import { CheckCircleOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, CloudDownloadOutlined } from "@ant-design/icons";
 import { Button, DatePicker, Input, InputNumber, Pagination, Select, Space, Spin, Tag, message } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -25,6 +25,7 @@ import {
 } from "@/services/authApi";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
 import { analyzeYouTubeVideoApi, getYouTubeVideoAnalysisApi } from "@/services/videosApi";
+import { submitDownload } from "@/services/downloadApi";
 import { formatNumber } from "@/utils/format";
 import { useTabStore } from "@/store/useTabStore";
 import MarkdownPreview from "@/components/MarkdownPreview";
@@ -98,6 +99,31 @@ export default function ChannelDetail({ channelId }: Props) {
   const [videoHasAnalysisOverride, setVideoHasAnalysisOverride] = useState<Record<number, boolean>>({});
   const [selectedModelByVideoId, setSelectedModelByVideoId] = useState<Record<number, string>>({});
   const [selectedAgentByVideoId, setSelectedAgentByVideoId] = useState<Record<number, number | undefined>>({});
+  const [downloadingVideoIds, setDownloadingVideoIds] = useState<Set<string>>(new Set());
+
+  const handleDownloadVideo = async (ytVideoId: string) => {
+    if (!ytVideoId?.trim()) {
+      message.warning('该视频缺少有效的 YouTube 视频 ID');
+      return;
+    }
+    if (downloadingVideoIds.has(ytVideoId)) return;
+    setDownloadingVideoIds((prev) => new Set(prev).add(ytVideoId));
+    try {
+      const res = await submitDownload({ video_ids: [ytVideoId] });
+      message.success(res.message || '下载任务已提交');
+    } catch (err: unknown) {
+      const d = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : undefined;
+      message.error(typeof d === 'string' ? d : '下载提交失败');
+    } finally {
+      setDownloadingVideoIds((prev) => {
+        const next = new Set(prev);
+        next.delete(ytVideoId);
+        return next;
+      });
+    }
+  };
 
   const videoModelOptions = useMemo(() => {
     const dedup = new Map<string, { value: string; label: string }>();
@@ -254,18 +280,24 @@ export default function ChannelDetail({ channelId }: Props) {
     }
   };
 
-  const openVideoAnalysisPanel = (videoId: number) => {
-    setVideoAnalysisPanelOpenId(videoId);
-  };
-
   const handleViewVideoAnalysis = async (videoId: number) => {
-    openVideoAnalysisPanel(videoId);
+    // Toggle: if panel is already open for this video, close it
+    if (videoAnalysisPanelOpenId === videoId) {
+      setVideoAnalysisPanelOpenId(null);
+      return;
+    }
+    setVideoAnalysisPanelOpenId(videoId);
+    // Skip fetch if content is already cached
+    if (videoAnalysisContentById[videoId]) return;
     try {
       const res = await getYouTubeVideoAnalysisApi(videoId);
       setVideoAnalysisContentById((prev) => ({ ...prev, [videoId]: res.content }));
       setVideoHasAnalysisOverride((prev) => ({ ...prev, [videoId]: true }));
-    } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? "获取视频分析失败");
+    } catch (err: unknown) {
+      const d = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : undefined;
+      message.error(typeof d === 'string' ? d : "获取视频分析失败");
     }
   };
 
@@ -279,7 +311,7 @@ export default function ChannelDetail({ channelId }: Props) {
     }
 
     const agentId = selectedAgentByVideoId[videoId] ?? selectedAgentId ?? promptAgents[0]?.id;
-    openVideoAnalysisPanel(videoId);
+    setVideoAnalysisPanelOpenId(videoId);
     setVideoAnalysisLoadingById((prev) => ({ ...prev, [videoId]: true }));
     try {
       const res = await analyzeYouTubeVideoApi({
@@ -289,8 +321,11 @@ export default function ChannelDetail({ channelId }: Props) {
       });
       setVideoAnalysisContentById((prev) => ({ ...prev, [videoId]: res.content }));
       setVideoHasAnalysisOverride((prev) => ({ ...prev, [videoId]: true }));
-    } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? "视频 AI 深度分析失败");
+    } catch (err: unknown) {
+      const d = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : undefined;
+      message.error(typeof d === 'string' ? d : "视频 AI 深度分析失败");
     } finally {
       setVideoAnalysisLoadingById((prev) => ({ ...prev, [videoId]: false }));
     }
@@ -665,13 +700,22 @@ export default function ChannelDetail({ channelId }: Props) {
                       >
                         {hasAnalyzed ? "重新分析" : "一键 AI 深度分析"}
                       </Button>
-                      {hasAnalyzed ? (
+                      <Button
+                          size="small"
+                          icon={<CloudDownloadOutlined />}
+                          loading={downloadingVideoIds.has(video.yt_video_id)}
+                          onClick={() => void handleDownloadVideo(video.yt_video_id)}
+                        >
+                          下载
+                        </Button>
+                        {hasAnalyzed ? (
                         <Button
                           type="primary"
                           size="small"
                           icon={<CheckCircleOutlined />}
                           onClick={() => void handleViewVideoAnalysis(video.id)}
                           disabled={Boolean(videoAnalysisLoadingById[video.id])}
+                          style={videoAnalysisPanelOpenId !== video.id ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
                         >
                           查看结果
                         </Button>
