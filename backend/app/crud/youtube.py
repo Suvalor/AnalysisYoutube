@@ -461,6 +461,27 @@ async def list_distinct_monitored_channels_for_org(session: AsyncSession, org_id
     return list(result.scalars().all())
 
 
+async def batch_check_video_analysis(
+    session: AsyncSession,
+    video_ids: list[int],
+    org_id: int,
+) -> dict[int, bool]:
+    """Return {video_id: True} for each video that has an existing analysis row."""
+    if not video_ids:
+        return {}
+    stmt = (
+        select(YouTubeVideoAnalysis.video_id)
+        .where(
+            YouTubeVideoAnalysis.video_id.in_(video_ids),
+            YouTubeVideoAnalysis.org_id == org_id,
+        )
+        .distinct()
+    )
+    result = await session.execute(stmt)
+    ids_with_analysis = {row[0] for row in result.all()}
+    return {vid: vid in ids_with_analysis for vid in video_ids}
+
+
 async def query_videos(
     session: AsyncSession,
     *,

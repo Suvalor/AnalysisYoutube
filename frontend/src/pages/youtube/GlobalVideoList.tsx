@@ -4,7 +4,7 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { Eye, MessageCircle, ThumbsUp } from "lucide-react";
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
-import { listYouTubeChannelsApi, listYouTubeVideosAllApi, scrapeVideoCommentsApi, type VideoListItem } from "@/services/authApi";
+import { listYouTubeChannelsApi, listYouTubeVideosAllApi, scrapeVideoCommentsApi, batchCheckVideoAnalysisApi, type VideoListItem } from "@/services/authApi";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
 import { analyzeYouTubeVideoApi, getYouTubeVideoAnalysisApi, type YouTubeVideoAnalysisResponse } from "@/services/videosApi";
 import { submitDownload } from "@/services/downloadApi";
@@ -209,6 +209,16 @@ export default function GlobalVideoList() {
       setTotal(data.total);
       setPage(data.page);
       setPageSize(data.page_size);
+      // Batch-check analysis status to ensure has_analysis is accurate
+      const videoIds = data.items.map((v) => v.id);
+      if (videoIds.length) {
+        try {
+          const statusMap = await batchCheckVideoAnalysisApi(videoIds);
+          setHasAnalysisOverride(statusMap);
+        } catch {
+          // Non-critical: fallback to has_analysis from list API
+        }
+      }
     } catch {
       message.error("加载视频列表失败");
     } finally {

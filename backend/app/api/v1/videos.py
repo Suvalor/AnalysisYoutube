@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.crud.library import get_by_user, list_by_user
-from app.crud.youtube import get_video_for_user, get_video_analysis_for_org, upsert_video_analysis
+from app.crud.youtube import get_video_for_user, get_video_analysis_for_org, upsert_video_analysis, batch_check_video_analysis
 from app.models.library import ModelLibrary, PromptLibrary
 from app.models.youtube import YouTubeVideo
 from app.schemas.youtube import YouTubeVideoAnalysisResponse, YouTubeVideoAnalyzeRequest
@@ -149,6 +149,22 @@ async def analyze_video(
     )
 
 
+@router.get("/batch-analysis-status")
+async def batch_analysis_status(
+    current_user: CurrentUserDep,
+    db: DBSessionDep,
+    video_ids: str = Query(..., description="Comma-separated internal video IDs"),
+) -> dict[int, bool]:
+    """Check which videos have existing analysis. Returns {video_id: has_analysis}."""
+    try:
+        ids = [int(x.strip()) for x in video_ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="video_ids must be comma-separated integers")
+    if not ids:
+        return {}
+    return await batch_check_video_analysis(db, ids, current_user.org_id)
+
+
 @router.get("/analysis/{video_id}", response_model=YouTubeVideoAnalysisResponse, summary="获取视频已持久化的 AI 分析结果")
 async def get_video_analysis(
     video_id: int,
@@ -170,4 +186,3 @@ async def get_video_analysis(
         content=row.content,
         updated_at=row.updated_at,
     )
-
