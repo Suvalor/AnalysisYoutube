@@ -336,6 +336,20 @@ export async function listYouTubeVideosAllApi(params: Parameters<typeof listYouT
 }
 
 
+/** Batch-check which videos have existing AI analysis. Returns {videoId: boolean}. */
+export async function batchCheckVideoAnalysisApi(videoIds: number[]): Promise<Record<number, boolean>> {
+  if (!videoIds.length) return {};
+  const { data } = await apiClient.get<Record<string, boolean>>('/api/videos/batch-analysis-status', {
+    params: { video_ids: videoIds.join(',') },
+  });
+  const result: Record<number, boolean> = {};
+  for (const [k, v] of Object.entries(data)) {
+    result[Number(k)] = v;
+  }
+  return result;
+}
+
+
 // ──────────────────────────────────────────────
 // 品类机会报告
 // ──────────────────────────────────────────────

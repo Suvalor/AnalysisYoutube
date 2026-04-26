@@ -21,6 +21,7 @@ import {
   analyzeYouTubeChannelAiApi,
   getYouTubeChannelDetailApi,
   listYouTubeVideosApi,
+  batchCheckVideoAnalysisApi,
   type VideoListItem,
 } from "@/services/authApi";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
@@ -157,6 +158,16 @@ export default function ChannelDetail({ channelId }: Props) {
       setTotal(data.total);
       setPage(data.page);
       setPageSize(data.page_size);
+      // Batch-check analysis status to ensure has_analysis is accurate
+      const videoIds = data.items.map((v) => v.id);
+      if (videoIds.length) {
+        try {
+          const statusMap = await batchCheckVideoAnalysisApi(videoIds);
+          setVideoHasAnalysisOverride(statusMap);
+        } catch {
+          // Non-critical: fallback to has_analysis from list API
+        }
+      }
     } catch {
       message.error("加载视频失败");
     } finally {
