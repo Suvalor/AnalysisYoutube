@@ -1,4 +1,4 @@
-import { CheckCircleOutlined, CloudDownloadOutlined } from "@ant-design/icons";
+import { CheckCircleOutlined, CloudDownloadOutlined, MergeOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import { Button, Checkbox, DatePicker, Input, InputNumber, Modal, Pagination, Select, Spin, Tag, message } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -6,8 +6,8 @@ import { Eye, MessageCircle, ThumbsUp } from "lucide-react";
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { listYouTubeChannelsApi, listYouTubeVideosAllApi, scrapeVideoCommentsApi, batchCheckVideoAnalysisApi, type VideoListItem } from "@/services/authApi";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
-import { analyzeYouTubeVideoApi, getYouTubeVideoAnalysisApi, type YouTubeVideoAnalysisResponse } from "@/services/videosApi";
-import { submitDownload } from "@/services/downloadApi";
+import { analyzeYouTubeVideoApi, getYouTubeVideoAnalysisApi, extractVideoHighlightsApi, getVideoHighlightsApi, type YouTubeVideoAnalysisResponse, type VideoHighlight } from "@/services/videosApi";
+import { submitDownload, submitMix } from "@/services/downloadApi";
 import MarkdownPreview from "@/components/MarkdownPreview";
 import { formatNumber } from "@/utils/format";
 import { buildYouTubeWatchUrl } from "@/utils/youtubeLinks";
@@ -122,6 +122,9 @@ export default function GlobalVideoList() {
   const [selectedAgentByVideoId, setSelectedAgentByVideoId] = useState<Record<number, number | undefined>>({});
   const [selectedVideoIds, setSelectedVideoIds] = useState<Set<string>>(new Set());
   const [downloadLoading, setDownloadLoading] = useState(false);
+  const [mixModalOpen, setMixModalOpen] = useState(false);
+  const [highlightsByVideoId, setHighlightsByVideoId] = useState<Record<number, VideoHighlight[]>>({});
+  const [extractingHighlights, setExtractingHighlights] = useState<Record<number, boolean>>({});
 
   const toggleVideoSelect = (ytVideoId: string) => {
     setSelectedVideoIds((prev) => {
@@ -152,6 +155,22 @@ export default function GlobalVideoList() {
       message.error(typeof d === 'string' ? d : '批量下载提交失败');
     } finally {
       setDownloadLoading(false);
+    }
+  };
+
+  const handleExtractHighlights = async (videoId: number) => {
+    setExtractingHighlights((prev) => ({ ...prev, [videoId]: true }));
+    try {
+      const res = await extractVideoHighlightsApi(videoId);
+      setHighlightsByVideoId((prev) => ({ ...prev, [videoId]: res.highlights }));
+      message.success(res.message || `已提取 ${res.highlights.length} 个精彩片段`);
+    } catch (err: unknown) {
+      const d = err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : undefined;
+      message.error(typeof d === 'string' ? d : '提取精彩片段失败');
+    } finally {
+      setExtractingHighlights((prev) => ({ ...prev, [videoId]: false }));
     }
   };
 
@@ -428,6 +447,14 @@ export default function GlobalVideoList() {
             批量下载素材
           </Button>
           <Button
+            type="primary"
+            size="small"
+            icon={<MergeOutlined />}
+            onClick={() => setMixModalOpen(true)}
+          >
+            AI 混剪
+          </Button>
+          <Button
             size="small"
             onClick={() => setSelectedVideoIds(new Set())}
           >
@@ -503,6 +530,15 @@ export default function GlobalVideoList() {
                       发布于 {video.published_at ? dayjs(video.published_at).format("YYYY-MM-DD HH:mm") : "-"} ·{" "}
                       {video.published_at ? dayjs(video.published_at).fromNow() : ""}
                     </div>
+                    {highlightsByVideoId[video.id] && highlightsByVideoId[video.id].length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {highlightsByVideoId[video.id].map((hl) => (
+                          <Tag key={hl.id} color="gold" className="text-xs">
+                            {hl.start_sec.toFixed(0)}s-{hl.end_sec.toFixed(0)}s {hl.label}
+                          </Tag>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col md:flex-col gap-3 md:w-52 shrink-0 justify-between">
                     <div className="border border-slate-200 rounded-md p-2 text-sm space-y-1">
@@ -520,9 +556,19 @@ export default function GlobalVideoList() {
                       </div>
                     </div>
 
-                    <Button type="primary" size="small" onClick={() => openScrape(video.id)}>
-                      抓取评论
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button type="primary" size="small" onClick={() => openScrape(video.id)}>
+                        抓取评论
+                      </Button>
+                      <Button
+                        size="small"
+                        icon={<ThunderboltOutlined />}
+                        loading={Boolean(extractingHighlights[video.id])}
+                        onClick={() => void handleExtractHighlights(video.id)}
+                      >
+                        提取精彩片段
+                      </Button>
+                    </div>
 
                     <div className="space-y-2 w-full">
                       <Select
@@ -612,6 +658,39 @@ export default function GlobalVideoList() {
       >
         <p className="text-sm text-slate-600 mb-2">将使用 YouTube commentThreads 接口按关键字搜索评论（最多 100 条）。</p>
         <Input placeholder="搜索关键字" value={scrapeKeyword} onChange={(e) => setScrapeKeyword(e.target.value)} />
+      </Modal>
+
+      <Modal
+        title="AI 混剪"
+        open={mixModalOpen}
+        onCancel={() => setMixModalOpen(false)}
+        onOk={async () => {
+          try {
+            const res = await submitMix({
+              video_ids: Array.from(selectedVideoIds),
+              aspect_ratio: '9:16',
+              use_highlights: true,
+            });
+            message.success(res.message || '混剪任务已提交');
+            setMixModalOpen(false);
+            setSelectedVideoIds(new Set());
+          } catch (err: unknown) {
+            const d = err && typeof err === 'object' && 'response' in err
+              ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+              : undefined;
+            message.error(typeof d === 'string' ? d : '混剪提交失败');
+          }
+        }}
+        okText="提交混剪"
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-slate-600">
+            将对选中的 {selectedVideoIds.size} 个视频执行 AI 混剪，优先使用已提取的精彩片段。
+          </p>
+          <p className="text-xs text-slate-400">
+            混剪为后台任务，提交后可在任务中心查看进度与结果。
+          </p>
+        </div>
       </Modal>
     </div>
   );

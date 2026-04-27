@@ -37,6 +37,7 @@ export interface MixRequest {
   narration_text?: string;
   audio_file_id?: string;
   aspect_ratio: '16:9' | '9:16';
+  use_highlights?: boolean;
 }
 
 export interface MixResponse {
@@ -72,6 +73,6 @@ export async function getDownloadTask(taskId: number): Promise<DownloadTask> {
 
 /** Submit a video mix task (runs in background). */
 export async function submitMix(payload: MixRequest): Promise<MixResponse> {
-  const { data } = await apiClient.post<MixResponse>('/api/materials/mix', payload);
+  const { data } = await apiClient.post<MixResponse>('/api/v1/materials/mix', payload);
   return data;
 }

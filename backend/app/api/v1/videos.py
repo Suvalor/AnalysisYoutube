@@ -7,9 +7,11 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.crud.library import get_by_user, list_by_user
+from app.crud.video_highlight import create_highlight, get_highlights_by_video, delete_highlight
 from app.crud.youtube import get_video_for_user, get_video_analysis_for_org, upsert_video_analysis, batch_check_video_analysis
 from app.models.library import ModelLibrary, PromptLibrary
 from app.models.youtube import YouTubeVideo
+from app.schemas.video_highlight import VideoHighlightCreate, VideoHighlightRead, ExtractHighlightsResponse
 from app.schemas.youtube import YouTubeVideoAnalysisResponse, YouTubeVideoAnalyzeRequest
 from app.services.field_encryption import try_decrypt
 from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig
@@ -186,3 +188,82 @@ async def get_video_analysis(
         content=row.content,
         updated_at=row.updated_at,
     )
+
+
+# --- Highlights (精彩片段) routes ---
+
+@router.post("/{video_id}/extract-highlights", response_model=ExtractHighlightsResponse)
+async def extract_highlights(
+    video_id: int,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> ExtractHighlightsResponse:
+    """Use AI to extract highlight segments from a video."""
+    video = await get_video_for_user(db, user_id=current_user.id, video_id=video_id)
+    if video is None:
+        raise HTTPException(status_code=404, detail="视频不存在或无权限访问")
+
+    from app.services.highlight_extract_service import extract_video_highlights
+    highlights = await extract_video_highlights(db, video=video, user_id=current_user.id)
+
+    return ExtractHighlightsResponse(
+        highlights=[VideoHighlightRead.model_validate(h) for h in highlights],
+        message=f"已提取 {len(highlights)} 个精彩片段",
+    )
+
+
+@router.get("/{video_id}/highlights", response_model=list[VideoHighlightRead])
+async def get_highlights(
+    video_id: int,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> list[VideoHighlightRead]:
+    """Get highlight segments for a video."""
+    video = await get_video_for_user(db, user_id=current_user.id, video_id=video_id)
+    if video is None:
+        raise HTTPException(status_code=404, detail="视频不存在或无权限访问")
+
+    highlights = await get_highlights_by_video(db, video_id=video_id, user_id=current_user.id)
+    return [VideoHighlightRead.model_validate(h) for h in highlights]
+
+
+@router.post("/{video_id}/highlights", response_model=VideoHighlightRead, status_code=201)
+async def add_highlight(
+    video_id: int,
+    payload: VideoHighlightCreate,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> VideoHighlightRead:
+    """Manually add a highlight segment."""
+    video = await get_video_for_user(db, user_id=current_user.id, video_id=video_id)
+    if video is None:
+        raise HTTPException(status_code=404, detail="视频不存在或无权限访问")
+
+    if payload.end_sec <= payload.start_sec:
+        raise HTTPException(status_code=400, detail="end_sec 必须大于 start_sec")
+
+    row = await create_highlight(
+        db,
+        video_id=video_id,
+        user_id=current_user.id,
+        start_sec=payload.start_sec,
+        end_sec=payload.end_sec,
+        score=payload.score,
+        label=payload.label,
+        source="manual",
+    )
+    return VideoHighlightRead.model_validate(row)
+
+
+@router.delete("/{video_id}/highlights/{highlight_id}")
+async def delete_highlight_endpoint(
+    video_id: int,
+    highlight_id: int,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> dict[str, str]:
+    """Delete a manually added highlight."""
+    deleted = await delete_highlight(db, video_id=video_id, user_id=current_user.id, highlight_id=highlight_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="精彩片段不存在或无权删除")
+    return {"message": "删除成功"}

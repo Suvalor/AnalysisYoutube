@@ -1,4 +1,4 @@
-import { Button, Form, Input, Modal, Radio, Upload, message } from 'antd';
+import { Button, Form, Input, Modal, Radio, Switch, Upload, message } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import type { UploadFile } from 'antd/es/upload/interface';
 import { useState } from 'react';
@@ -21,6 +21,7 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
   const [audioMode, setAudioMode] = useState<AudioMode>('text');
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioFileList, setAudioFileList] = useState<UploadFile[]>([]);
+  const [useHighlights, setUseHighlights] = useState(true);
 
   const handleSubmit = async () => {
     try {
@@ -73,6 +74,7 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
         narration_text: narrationText,
         audio_file_id: audioFileId,
         aspect_ratio: values.aspect_ratio,
+        use_highlights: useHighlights,
       });
 
       message.success(res.message || '混编任务已提交，可在任务中心查看进度');
@@ -205,6 +207,12 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
               ]}
             />
           </Form.Item>
+
+          {/* Highlights toggle */}
+          <div className="flex items-center gap-2">
+            <Switch checked={useHighlights} onChange={setUseHighlights} />
+            <span className="text-sm text-slate-600">精彩片段优先</span>
+          </div>
         </Form>
 
         <p className="text-xs text-slate-400">

@@ -1,6 +1,6 @@
 from datetime import datetime, time
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy import or_, select
 
 from app.api.deps import CurrentUserDep, DBSessionDep
@@ -9,6 +9,7 @@ from app.constants.asset_source import (
     ASSET_SOURCE_INSPIRATION,
     ASSET_SOURCE_SOP,
 )
+from app.crud.mix_task import create_mix_task, get_mix_task, list_mix_tasks
 from app.models.library import AssetLibrary
 from app.schemas.materials import (
     MaterialAccessUrlResponse,
@@ -16,6 +17,7 @@ from app.schemas.materials import (
     MaterialTypeEnum,
     MaterialUploadResponse,
 )
+from app.schemas.mix_task import MixRequest, MixTaskRead, MixTaskListResponse
 from app.services.material_service import (
     infer_file_type,
     process_watermark_removal_best_effort,
@@ -25,6 +27,7 @@ from app.services.material_service import (
 from app.services.watermark_inpaint_config import resolve_inpaint_runtime_config
 from app.services.asset_access_service import library_row_access_url
 from app.services.config_manager import resolve_integration_config
+from app.services.mix_task_service import run_mix_task
 from app.services.object_storage import get_write_backend, material_access_url
 
 
@@ -183,3 +186,54 @@ async def upload_material(
         )
     finally:
         remove_temp_dir(tmp_dir)
+
+
+# --- Mix (混剪) routes ---
+
+@router.post("/mix", response_model=dict)
+async def create_mix_task_endpoint(
+    payload: MixRequest,
+    background_tasks: BackgroundTasks,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> dict:
+    """Submit a video mix task. Returns immediately; processing runs in background."""
+    if payload.narration_text is None and payload.audio_file_id is None:
+        raise HTTPException(status_code=400, detail="必须提供 narration_text 或 audio_file_id")
+
+    row = await create_mix_task(
+        db,
+        user_id=current_user.id,
+        source_video_ids=payload.video_ids,
+        audio_source_type="tts" if payload.narration_text else "file",
+        audio_source_ref=payload.narration_text or payload.audio_file_id or "",
+        aspect_ratio=payload.aspect_ratio,
+        use_highlights=payload.use_highlights,
+    )
+
+    background_tasks.add_task(run_mix_task, row.id, current_user.id)
+
+    return {"message": "混剪任务已提交", "task_id": row.id}
+
+
+@router.get("/mix-tasks", response_model=MixTaskListResponse)
+async def list_mix_tasks_endpoint(
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+) -> MixTaskListResponse:
+    rows, total = await list_mix_tasks(db, current_user.id, offset, limit)
+    return MixTaskListResponse(items=[MixTaskRead.model_validate(r) for r in rows], total=total)
+
+
+@router.get("/mix-tasks/{task_id}", response_model=MixTaskRead)
+async def get_mix_task_endpoint(
+    task_id: int,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> MixTaskRead:
+    row = await get_mix_task(db, current_user.id, task_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="混剪任务不存在")
+    return MixTaskRead.model_validate(row)
