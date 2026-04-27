@@ -158,6 +158,7 @@ def mix_videos(
     target_height: int = DEFAULT_TARGET_HEIGHT,
     fps: int = DEFAULT_FPS,
     seed: int | None = None,
+    highlights: dict[str, list[tuple[float, float]]] | None = None,
 ) -> str:
     """Slice, shuffle, normalize and merge video clips with a new audio track.
 
@@ -169,6 +170,9 @@ def mix_videos(
         target_height: Output height in pixels.
         fps: Output frame rate.
         seed: Optional random seed for reproducible slice selection.
+        highlights: Optional mapping of source video path to list of (start_sec, end_sec)
+            highlight segments. When provided, highlight segments are used first before
+            falling back to random slicing for remaining duration.
 
     Returns:
         Absolute path of the generated video file.
@@ -195,8 +199,7 @@ def mix_videos(
     audio_duration = _probe_duration(new_audio_path)
     logger.info("Audio duration: %.2f s — target total clip length", audio_duration)
 
-    # -- Step 2: Random slice extraction ----------------------------------
-    # Pre-compute each source video's duration so we can pick valid offsets.
+    # -- Step 2: Slice extraction (highlights first, then random) --
     video_durations: list[float] = []
     for vp in source_video_paths:
         d = _probe_video_duration(vp)
@@ -207,16 +210,32 @@ def mix_videos(
     clips: list[ffmpeg.Stream] = []
     accumulated = 0.0
 
-    while accumulated < audio_duration and len(clips) < MAX_CLIPS:
-        # Pick a random slice length in [SLICE_DURATION_MIN, SLICE_DURATION_MAX].
-        slice_len = random.uniform(SLICE_DURATION_MIN, SLICE_DURATION_MAX)
+    # Phase A: Use highlights first (if available)
+    if highlights:
+        for vp in source_video_paths:
+            vp_highlights = highlights.get(vp, [])
+            for start, end in vp_highlights:
+                if accumulated >= audio_duration:
+                    break
+                duration = min(end - start, audio_duration - accumulated)
+                if duration <= 0:
+                    continue
+                logger.info(
+                    "Highlight clip #%d: src=%s start=%.2f len=%.2f (accumulated=%.2f/%.2f)",
+                    len(clips), Path(vp).name, start, duration,
+                    accumulated + duration, audio_duration,
+                )
+                normalized = _normalize_clip(vp, start, duration, target_width, target_height, fps)
+                clips.append(normalized)
+                accumulated += duration
 
-        # Pick a random source video.
+    # Phase B: Fill remaining duration with random slices
+    while accumulated < audio_duration and len(clips) < MAX_CLIPS:
+        slice_len = random.uniform(SLICE_DURATION_MIN, SLICE_DURATION_MAX)
         idx = random.randint(0, len(source_video_paths) - 1)
         src_path = source_video_paths[idx]
         src_dur = video_durations[idx]
 
-        # If the source is shorter than the desired slice, use its full length.
         if src_dur <= slice_len:
             start = 0.0
             actual_len = src_dur
@@ -224,15 +243,11 @@ def mix_videos(
             start = random.uniform(0, src_dur - slice_len)
             actual_len = slice_len
 
-        # Don't overshoot the audio duration by more than one slice.
         remaining = audio_duration - accumulated
         if actual_len > remaining + SLICE_DURATION_MAX:
             actual_len = remaining
 
-        # Guard against zero-length clips (shouldn't happen after the check above,
-        # but protects against floating-point edge cases).
         if actual_len <= 0:
-            logger.warning("Zero-length clip computed, skipping")
             continue
 
         logger.info(
@@ -241,9 +256,7 @@ def mix_videos(
             accumulated + actual_len, audio_duration,
         )
 
-        normalized = _normalize_clip(
-            src_path, start, actual_len, target_width, target_height, fps,
-        )
+        normalized = _normalize_clip(src_path, start, actual_len, target_width, target_height, fps)
         clips.append(normalized)
         accumulated += actual_len
 

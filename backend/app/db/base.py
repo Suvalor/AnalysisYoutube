@@ -23,4 +23,6 @@ from app.models.feishu_doc import FeishuDoc  # noqa: F401,E402
 from app.models.navigation_guide_record import NavigationGuideRecord  # noqa: F401,E402
 from app.models.seo_score import SeoScoreRecord  # noqa: F401,E402
 from app.models.download_task import DownloadTask  # noqa: F401,E402
+from app.models.mix_task import MixTask  # noqa: F401,E402
+from app.models.video_highlight import VideoHighlight  # noqa: F401,E402
 
