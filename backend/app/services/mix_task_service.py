@@ -29,6 +29,32 @@ logger = logging.getLogger(__name__)
 MIX_OUTPUT_DIR = Path(__file__).resolve().parent.parent / "data" / "mixed"
 MIX_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# Allowed base directories for resolved file paths (prevent path traversal)
+_ALLOWED_DATA_DIRS: list[Path] = [
+    (Path(__file__).resolve().parent.parent / "data"),
+]
+# Add common download directories
+for _candidate in [Path("/data"), Path.home() / "data", Path.home() / "downloads"]:
+    if _candidate.is_dir():
+        _ALLOWED_DATA_DIRS.append(_candidate)
+
+
+def _is_safe_path(path_str: str) -> bool:
+    """Validate that a resolved path is within allowed directories and is a regular file."""
+    try:
+        resolved = Path(path_str).resolve()
+    except (ValueError, OSError):
+        return False
+    if not resolved.is_file():
+        return False
+    for allowed in _ALLOWED_DATA_DIRS:
+        try:
+            resolved.relative_to(allowed)
+            return True
+        except ValueError:
+            continue
+    return False
+
 
 async def _resolve_video_path(db: AsyncSession, user_id: int, vid_id: int) -> str | None:
     """Resolve a video ID to a local file path via DownloadTask."""
@@ -43,7 +69,7 @@ async def _resolve_video_path(db: AsyncSession, user_id: int, vid_id: int) -> st
         )
     )
     dt = result.scalar_one_or_none()
-    if dt and dt.local_path and Path(dt.local_path).is_file():
+    if dt and dt.local_path and _is_safe_path(dt.local_path):
         return dt.local_path
 
     # Second try: vid_id as youtube_video_id — find any completed download
@@ -54,7 +80,7 @@ async def _resolve_video_path(db: AsyncSession, user_id: int, vid_id: int) -> st
         )
     )
     for dt in result.scalars().all():
-        if str(vid_id) == str(dt.video_id) and dt.local_path and Path(dt.local_path).is_file():
+        if str(vid_id) == str(dt.video_id) and dt.local_path and _is_safe_path(dt.local_path):
             return dt.local_path
 
     # Third try: check AssetLibrary if it exists
@@ -68,7 +94,7 @@ async def _resolve_video_path(db: AsyncSession, user_id: int, vid_id: int) -> st
         )
         asset = result.scalar_one_or_none()
         if asset and asset.file_url and not asset.file_url.startswith(("http://", "https://")):
-            if Path(asset.file_url).is_file():
+            if _is_safe_path(asset.file_url):
                 return asset.file_url
     except ImportError:
         pass
@@ -89,7 +115,7 @@ async def _resolve_audio(db: AsyncSession, user_id: int, task: MixTask) -> str |
         # TTS placeholder: generate silent audio via ffmpeg
         import subprocess
         import tempfile
-        tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+        tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False, dir=str(MIX_OUTPUT_DIR))
         tmp.close()
         try:
             subprocess.run(
@@ -207,6 +233,10 @@ async def run_mix_task(task_id: int, user_id: int) -> None:
                 highlights=highlights,
             )
 
+            # Clean up TTS temp audio file after mixing
+            if audio_path and audio_path.startswith(str(MIX_OUTPUT_DIR)):
+                Path(audio_path).unlink(missing_ok=True)
+
             await update_mix_task_status(db, task, MixTaskStatus.COMPLETED, output_path=result_path)
             logger.info("Mix task %d completed: %s", task_id, result_path)
 
@@ -218,7 +248,7 @@ async def run_mix_task(task_id: int, user_id: int) -> None:
                     if task2 is not None:
                         await update_mix_task_status(
                             db2, task2, MixTaskStatus.FAILED,
-                            error_message=f"混剪失败: {type(exc).__name__}: {exc}",
+                            error_message=f"混剪失败: {type(exc).__name__}",
                         )
             except Exception:
                 logger.exception("Failed to record error for MixTask id=%d", task_id)

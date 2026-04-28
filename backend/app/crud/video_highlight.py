@@ -74,8 +74,20 @@ async def bulk_create_highlights(
     highlights: list[dict],
     source: str = "ai",
 ) -> list[VideoHighlight]:
+    # Dedup: skip highlights that overlap with existing ones (0.5s quantization tolerance)
+    existing = await get_highlights_by_video(db, video_id, user_id)
+    existing_keys = set()
+    for ex in existing:
+        # Quantize to 0.5s grid to handle float precision
+        key = (round(ex.start_sec * 2) / 2, round(ex.end_sec * 2) / 2)
+        existing_keys.add(key)
+
     rows = []
     for h in highlights:
+        key = (round(h["start_sec"] * 2) / 2, round(h["end_sec"] * 2) / 2)
+        if key in existing_keys:
+            continue
+        existing_keys.add(key)
         row = VideoHighlight(
             video_id=video_id,
             user_id=user_id,
@@ -87,6 +99,8 @@ async def bulk_create_highlights(
         )
         db.add(row)
         rows.append(row)
+    if not rows:
+        return []
     await db.commit()
     for row in rows:
         await db.refresh(row)
