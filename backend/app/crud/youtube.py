@@ -465,21 +465,26 @@ async def batch_check_video_analysis(
     session: AsyncSession,
     video_ids: list[int],
     org_id: int,
-) -> dict[int, bool]:
-    """Return {video_id: True} for each video that has an existing analysis row."""
+) -> dict[int, tuple[bool, datetime | None]]:
+    """Return {video_id: (has_analysis, analyzed_at)} for each video."""
     if not video_ids:
         return {}
     stmt = (
-        select(YouTubeVideoAnalysis.video_id)
+        select(
+            YouTubeVideoAnalysis.video_id,
+            func.max(YouTubeVideoAnalysis.updated_at),
+        )
         .where(
             YouTubeVideoAnalysis.video_id.in_(video_ids),
             YouTubeVideoAnalysis.org_id == org_id,
         )
-        .distinct()
+        .group_by(YouTubeVideoAnalysis.video_id)
     )
     result = await session.execute(stmt)
-    ids_with_analysis = {row[0] for row in result.all()}
-    return {vid: vid in ids_with_analysis for vid in video_ids}
+    analysis_map: dict[int, datetime | None] = {}
+    for vid, updated_at in result.all():
+        analysis_map[vid] = updated_at
+    return {vid: (vid in analysis_map, analysis_map.get(vid)) for vid in video_ids}
 
 
 async def query_videos(

@@ -140,6 +140,11 @@ class YouTubeVideoAnalyzeRequest(BaseModel):
     agent_id: int | None = Field(default=None, description="prompt_libraries 表主键，可选")
 
 
+class BatchAnalysisStatusItem(BaseModel):
+    has_analysis: bool = False
+    analyzed_at: datetime | None = Field(None, description="最近一次分析时间 (updated_at)")
+
+
 class YouTubeVideoAnalysisResponse(BaseModel):
     video_id: int
     model_id: str
