@@ -11,6 +11,7 @@ import asyncio
 import logging
 import re
 from pathlib import Path
+from typing import Callable
 
 import yt_dlp
 from sqlalchemy import select
@@ -30,17 +31,27 @@ RAW_MATERIALS_DIR.mkdir(parents=True, exist_ok=True)
 
 VIDEO_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{11}$")
 
+# How often (in seconds) the background task flushes progress to DB.
+_PROGRESS_FLUSH_INTERVAL = 3.0
+
 
 # ---------------------------------------------------------------------------
 # Synchronous download
 # ---------------------------------------------------------------------------
 
 
-def download_youtube_video(video_id: str) -> str:
+def download_youtube_video(
+    video_id: str,
+    progress_callback: Callable[[float], None] | None = None,
+) -> str:
     """Download a YouTube video by *video_id* and return the local file path.
 
     If the target file already exists and is non-empty the download is skipped
     and the existing path is returned immediately.
+
+    Args:
+        video_id: Valid YouTube video ID (11 chars).
+        progress_callback: Optional callable receiving progress percentage (0-100).
 
     Raises:
         ValueError: If video_id is not a valid YouTube video ID.
@@ -55,7 +66,33 @@ def download_youtube_video(video_id: str) -> str:
     # Skip re-download when the file is already present and non-empty.
     if output_path.exists() and output_path.stat().st_size > 0:
         logger.info("视频已存在，跳过下载: %s", output_path)
+        if progress_callback is not None:
+            progress_callback(100.0)
         return str(output_path.resolve())
+
+    def _progress_hook(d: dict[str, object]) -> None:
+        """yt-dlp progress hook that forwards percentage to the callback."""
+        if progress_callback is None:
+            return
+        status = d.get("_status") or d.get("status")
+        if status == "finished":
+            progress_callback(100.0)
+            return
+        if status != "downloading":
+            return
+        # Prefer the pre-formatted percent string from yt-dlp.
+        percent_str = d.get("_percent_str")
+        if percent_str is not None:
+            try:
+                progress_callback(float(str(percent_str).strip().replace("%", "")))
+                return
+            except (ValueError, TypeError):
+                pass
+        # Fallback: compute from byte counters.
+        downloaded = d.get("downloaded_bytes") or 0
+        total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+        if total and total > 0:
+            progress_callback(min(float(downloaded) / float(total) * 100.0, 100.0))
 
     ydl_opts: dict[str, object] = {
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4/best",
@@ -63,6 +100,7 @@ def download_youtube_video(video_id: str) -> str:
         "quiet": True,
         "no_warnings": True,
         "noprogress": True,
+        "progress_hooks": [_progress_hook],
     }
 
     if settings.download_proxy:
@@ -90,7 +128,39 @@ async def run_download_task(task_id: int, user_id: int) -> None:
     after the response has been sent, at which point the request-scoped
     session is already closed.
     """
+    # Shared container for progress value (written by the download thread,
+    # read by the periodic flush coroutine).  Thread-safe via GIL for
+    # simple float assignment.
+    progress_container: dict[str, float] = {"value": 0.0}
+
+    def _progress_cb(pct: float) -> None:
+        progress_container["value"] = pct
+
+    async def _flush_progress() -> None:
+        """Periodically write progress to the database."""
+        while True:
+            await asyncio.sleep(_PROGRESS_FLUSH_INTERVAL)
+            current = progress_container["value"]
+            try:
+                async with AsyncSessionLocal() as flush_db:
+                    stmt = select(DownloadTask).where(
+                        DownloadTask.id == task_id,
+                        DownloadTask.user_id == user_id,
+                    )
+                    result = await flush_db.execute(stmt)
+                    t = result.scalar_one_or_none()
+                    if t is not None and t.progress != current:
+                        t.progress = current
+                        await flush_db.commit()
+            except Exception:
+                logger.warning(
+                    "Failed to flush progress for DownloadTask id=%d",
+                    task_id,
+                    exc_info=True,
+                )
+
     async with AsyncSessionLocal() as db:
+        flush_handle: asyncio.Task[None] | None = None
         try:
             stmt = select(DownloadTask).where(
                 DownloadTask.id == task_id,
@@ -104,10 +174,23 @@ async def run_download_task(task_id: int, user_id: int) -> None:
                 return
 
             task.status = DownloadStatus.DOWNLOADING
+            task.progress = 0.0
             await db.commit()
 
+            # Start the periodic progress flusher.
+            flush_handle = asyncio.ensure_future(_flush_progress())
+
             # Run blocking yt-dlp download in a thread to avoid freezing the event loop.
-            local_path = await asyncio.to_thread(download_youtube_video, task.video_id)
+            local_path = await asyncio.to_thread(
+                download_youtube_video, task.video_id, _progress_cb,
+            )
+
+            # Stop the flusher and do a final progress update.
+            flush_handle.cancel()
+            try:
+                await flush_handle
+            except asyncio.CancelledError:
+                pass
 
             # Determine file size after successful download.
             file_path = Path(local_path)
@@ -116,9 +199,18 @@ async def run_download_task(task_id: int, user_id: int) -> None:
             task.status = DownloadStatus.COMPLETED
             task.local_path = local_path
             task.file_size = file_size
+            task.progress = 100.0
             await db.commit()
 
         except Exception as exc:
+            # Cancel the flusher on error path as well.
+            if flush_handle is not None:
+                flush_handle.cancel()
+                try:
+                    await flush_handle
+                except asyncio.CancelledError:
+                    pass
+
             logger.exception("run_download_task failed: task_id=%d", task_id)
             # Re-fetch the task inside a fresh transaction so we can record the
             # failure even if the current transaction is broken.

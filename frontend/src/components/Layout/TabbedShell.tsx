@@ -6,6 +6,7 @@ import {
   Clapperboard,
   Cloud,
   Compass,
+  Download,
   Home,
   Image,
   Kanban,
@@ -52,6 +53,7 @@ import KeywordResearch from "@/pages/keyword/KeywordResearch";
 import SeoScoring from "@/pages/seo/SeoScoring";
 import TrendDiscovery from "@/pages/trend/TrendDiscovery";
 import ChannelGrowthDashboard from "@/pages/growth/ChannelGrowthDashboard";
+import DownloadList from "@/pages/youtube/DownloadList";
 import { isFeatureEnabled, type FeatureKey } from "@/config/features";
 import { useThemeStore } from "@/store/useThemeStore";
 import { useI18nStore } from "@/store/useI18nStore";
@@ -104,6 +106,7 @@ const navDefs: NavDef[] = [
   { path: "/youtube/channels", labelKey: "nav:channelManagement", icon: Youtube, type: "channel-list", tabId: "channel-list" },
   { path: "/youtube/videos", labelKey: "nav:globalVideos", icon: Video, type: "global-videos", tabId: "global-videos" },
   { path: "/video-board", labelKey: "nav:videoBoard", icon: Kanban, type: "video-board", tabId: "video-board" },
+  { path: "/downloads", labelKey: "nav:downloadManager", icon: Download, type: "download-list", tabId: "download-list" },
   { path: "/config-center", labelKey: "nav:configCenter", icon: Settings, type: "config-center", tabId: "config-center" },
   // 创作者工具（Feature Flag 控制）
   { path: "/inspiration-pool", labelKey: "nav:inspirationPool", icon: Lightbulb, type: "inspiration-pool", tabId: "inspiration-pool", featureKey: "INSPIRATION_POOL" },
@@ -136,6 +139,8 @@ function renderTabPanel(tab: TabItem) {
       return <AssetLibraryPage />;
     case "video-board":
       return <VideoBoard />;
+    case "download-list":
+      return <DownloadList />;
     case "sop-workflow":
       return <ScriptWorkflowSOP />;
     case "inspiration-pool":

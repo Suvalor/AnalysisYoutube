@@ -20,9 +20,10 @@ export interface DownloadTask {
   id: number;
   video_id: string;
   status: DownloadStatus;
-  local_path: string;
+  has_file: boolean;
   error_message: string;
   file_size: number;
+  progress: number;
   created_at: string;
   updated_at: string;
 }
@@ -69,6 +70,11 @@ export async function listDownloadTasks(params?: {
 export async function getDownloadTask(taskId: number): Promise<DownloadTask> {
   const { data } = await apiClient.get<DownloadTask>(`/api/downloads/download-tasks/${taskId}`);
   return data;
+}
+
+/** Build the URL for serving a download task's video file. */
+export function getDownloadFileUrl(taskId: number): string {
+  return `/api/downloads/download-tasks/${taskId}/file`;
 }
 
 /** Submit a video mix task (runs in background). */
