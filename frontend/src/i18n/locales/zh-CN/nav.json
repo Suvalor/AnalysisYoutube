@@ -27,5 +27,6 @@
     "closeOthers": "关闭其他",
     "closeAll": "关闭全部"
   },
-  "unknownTab": "无法识别该标签类型（{{type}}），请关闭标签后从左侧菜单重新打开对应页面。"
+  "unknownTab": "无法识别该标签类型（{{type}}），请关闭标签后从左侧菜单重新打开对应页面。",
+  "downloadManager": "下载管理"
 }

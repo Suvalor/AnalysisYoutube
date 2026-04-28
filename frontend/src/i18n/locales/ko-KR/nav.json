@@ -1,3 +1,32 @@
-{"blueOceanRadar": "블루오션 레이더", "keywordResearch": "키워드 연구",
+{
+  "blueOceanRadar": "블루오션 레이더",
+  "keywordResearch": "키워드 연구",
   "seoScoring": "SEO 점수",
-  "trendDiscovery": "트렌드 발견", "navigationGuide": "해외 내비게이션", "competitorAnalysis": "경쟁사 분석", "channelGrowth": "채널 성장", "channelManagement": "채널 관리", "globalVideos": "전체 동영상", "videoBoard": "동영상 보드", "dashboard": "대시보드", "configCenter": "설정", "inspirationPool": "인스피레이션", "aiCreator": "AI 스크립트 스튜디오", "sopWorkflow": "SOP 워크플로우", "assetLibrary": "에셋 라이브러리", "knowledgeBase": "지식 베이스", "feishuWorkspace": "Feishu 문서", "personalSettings": "개인 설정", "channelDetail": "채널 상세", "agentEdit": "에이전트 편집", "feishuViewer": "Feishu 문서 미리보기", "tabClose": {"closeLeft": "왼쪽 닫기", "closeRight": "오른쪽 닫기", "closeOthers": "다른 탭 닫기", "closeAll": "모두 닫기"}, "unknownTab": "인식할 수 없는 탭 유형({{type}}). 닫고 사이드바에서 다시 열어주세요."}
+  "trendDiscovery": "트렌드 발견",
+  "navigationGuide": "해외 내비게이션",
+  "competitorAnalysis": "경쟁사 분석",
+  "channelGrowth": "채널 성장",
+  "channelManagement": "채널 관리",
+  "globalVideos": "전체 동영상",
+  "videoBoard": "동영상 보드",
+  "dashboard": "대시보드",
+  "configCenter": "설정",
+  "inspirationPool": "인스피레이션",
+  "aiCreator": "AI 스크립트 스튜디오",
+  "sopWorkflow": "SOP 워크플로우",
+  "assetLibrary": "에셋 라이브러리",
+  "knowledgeBase": "지식 베이스",
+  "feishuWorkspace": "Feishu 문서",
+  "personalSettings": "개인 설정",
+  "channelDetail": "채널 상세",
+  "agentEdit": "에이전트 편집",
+  "feishuViewer": "Feishu 문서 미리보기",
+  "tabClose": {
+    "closeLeft": "왼쪽 닫기",
+    "closeRight": "오른쪽 닫기",
+    "closeOthers": "다른 탭 닫기",
+    "closeAll": "모두 닫기"
+  },
+  "unknownTab": "인식할 수 없는 탭 유형({{type}}). 닫고 사이드바에서 다시 열어주세요.",
+  "downloadManager": "다운로드"
+}

@@ -25,7 +25,8 @@ export type TabType =
   | "trend-discovery"
   | "navigation-guide"
   | "personal-settings"
-  | "channel-growth";
+  | "channel-growth"
+  | "download-list";
 
 export type TabItem = {
   id: string;

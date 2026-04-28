@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 
 from app.api.deps import CurrentUserDep, DBSessionDep
@@ -95,3 +98,41 @@ async def get_download_task(
     if task is None:
         raise HTTPException(status_code=404, detail="下载任务不存在")
     return DownloadTaskRead.model_validate(task)
+
+
+@router.get("/download-tasks/{task_id}/file")
+async def serve_download_task_file(
+    task_id: int,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> FileResponse:
+    """Serve the downloaded video file for playback.
+
+    Only available when the task status is COMPLETED and the file exists on disk.
+    """
+    result = await db.execute(
+        select(DownloadTask).where(
+            DownloadTask.id == task_id,
+            DownloadTask.user_id == current_user.id,
+        )
+    )
+    task = result.scalar_one_or_none()
+    if task is None:
+        raise HTTPException(status_code=404, detail="下载任务不存在")
+    if task.status != DownloadStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="下载尚未完成")
+
+    file_path = Path(task.local_path)
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+
+    # Determine media type from extension.
+    media_type = "video/mp4"
+    if file_path.suffix.lower() in (".webm",):
+        media_type = "video/webm"
+
+    return FileResponse(
+        path=str(file_path),
+        media_type=media_type,
+        filename=file_path.name,
+    )
