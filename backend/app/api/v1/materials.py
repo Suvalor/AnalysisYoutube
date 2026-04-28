@@ -11,6 +11,7 @@ from app.constants.asset_source import (
 )
 from app.crud.mix_task import create_mix_task, get_mix_task, list_mix_tasks
 from app.models.library import AssetLibrary
+from app.models.mix_task import MixTask
 from app.schemas.materials import (
     MaterialAccessUrlResponse,
     MaterialRead,
@@ -216,6 +217,13 @@ async def create_mix_task_endpoint(
     return {"message": "混剪任务已提交", "task_id": row.id}
 
 
+def _mix_task_to_read(row: MixTask) -> MixTaskRead:
+    """Convert MixTask ORM row to MixTaskRead, hiding server-local output_path."""
+    return MixTaskRead.model_validate(row).model_copy(
+        update={"has_output": bool(row.output_path)},
+    )
+
+
 @router.get("/mix-tasks", response_model=MixTaskListResponse)
 async def list_mix_tasks_endpoint(
     db: DBSessionDep,
@@ -224,7 +232,7 @@ async def list_mix_tasks_endpoint(
     limit: int = Query(default=20, ge=1, le=100),
 ) -> MixTaskListResponse:
     rows, total = await list_mix_tasks(db, current_user.id, offset, limit)
-    return MixTaskListResponse(items=[MixTaskRead.model_validate(r) for r in rows], total=total)
+    return MixTaskListResponse(items=[_mix_task_to_read(r) for r in rows], total=total)
 
 
 @router.get("/mix-tasks/{task_id}", response_model=MixTaskRead)
@@ -236,4 +244,4 @@ async def get_mix_task_endpoint(
     row = await get_mix_task(db, current_user.id, task_id)
     if row is None:
         raise HTTPException(status_code=404, detail="混剪任务不存在")
-    return MixTaskRead.model_validate(row)
+    return _mix_task_to_read(row)

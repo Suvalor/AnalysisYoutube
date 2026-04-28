@@ -22,7 +22,7 @@ class MixTaskRead(BaseModel):
     audio_source_ref: str
     aspect_ratio: str
     use_highlights: bool
-    output_path: str
+    has_output: bool = Field(default=False, description="是否有输出文件")
     error_message: str
     created_at: datetime
     updated_at: datetime
