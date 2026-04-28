@@ -12,7 +12,7 @@ from app.crud.youtube import get_video_for_user, get_video_analysis_for_org, ups
 from app.models.library import ModelLibrary, PromptLibrary
 from app.models.youtube import YouTubeVideo
 from app.schemas.video_highlight import VideoHighlightCreate, VideoHighlightRead, ExtractHighlightsResponse
-from app.schemas.youtube import YouTubeVideoAnalysisResponse, YouTubeVideoAnalyzeRequest
+from app.schemas.youtube import YouTubeVideoAnalysisResponse, YouTubeVideoAnalyzeRequest, BatchAnalysisStatusItem
 from app.services.field_encryption import try_decrypt
 from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig
 
@@ -156,15 +156,21 @@ async def batch_analysis_status(
     current_user: CurrentUserDep,
     db: DBSessionDep,
     video_ids: str = Query(..., description="Comma-separated internal video IDs"),
-) -> dict[int, bool]:
-    """Check which videos have existing analysis. Returns {video_id: has_analysis}."""
+) -> dict[str, BatchAnalysisStatusItem]:
+    """Check which videos have existing analysis. Returns {video_id: {has_analysis, analyzed_at}}."""
     try:
         ids = [int(x.strip()) for x in video_ids.split(",") if x.strip()]
     except ValueError:
         raise HTTPException(status_code=400, detail="video_ids must be comma-separated integers")
     if not ids:
         return {}
-    return await batch_check_video_analysis(db, ids, current_user.org_id)
+    if len(ids) > 500:
+        raise HTTPException(status_code=400, detail="Too many video IDs (max 500)")
+    raw = await batch_check_video_analysis(db, ids, current_user.org_id)
+    return {
+        str(vid): BatchAnalysisStatusItem(has_analysis=has_analysis, analyzed_at=updated_at)
+        for vid, (has_analysis, updated_at) in raw.items()
+    }
 
 
 @router.get("/analysis/{video_id}", response_model=YouTubeVideoAnalysisResponse, summary="获取视频已持久化的 AI 分析结果")

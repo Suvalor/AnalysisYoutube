@@ -4,7 +4,7 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { Eye, MessageCircle, ThumbsUp } from "lucide-react";
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
-import { listYouTubeChannelsApi, listYouTubeVideosAllApi, scrapeVideoCommentsApi, batchCheckVideoAnalysisApi, type VideoListItem } from "@/services/authApi";
+import { listYouTubeChannelsApi, listYouTubeVideosAllApi, scrapeVideoCommentsApi, batchCheckVideoAnalysisApi, type VideoListItem, type BatchAnalysisStatusItem } from "@/services/authApi";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
 import { analyzeYouTubeVideoApi, getYouTubeVideoAnalysisApi, extractVideoHighlightsApi, getVideoHighlightsApi, type YouTubeVideoAnalysisResponse, type VideoHighlight } from "@/services/videosApi";
 import { submitDownload, submitMix } from "@/services/downloadApi";
@@ -117,7 +117,7 @@ export default function GlobalVideoList() {
   const [panelLoading, setPanelLoading] = useState<Record<number, boolean>>({});
   const [panelContentByVideoId, setPanelContentByVideoId] = useState<Record<number, string>>({});
   /** 分析成功后立即把列表标为「已分析」，与接口 has_analysis 合并 */
-  const [hasAnalysisOverride, setHasAnalysisOverride] = useState<Record<number, boolean>>({});
+  const [analysisStatusOverride, setAnalysisStatusOverride] = useState<Record<number, BatchAnalysisStatusItem>>({});
   const [selectedModelByVideoId, setSelectedModelByVideoId] = useState<Record<number, string>>({});
   const [selectedAgentByVideoId, setSelectedAgentByVideoId] = useState<Record<number, number | undefined>>({});
   const [selectedVideoIds, setSelectedVideoIds] = useState<Set<string>>(new Set());
@@ -223,7 +223,7 @@ export default function GlobalVideoList() {
         page_size: ps,
       });
       setVideos(data.items);
-      setHasAnalysisOverride({});
+      setAnalysisStatusOverride({});
       setSelectedVideoIds(new Set());
       setTotal(data.total);
       setPage(data.page);
@@ -233,7 +233,7 @@ export default function GlobalVideoList() {
       if (videoIds.length) {
         try {
           const statusMap = await batchCheckVideoAnalysisApi(videoIds);
-          setHasAnalysisOverride(statusMap);
+          setAnalysisStatusOverride(statusMap);
         } catch {
           // Non-critical: fallback to has_analysis from list API
         }
@@ -293,7 +293,7 @@ export default function GlobalVideoList() {
     try {
       const res = await getYouTubeVideoAnalysisApi(videoId);
       setPanelContentByVideoId((prev) => ({ ...prev, [videoId]: res.content }));
-      setHasAnalysisOverride((prev) => ({ ...prev, [videoId]: true }));
+      setAnalysisStatusOverride((prev) => ({ ...prev, [videoId]: { has_analysis: true, analyzed_at: res.updated_at } }));
     } catch (err: unknown) {
       const d = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
@@ -321,7 +321,7 @@ export default function GlobalVideoList() {
         agent_id: agentId ?? null,
       });
       setPanelContentByVideoId((prev) => ({ ...prev, [videoId]: res.content }));
-      setHasAnalysisOverride((prev) => ({ ...prev, [videoId]: true }));
+      setAnalysisStatusOverride((prev) => ({ ...prev, [videoId]: { has_analysis: true, analyzed_at: res.updated_at } }));
     } catch (err: unknown) {
       const d = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
@@ -468,7 +468,8 @@ export default function GlobalVideoList() {
           <div className="text-slate-500">加载中...</div>
         ) : (
           videos.map((video) => {
-            const hasAnalyzed = hasAnalysisOverride[video.id] ?? Boolean(video.has_analysis);
+            const hasAnalyzed = video.has_analysis || !!analysisStatusOverride[video.id]?.has_analysis;
+            const analyzedAt = analysisStatusOverride[video.id]?.analyzed_at ?? null;
             const watchUrl = buildYouTubeWatchUrl(video.yt_video_id);
             const openYouTube = (e: MouseEvent) => {
               e.stopPropagation();
@@ -488,6 +489,7 @@ export default function GlobalVideoList() {
                   />
                 </div>
                 <div className="flex flex-col md:flex-row gap-4">
+                  {/* 缩略图 */}
                   <div className="relative w-full md:w-64 shrink-0">
                     {watchUrl ? (
                       <button
@@ -509,6 +511,7 @@ export default function GlobalVideoList() {
                       {video.duration_str}
                     </div>
                   </div>
+                  {/* 信息区 */}
                   <div className="flex-1 min-w-0">
                     {watchUrl ? (
                       <button
@@ -525,6 +528,16 @@ export default function GlobalVideoList() {
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Tag className="!border-slate-200 !bg-white !text-slate-700">{video.definition.toUpperCase()}</Tag>
                       <Tag className="!border-slate-200 !bg-white !text-slate-700">{video.privacy_status}</Tag>
+                      {hasAnalyzed && (
+                        <Tag
+                          color="success"
+                          icon={<CheckCircleOutlined />}
+                          className="cursor-pointer"
+                          onClick={(e) => { e.stopPropagation(); void handleViewAnalysis(video.id); }}
+                        >
+                          已分析{analyzedAt ? ` ${dayjs(analyzedAt).fromNow()}` : ''}
+                        </Tag>
+                      )}
                     </div>
                     <div className="text-slate-500 text-sm mt-2">
                       发布于 {video.published_at ? dayjs(video.published_at).format("YYYY-MM-DD HH:mm") : "-"} ·{" "}
@@ -539,80 +552,64 @@ export default function GlobalVideoList() {
                         ))}
                       </div>
                     )}
-                  </div>
-                  <div className="flex flex-col md:flex-col gap-3 md:w-52 shrink-0 justify-between">
-                    <div className="border border-slate-200 rounded-md p-2 text-sm space-y-1">
-                      <div className="text-blue-600 flex items-center gap-1.5">
-                        <Eye className="h-4 w-4 shrink-0" aria-hidden />
-                        <span>播放量：{formatNumber(video.view_count)}</span>
-                      </div>
-                      <div className="text-emerald-600 flex items-center gap-1.5">
-                        <ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />
-                        <span>点赞：{formatNumber(video.like_count)}</span>
-                      </div>
-                      <div className="text-orange-500 flex items-center gap-1.5">
-                        <MessageCircle className="h-4 w-4 shrink-0" aria-hidden />
-                        <span>评论：{formatNumber(video.comment_count)}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button type="primary" size="small" onClick={() => openScrape(video.id)}>
-                        抓取评论
-                      </Button>
-                      <Button
-                        size="small"
-                        icon={<ThunderboltOutlined />}
-                        loading={Boolean(extractingHighlights[video.id])}
-                        onClick={() => void handleExtractHighlights(video.id)}
-                      >
-                        提取精彩片段
-                      </Button>
-                    </div>
-
-                    <div className="space-y-2 w-full">
-                      <Select
-                        showSearch
-                        placeholder="选择模型（Model）"
-                        className="w-full"
-                        value={selectedModelByVideoId[video.id] ?? (modelOptions[0]?.value ?? undefined)}
-                        options={modelOptions}
-                        onChange={(v) => setSelectedModelByVideoId((prev) => ({ ...prev, [video.id]: String(v) }))}
-                      />
-                      <Select
-                        allowClear
-                        placeholder="选择智能体（Agent，可选）"
-                        className="w-full"
-                        value={selectedAgentByVideoId[video.id] ?? undefined}
-                        options={promptAgents.map((p) => ({ value: p.id, label: p.title }))}
-                        onChange={(v) => setSelectedAgentByVideoId((prev) => ({ ...prev, [video.id]: v === undefined ? undefined : Number(v) }))}
-                      />
-                      <div className="flex gap-2 w-full">
-                        <Button
-                          type={hasAnalyzed ? "dashed" : "primary"}
-                          size="small"
-                          onClick={() => void handleAnalyzeVideo(video)}
-                          loading={Boolean(panelLoading[video.id])}
-                          className="!flex-1"
-                        >
-                          {hasAnalyzed ? "重新分析" : "一键 AI 视频分析"}
-                        </Button>
-                        {hasAnalyzed ? (
-                          <Button
-                            type="primary"
-                            size="small"
-                            icon={<CheckCircleOutlined />}
-                            onClick={() => void handleViewAnalysis(video.id)}
-                            disabled={Boolean(panelLoading[video.id])}
-                            className="shrink-0"
-                            style={panelOpenVideoId !== video.id ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
-                          >
-                            查看结果
-                          </Button>
-                        ) : null}
-                      </div>
+                    {/* 统计数据 */}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm">
+                      <span className="text-blue-600 flex items-center gap-1"><Eye className="h-4 w-4 shrink-0" aria-hidden />播放量：{formatNumber(video.view_count)}</span>
+                      <span className="text-emerald-600 flex items-center gap-1"><ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />点赞：{formatNumber(video.like_count)}</span>
+                      <span className="text-orange-500 flex items-center gap-1"><MessageCircle className="h-4 w-4 shrink-0" aria-hidden />评论：{formatNumber(video.comment_count)}</span>
                     </div>
                   </div>
+                </div>
+
+                {/* 操作按钮栏 */}
+                <div className="mt-3 flex flex-wrap gap-2 items-center">
+                  <Button type="primary" size="small" onClick={() => openScrape(video.id)}>
+                    抓取评论
+                  </Button>
+                  <Button
+                    size="small"
+                    icon={<ThunderboltOutlined />}
+                    loading={Boolean(extractingHighlights[video.id])}
+                    onClick={() => void handleExtractHighlights(video.id)}
+                  >
+                    提取精彩片段
+                  </Button>
+                  <Select
+                    showSearch
+                    placeholder="选择模型"
+                    style={{ minWidth: 160 }}
+                    value={selectedModelByVideoId[video.id] ?? (modelOptions[0]?.value ?? undefined)}
+                    options={modelOptions}
+                    onChange={(v) => setSelectedModelByVideoId((prev) => ({ ...prev, [video.id]: String(v) }))}
+                  />
+                  <Select
+                    allowClear
+                    placeholder="选择智能体（可选）"
+                    style={{ minWidth: 160 }}
+                    value={selectedAgentByVideoId[video.id] ?? undefined}
+                    options={promptAgents.map((p) => ({ value: p.id, label: p.title }))}
+                    onChange={(v) => setSelectedAgentByVideoId((prev) => ({ ...prev, [video.id]: v === undefined ? undefined : Number(v) }))}
+                  />
+                  <Button
+                    type={hasAnalyzed ? "dashed" : "primary"}
+                    size="small"
+                    onClick={() => void handleAnalyzeVideo(video)}
+                    loading={Boolean(panelLoading[video.id])}
+                  >
+                    {hasAnalyzed ? "重新分析" : "一键 AI 视频分析"}
+                  </Button>
+                  {hasAnalyzed && (
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<CheckCircleOutlined />}
+                      onClick={() => void handleViewAnalysis(video.id)}
+                      disabled={Boolean(panelLoading[video.id])}
+                      style={panelOpenVideoId !== video.id ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
+                    >
+                      查看结果{analyzedAt ? `(${dayjs(analyzedAt).fromNow()})` : ''}
+                    </Button>
+                  )}
                 </div>
 
                 {panelOpenVideoId === video.id ? (
