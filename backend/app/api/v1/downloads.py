@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.models.download_task import DownloadStatus, DownloadTask
-from app.models.youtube import YouTubeVideo
+from app.models.youtube import YouTubeChannel, YouTubeVideo
 from app.schemas.download_task import DownloadRequest, DownloadTaskListResponse, DownloadTaskRead
 from app.services.downloader_service import VIDEO_ID_RE, run_download_task
 
@@ -94,7 +94,52 @@ async def list_download_tasks(
         await db.execute(base.order_by(DownloadTask.id.desc()).offset(offset).limit(limit))
     ).scalars().all()
 
-    return DownloadTaskListResponse(items=[DownloadTaskRead.model_validate(r) for r in rows], total=total)
+    # Enrich with youtube_videos + youtube_channels data via JOIN
+    video_ids = [r.video_id for r in rows]
+    video_map: dict[str, dict] = {}
+    if video_ids:
+        vid_rows = await db.execute(
+            select(
+                YouTubeVideo.yt_video_id,
+                YouTubeVideo.title,
+                YouTubeVideo.thumbnail_url,
+                YouTubeVideo.published_at,
+                YouTubeVideo.view_count,
+                YouTubeVideo.like_count,
+                YouTubeVideo.comment_count,
+                YouTubeChannel.title,
+            )
+            .outerjoin(YouTubeChannel, YouTubeVideo.channel_id == YouTubeChannel.id)
+            .where(YouTubeVideo.yt_video_id.in_(video_ids))
+        )
+        for yt_vid, title, thumb, pub, views, likes, comments, ch_title in vid_rows.all():
+            video_map[yt_vid] = {
+                "title": title,
+                "thumbnail_url": thumb,
+                "published_at": pub,
+                "view_count": views,
+                "like_count": likes,
+                "comment_count": comments,
+                "channel_title": ch_title,
+            }
+
+    items: list[DownloadTaskRead] = []
+    for r in rows:
+        d = DownloadTaskRead.model_validate(r)
+        vm = video_map.get(r.video_id)
+        if vm:
+            if not d.video_title and vm["title"]:
+                d.video_title = vm["title"]
+            if not d.thumbnail_url and vm["thumbnail_url"]:
+                d.thumbnail_url = vm["thumbnail_url"]
+            d.video_channel_title = vm["channel_title"]
+            d.video_published_at = vm["published_at"]
+            d.video_view_count = vm["view_count"]
+            d.video_like_count = vm["like_count"]
+            d.video_comment_count = vm["comment_count"]
+        items.append(d)
+
+    return DownloadTaskListResponse(items=items, total=total)
 
 
 @router.get("/download-tasks/{task_id}", response_model=DownloadTaskRead)
@@ -110,7 +155,35 @@ async def get_download_task(
     task = result.scalar_one_or_none()
     if task is None:
         raise HTTPException(status_code=404, detail="下载任务不存在")
-    return DownloadTaskRead.model_validate(task)
+
+    d = DownloadTaskRead.model_validate(task)
+    # Enrich with youtube_videos + youtube_channels
+    vid_row = await db.execute(
+        select(
+            YouTubeVideo.title,
+            YouTubeVideo.thumbnail_url,
+            YouTubeVideo.published_at,
+            YouTubeVideo.view_count,
+            YouTubeVideo.like_count,
+            YouTubeVideo.comment_count,
+            YouTubeChannel.title,
+        )
+        .outerjoin(YouTubeChannel, YouTubeVideo.channel_id == YouTubeChannel.id)
+        .where(YouTubeVideo.yt_video_id == task.video_id)
+    )
+    row = vid_row.first()
+    if row:
+        v_title, thumb, pub, views, likes, comments, ch_title = row._asdict() if hasattr(row, '_asdict') else row
+        if not d.video_title and v_title:
+            d.video_title = v_title
+        if not d.thumbnail_url and thumb:
+            d.thumbnail_url = thumb
+        d.video_channel_title = ch_title
+        d.video_published_at = pub
+        d.video_view_count = views
+        d.video_like_count = likes
+        d.video_comment_count = comments
+    return d
 
 
 @router.get("/download-tasks/{task_id}/file")

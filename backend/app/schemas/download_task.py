@@ -25,6 +25,12 @@ class DownloadTaskRead(BaseModel):
     error_message: str = ""
     file_size: int = 0
     progress: float = 0
+    # Enriched from youtube_videos + youtube_channels
+    video_channel_title: str | None = None
+    video_published_at: datetime | None = None
+    video_view_count: int | None = None
+    video_like_count: int | None = None
+    video_comment_count: int | None = None
     created_at: datetime
     updated_at: datetime
 
