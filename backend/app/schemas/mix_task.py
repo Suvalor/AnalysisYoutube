@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class MixRequest(BaseModel):
-    video_ids: list[int] = Field(..., min_length=1, max_length=20, description="素材 ID 列表")
+    video_ids: list[str] = Field(..., min_length=1, max_length=20, description="素材 ID 列表")
     narration_text: str | None = Field(default=None, max_length=2000, description="TTS 配音文案")
     audio_file_id: str | None = Field(default=None, description="已上传的音频素材 ID")
     aspect_ratio: str = Field(default="9:16", pattern=r"^(9:16|16:9)$")

@@ -1,6 +1,6 @@
 import logging
 
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import Select, exists, func, select
 from sqlalchemy.dialects.mysql import insert as mysql_insert

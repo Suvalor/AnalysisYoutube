@@ -10,7 +10,7 @@ async def create_mix_task(
     db: AsyncSession,
     *,
     user_id: int,
-    source_video_ids: list[int],
+    source_video_ids: list[str],
     audio_source_type: str,
     audio_source_ref: str,
     aspect_ratio: str,
