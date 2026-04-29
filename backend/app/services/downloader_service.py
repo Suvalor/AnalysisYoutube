@@ -72,7 +72,21 @@ def download_youtube_video(
         logger.info("视频已存在，跳过下载: %s", output_path)
         if progress_callback is not None:
             progress_callback(100.0)
-        return str(output_path.resolve()), None, None
+        # M-01: Still extract metadata even when skipping download, but with a
+        # short timeout to avoid blocking the download thread on slow networks.
+        try:
+            info_opts: dict = {"quiet": True, "no_warnings": True, "noprogress": True, "socket_timeout": 5}
+            if settings.download_proxy:
+                info_opts["proxy"] = settings.download_proxy
+            with yt_dlp.YoutubeDL(info_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                return (
+                    str(output_path.resolve()),
+                    info.get("title") if info else None,
+                    info.get("thumbnail") if info else None,
+                )
+        except Exception:
+            return str(output_path.resolve()), None, None
 
     def _progress_hook(d: dict[str, object]) -> None:
         """yt-dlp progress hook that forwards percentage to the callback."""
