@@ -19,6 +19,8 @@ export type DownloadStatus = 'PENDING' | 'DOWNLOADING' | 'COMPLETED' | 'FAILED';
 export interface DownloadTask {
   id: number;
   video_id: string;
+  video_title: string | null;
+  thumbnail_url: string | null;
   status: DownloadStatus;
   has_file: boolean;
   error_message: string;
@@ -75,6 +77,11 @@ export async function getDownloadTask(taskId: number): Promise<DownloadTask> {
 /** Build the URL for serving a download task's video file. */
 export function getDownloadFileUrl(taskId: number): string {
   return `/api/downloads/download-tasks/${taskId}/file`;
+}
+
+export async function retryDownloadTaskApi(taskId: number): Promise<DownloadTask> {
+  const { data } = await apiClient.post<DownloadTask>(`/api/downloads/download-tasks/${taskId}/retry`);
+  return data;
 }
 
 /** Submit a video mix task (runs in background). */

@@ -19,6 +19,8 @@ class DownloadRequest(BaseModel):
 class DownloadTaskRead(BaseModel):
     id: int
     video_id: str
+    video_title: str | None = None
+    thumbnail_url: str | None = None
     status: str
     error_message: str = ""
     file_size: int = 0
