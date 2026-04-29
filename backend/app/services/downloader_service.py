@@ -43,7 +43,7 @@ _PROGRESS_FLUSH_INTERVAL = 3.0
 def download_youtube_video(
     video_id: str,
     progress_callback: Callable[[float], None] | None = None,
-) -> str:
+) -> tuple[str, str | None, str | None]:
     """Download a YouTube video by *video_id* and return the local file path.
 
     If the target file already exists and is non-empty the download is skipped
@@ -52,6 +52,10 @@ def download_youtube_video(
     Args:
         video_id: Valid YouTube video ID (11 chars).
         progress_callback: Optional callable receiving progress percentage (0-100).
+
+    Returns:
+        Tuple of (local_file_path, video_title, thumbnail_url).
+        video_title and thumbnail_url come from yt-dlp info_dict.
 
     Raises:
         ValueError: If video_id is not a valid YouTube video ID.
@@ -68,7 +72,7 @@ def download_youtube_video(
         logger.info("视频已存在，跳过下载: %s", output_path)
         if progress_callback is not None:
             progress_callback(100.0)
-        return str(output_path.resolve())
+        return str(output_path.resolve()), None, None
 
     def _progress_hook(d: dict[str, object]) -> None:
         """yt-dlp progress hook that forwards percentage to the callback."""
