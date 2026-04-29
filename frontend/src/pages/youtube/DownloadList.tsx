@@ -1,14 +1,18 @@
-import { CloudDownloadOutlined, DeleteOutlined, PlayCircleOutlined, ReloadOutlined } from "@ant-design/icons";
+import { CloudDownloadOutlined, DeleteOutlined, PlayCircleOutlined, RedoOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Button, Modal, Progress, Select, Space, Spin, Table, Tag, Tooltip, message } from "antd";
+import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   listDownloadTasks,
   getDownloadFileUrl,
+  retryDownloadTaskApi,
   type DownloadTask,
   type DownloadStatus,
 } from "@/services/downloadApi";
+import { useTabStore } from "@/store/useTabStore";
 
 dayjs.extend(relativeTime);
 
@@ -35,9 +39,12 @@ export default function DownloadList() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [playingTaskId, setPlayingTaskId] = useState<number | null>(null);
+  const [retryingIds, setRetryingIds] = useState<Set<number>>(new Set());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const navigate = useNavigate();
+  const openTab = useTabStore((s) => s.openTab);
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     setLoading(true);
     try {
       const res = await listDownloadTasks({
@@ -52,11 +59,11 @@ export default function DownloadList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, pageSize, statusFilter]);
 
   useEffect(() => {
     void fetchTasks();
-  }, [page, pageSize, statusFilter]);
+  }, [fetchTasks]);
 
   // Auto-poll for downloading tasks (every 3s)
   useEffect(() => {
@@ -91,21 +98,66 @@ export default function DownloadList() {
     };
   }, [tasks, statusFilter, page, pageSize]);
 
-  const columns = [
+  const handleRetry = async (taskId: number) => {
+    setRetryingIds((prev) => new Set(prev).add(taskId));
+    try {
+      await retryDownloadTaskApi(taskId);
+      message.success("已重新开始下载");
+      await fetchTasks();
+    } catch {
+      message.error("重试失败");
+    } finally {
+      setRetryingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(taskId);
+        return next;
+      });
+    }
+  };
+
+  const handleRowClick = (record: DownloadTask) => {
+    openTab({
+      id: "global-videos",
+      title: "全局视频",
+      path: "/global-videos",
+      type: "global-videos",
+    });
+    navigate(`/global-videos?video_id=${record.video_id}`);
+  };
+
+  const columns: ColumnsType<DownloadTask> = [
     {
-      title: "视频 ID",
-      dataIndex: "video_id",
-      key: "video_id",
-      width: 140,
-      render: (vid: string) => (
-        <a
-          href={`https://www.youtube.com/watch?v=${vid}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: "var(--color-primary)" }}
-        >
-          {vid}
-        </a>
+      title: "视频",
+      key: "video",
+      width: 320,
+      render: (_: unknown, record: DownloadTask) => (
+        <div className="flex items-center gap-3">
+          {record.thumbnail_url ? (
+            <img
+              src={record.thumbnail_url}
+              alt=""
+              className="w-24 h-14 object-cover rounded shrink-0"
+            />
+          ) : (
+            <div className="w-24 h-14 bg-slate-100 rounded shrink-0 flex items-center justify-center text-slate-400 text-xs">
+              无缩略图
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-slate-900 truncate" title={record.video_title ?? undefined}>
+              {record.video_title || record.video_id}
+            </div>
+            <a
+              href={`https://www.youtube.com/watch?v=${record.video_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-slate-400 hover:text-blue-500"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {record.video_id}
+            </a>
+          </div>
+        </div>
       ),
     },
     {
@@ -147,25 +199,42 @@ export default function DownloadList() {
     {
       title: "操作",
       key: "actions",
-      width: 120,
+      width: 160,
       render: (_: unknown, record: DownloadTask) => (
         <Space size="small">
-          {record.has_file && record.status === "COMPLETED" && (
+          {record.status === "COMPLETED" && record.has_file && (
             <Tooltip title="播放视频">
               <Button
                 type="text"
                 size="small"
                 icon={<PlayCircleOutlined />}
-                onClick={() => setPlayingTaskId(record.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPlayingTaskId(record.id);
+                }}
               />
             </Tooltip>
           )}
           {record.status === "FAILED" && (
-            <Tooltip title={record.error_message}>
-              <Tag color="error" style={{ cursor: "help", maxWidth: 120 }} className="truncate">
-                错误
-              </Tag>
-            </Tooltip>
+            <>
+              <Tooltip title="重试下载">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<RedoOutlined />}
+                  loading={retryingIds.has(record.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleRetry(record.id);
+                  }}
+                />
+              </Tooltip>
+              <Tooltip title={record.error_message}>
+                <Tag color="error" style={{ cursor: "help", maxWidth: 120 }} className="truncate">
+                  错误
+                </Tag>
+              </Tooltip>
+            </>
           )}
         </Space>
       ),
@@ -212,6 +281,10 @@ export default function DownloadList() {
           columns={columns}
           rowKey="id"
           size="small"
+          onRow={(record) => ({
+            onClick: () => handleRowClick(record),
+            style: { cursor: "pointer" },
+          })}
           pagination={{
             current: page,
             pageSize,
@@ -230,7 +303,7 @@ export default function DownloadList() {
       {/* Video Player Modal */}
       <Modal
         open={playingTaskId !== null}
-        title={playingTask ? `播放视频 - ${playingTask.video_id}` : "播放视频"}
+        title={playingTask ? `播放视频 - ${playingTask.video_title ?? playingTask.video_id}` : "播放视频"}
         onCancel={() => setPlayingTaskId(null)}
         footer={null}
         width={800}

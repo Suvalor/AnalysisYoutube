@@ -27,5 +27,7 @@ class DownloadTask(Base):
     error_message: Mapped[str] = mapped_column(String(500), nullable=False, default="", server_default="")
     file_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     progress: Mapped[float] = mapped_column(Float, nullable=False, default=0, server_default="0")
+    video_title: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
+    thumbnail_url: Mapped[str | None] = mapped_column(String(1000), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

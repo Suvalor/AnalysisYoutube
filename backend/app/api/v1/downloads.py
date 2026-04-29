@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.models.download_task import DownloadStatus, DownloadTask
+from app.models.youtube import YouTubeVideo
 from app.schemas.download_task import DownloadRequest, DownloadTaskListResponse, DownloadTaskRead
 from app.services.downloader_service import VIDEO_ID_RE, run_download_task
 
@@ -27,6 +28,17 @@ async def create_download_tasks(
     if invalid_ids:
         raise HTTPException(status_code=400, detail=f"无效的视频 ID: {invalid_ids[:3]}")
 
+    # Pre-fetch video metadata from youtube_videos for all video_ids
+    yt_video_ids = [vid for vid in payload.video_ids]
+    video_meta: dict[str, tuple[str | None, str | None]] = {}
+    if yt_video_ids:
+        meta_rows = await db.execute(
+            select(YouTubeVideo.yt_video_id, YouTubeVideo.title, YouTubeVideo.thumbnail_url)
+            .where(YouTubeVideo.yt_video_id.in_(yt_video_ids))
+        )
+        for yt_vid, title, thumb in meta_rows.all():
+            video_meta[yt_vid] = (title, thumb)
+
     tasks: list[DownloadTask] = []
     skipped: list[str] = []
 
@@ -43,7 +55,8 @@ async def create_download_tasks(
             skipped.append(video_id)
             continue
 
-        task = DownloadTask(user_id=current_user.id, video_id=video_id)
+        title, thumb = video_meta.get(video_id, (None, None))
+        task = DownloadTask(user_id=current_user.id, video_id=video_id, video_title=title, thumbnail_url=thumb)
         db.add(task)
         tasks.append(task)
 
@@ -136,3 +149,41 @@ async def serve_download_task_file(
         media_type=media_type,
         filename=file_path.name,
     )
+
+
+@router.post("/download-tasks/{task_id}/retry", response_model=DownloadTaskRead)
+async def retry_download_task(
+    task_id: int,
+    background_tasks: BackgroundTasks,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> DownloadTaskRead:
+    """Retry a failed download task by resetting its status and re-queueing."""
+    result = await db.execute(
+        select(DownloadTask).where(
+            DownloadTask.id == task_id,
+            DownloadTask.user_id == current_user.id,
+        )
+    )
+    task = result.scalar_one_or_none()
+    if task is None:
+        raise HTTPException(status_code=404, detail="下载任务不存在")
+    if task.status not in (DownloadStatus.FAILED, DownloadStatus.COMPLETED):
+        raise HTTPException(status_code=400, detail="仅失败或已完成的任务可重试")
+
+    # Clean up existing file if retrying a completed task
+    if task.local_path:
+        old_file = Path(task.local_path)
+        if old_file.is_file():
+            old_file.unlink(missing_ok=True)
+
+    task.status = DownloadStatus.PENDING
+    task.progress = 0.0
+    task.error_message = ""
+    task.local_path = ""
+    task.file_size = 0
+    await db.commit()
+    await db.refresh(task)
+
+    background_tasks.add_task(run_download_task, task.id, current_user.id)
+    return DownloadTaskRead.model_validate(task)
