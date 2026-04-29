@@ -1,17 +1,18 @@
-import { CloudDownloadOutlined, PlayCircleOutlined, RedoOutlined, ReloadOutlined } from "@ant-design/icons";
-import { Button, Modal, Progress, Select, Space, Spin, Table, Tag, Tooltip, message } from "antd";
+import { CloudDownloadOutlined, DeleteOutlined, PlayCircleOutlined, RedoOutlined, ReloadOutlined } from "@ant-design/icons";
+import { Button, Modal, Popconfirm, Progress, Select, Space, Spin, Table, Tag, Tooltip, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   listDownloadTasks,
+  requestPlayToken,
   getDownloadFileUrl,
   retryDownloadTaskApi,
+  deleteDownloadTaskApi,
   type DownloadTask,
   type DownloadStatus,
 } from "@/services/downloadApi";
-import { authFetch } from "@/services/apiClient";
 import { formatNumber } from "@/utils/format";
 
 dayjs.extend(relativeTime);
@@ -40,8 +41,8 @@ export default function DownloadList() {
   const [pageSize, setPageSize] = useState(20);
   const [playingTaskId, setPlayingTaskId] = useState<number | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [videoLoading, setVideoLoading] = useState(false);
   const [retryingIds, setRetryingIds] = useState<Set<number>>(new Set());
+  const [loadingPlayId, setLoadingPlayId] = useState<number | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchTasks = useCallback(async () => {
@@ -115,25 +116,39 @@ export default function DownloadList() {
     }
   };
 
-  const handlePlay = async (taskId: number) => {
-    setPlayingTaskId(taskId);
-    setVideoLoading(true);
-    setVideoUrl(null);
+  const handleDelete = async (taskId: number) => {
     try {
-      const resp = await authFetch(getDownloadFileUrl(taskId));
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const blob = await resp.blob();
-      setVideoUrl(URL.createObjectURL(blob));
+      await deleteDownloadTaskApi(taskId);
+      message.success("已删除");
+      await fetchTasks();
     } catch {
-      message.error("视频加载失败");
-      setPlayingTaskId(null);
+      message.error("删除失败");
+    }
+  };
+
+  const handlePlay = async (taskId: number) => {
+    // M-02: guard against missing auth token
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      message.error("登录已过期，请重新登录");
+      return;
+    }
+
+    setLoadingPlayId(taskId);
+    try {
+      // C-01: request a short-lived play token instead of passing JWT in URL
+      const { play_token } = await requestPlayToken(taskId);
+      const url = `${getDownloadFileUrl(taskId)}?play_token=${encodeURIComponent(play_token)}`;
+      setVideoUrl(url);
+      setPlayingTaskId(taskId);
+    } catch {
+      message.error("获取播放令牌失败");
     } finally {
-      setVideoLoading(false);
+      setLoadingPlayId(null);
     }
   };
 
   const handleClosePlayer = () => {
-    if (videoUrl) URL.revokeObjectURL(videoUrl);
     setVideoUrl(null);
     setPlayingTaskId(null);
   };
@@ -243,6 +258,8 @@ export default function DownloadList() {
                 type="text"
                 size="small"
                 icon={<PlayCircleOutlined />}
+                loading={loadingPlayId === record.id}
+                disabled={loadingPlayId !== null}
                 onClick={() => void handlePlay(record.id)}
               />
             </Tooltip>
@@ -258,6 +275,20 @@ export default function DownloadList() {
                   onClick={() => void handleRetry(record.id)}
                 />
               </Tooltip>
+              <Popconfirm
+                title="确定删除该失败任务？"
+                onConfirm={() => void handleDelete(record.id)}
+                okText="删除"
+                cancelText="取消"
+              >
+                <Tooltip title="删除任务">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<DeleteOutlined />}
+                  />
+                </Tooltip>
+              </Popconfirm>
               <Tooltip title={record.error_message}>
                 <Tag color="error" style={{ cursor: "help", maxWidth: 120 }} className="truncate">
                   错误
@@ -334,11 +365,6 @@ export default function DownloadList() {
         width={800}
         destroyOnClose
       >
-        {videoLoading && (
-          <div className="flex items-center justify-center" style={{ height: 300 }}>
-            <Spin tip="视频加载中..." />
-          </div>
-        )}
         {videoUrl && (
           <video
             src={videoUrl}

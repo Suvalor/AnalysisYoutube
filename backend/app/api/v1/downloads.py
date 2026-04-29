@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import secrets
+import time
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import func, select
 
 from app.api.deps import CurrentUserDep, DBSessionDep
@@ -13,6 +16,16 @@ from app.schemas.download_task import DownloadRequest, DownloadTaskListResponse,
 from app.services.downloader_service import VIDEO_ID_RE, run_download_task
 
 router = APIRouter()
+
+# ---------------------------------------------------------------------------
+# Play-token store (C-01: short-lived, single-use tokens for video playback)
+# ---------------------------------------------------------------------------
+_play_tokens: dict[str, tuple[int, int, float]] = {}  # token -> (task_id, user_id, expires_at)
+_PLAY_TOKEN_TTL = 60  # seconds
+
+# Optional OAuth2 scheme for the file-serving endpoint: when a play_token is
+# provided we skip header-based auth entirely, so this must not auto-error.
+_optional_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 
 @router.post("/download", response_model=dict)
@@ -81,9 +94,26 @@ async def list_download_tasks(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=100),
 ) -> DownloadTaskListResponse:
-    """List download tasks for the current user with optional status filter."""
-    base = select(DownloadTask).where(DownloadTask.user_id == current_user.id)
-    count_base = select(func.count()).select_from(DownloadTask).where(DownloadTask.user_id == current_user.id)
+    """List download tasks for the current user with optional status filter.
+    Only the most recent task per video_id is returned (deduplication).
+    """
+    # Subquery: max id per video_id for this user (deduplication).
+    # C-02: status filter must be inside the subquery so that dedup only
+    # considers tasks matching the current filter, preventing semantic errors
+    # where a non-matching newer task shadows an older matching one.
+    dedup_base = select(func.max(DownloadTask.id)).where(DownloadTask.user_id == current_user.id)
+    if status is not None:
+        dedup_base = dedup_base.where(DownloadTask.status == status.value)
+    max_id_subq = dedup_base.group_by(DownloadTask.video_id).scalar_subquery()
+
+    base = select(DownloadTask).where(
+        DownloadTask.user_id == current_user.id,
+        DownloadTask.id.in_(max_id_subq),
+    )
+    count_base = select(func.count()).select_from(DownloadTask).where(
+        DownloadTask.user_id == current_user.id,
+        DownloadTask.id.in_(max_id_subq),
+    )
 
     if status is not None:
         base = base.where(DownloadTask.status == status.value)
@@ -186,20 +216,88 @@ async def get_download_task(
     return d
 
 
-@router.get("/download-tasks/{task_id}/file")
-async def serve_download_task_file(
+@router.post("/download-tasks/{task_id}/play-token", response_model=dict)
+async def create_play_token(
     task_id: int,
     db: DBSessionDep,
     current_user: CurrentUserDep,
-) -> FileResponse:
-    """Serve the downloaded video file for playback.
+) -> dict:
+    """Generate a short-lived, single-use play token for video playback.
 
-    Only available when the task status is COMPLETED and the file exists on disk.
+    The token replaces the previous approach of passing the full JWT in the URL
+    query parameter, which leaked credentials to server logs, browser history,
+    and referrer headers.
     """
     result = await db.execute(
         select(DownloadTask).where(
             DownloadTask.id == task_id,
             DownloadTask.user_id == current_user.id,
+        )
+    )
+    task = result.scalar_one_or_none()
+    if task is None:
+        raise HTTPException(status_code=404, detail="下载任务不存在")
+    if task.status != DownloadStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="下载尚未完成")
+    if not task.local_path:
+        raise HTTPException(status_code=400, detail="文件不存在")
+
+    token = secrets.token_urlsafe(32)
+    _play_tokens[token] = (task_id, current_user.id, time.monotonic() + _PLAY_TOKEN_TTL)
+    return {"play_token": token}
+
+
+@router.get("/download-tasks/{task_id}/file")
+async def serve_download_task_file(
+    task_id: int,
+    db: DBSessionDep,
+    play_token: str | None = Query(default=None, description="Short-lived play token"),
+    authorization: str | None = Depends(_optional_oauth2),
+) -> FileResponse:
+    """Serve the downloaded video file for playback.
+
+    Only available when the task status is COMPLETED and the file exists on disk.
+    Authenticates via a short-lived play_token query parameter (preferred) or
+    falls back to Authorization header for backward compatibility.
+    """
+    from app.core.security import decode_access_token
+    from app.crud.user import get_user_by_email
+    from jose import JWTError
+
+    resolved_user_id: int | None = None
+
+    if play_token is not None:
+        # C-01: use short-lived, single-use play token
+        entry = _play_tokens.pop(play_token, None)
+        if entry is None:
+            raise HTTPException(status_code=401, detail="播放令牌无效或已使用")
+        stored_task_id, stored_user_id, expires_at = entry
+        if time.monotonic() > expires_at:
+            raise HTTPException(status_code=401, detail="播放令牌已过期")
+        if stored_task_id != task_id:
+            raise HTTPException(status_code=403, detail="播放令牌与任务不匹配")
+        resolved_user_id = stored_user_id
+    elif authorization is not None:
+        # Backward-compatible fallback: resolve JWT from Authorization header
+        www = {"WWW-Authenticate": "Bearer"}
+        try:
+            payload = decode_access_token(authorization)
+            subject: str | None = payload.get("sub")
+            if subject is None:
+                raise HTTPException(status_code=401, detail="令牌缺少主体信息", headers=www)
+        except JWTError:
+            raise HTTPException(status_code=401, detail="令牌无效或已过期", headers=www)
+        user = await get_user_by_email(db, subject)
+        if user is None or not user.is_active:
+            raise HTTPException(status_code=401, detail="用户不存在或已被禁用", headers=www)
+        resolved_user_id = user.id
+    else:
+        raise HTTPException(status_code=401, detail="未认证")
+
+    result = await db.execute(
+        select(DownloadTask).where(
+            DownloadTask.id == task_id,
+            DownloadTask.user_id == resolved_user_id,
         )
     )
     task = result.scalar_one_or_none()
@@ -260,3 +358,33 @@ async def retry_download_task(
 
     background_tasks.add_task(run_download_task, task.id, current_user.id)
     return DownloadTaskRead.model_validate(task)
+
+
+@router.delete("/download-tasks/{task_id}", response_model=dict)
+async def delete_download_task(
+    task_id: int,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> dict:
+    """Delete a failed download task and clean up its local file."""
+    # C-03: lock the row to prevent race condition between status check and delete
+    result = await db.execute(
+        select(DownloadTask)
+        .where(DownloadTask.id == task_id, DownloadTask.user_id == current_user.id)
+        .with_for_update()
+    )
+    task = result.scalar_one_or_none()
+    if task is None:
+        raise HTTPException(status_code=404, detail="下载任务不存在")
+    if task.status != DownloadStatus.FAILED:
+        raise HTTPException(status_code=400, detail="仅失败的任务可删除")
+
+    # Clean up local file if it exists
+    if task.local_path:
+        old_file = Path(task.local_path)
+        if old_file.is_file():
+            old_file.unlink(missing_ok=True)
+
+    await db.delete(task)
+    await db.commit()
+    return {"message": "已删除"}

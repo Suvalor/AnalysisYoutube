@@ -64,6 +64,11 @@ export async function submitDownload(payload: DownloadRequest): Promise<Download
 }
 
 /** List download tasks with optional status filter. */
+export async function deleteDownloadTaskApi(taskId: number): Promise<{ message: string }> {
+  const { data } = await apiClient.delete<{ message: string }>(`/api/downloads/download-tasks/${taskId}`);
+  return data;
+}
+
 export async function listDownloadTasks(params?: {
   status?: DownloadStatus;
   offset?: number;
@@ -76,6 +81,14 @@ export async function listDownloadTasks(params?: {
 /** Get a single download task by ID. */
 export async function getDownloadTask(taskId: number): Promise<DownloadTask> {
   const { data } = await apiClient.get<DownloadTask>(`/api/downloads/download-tasks/${taskId}`);
+  return data;
+}
+
+/** Request a short-lived play token for video playback (replaces JWT-in-URL). */
+export async function requestPlayToken(taskId: number): Promise<{ play_token: string }> {
+  const { data } = await apiClient.post<{ play_token: string }>(
+    `/api/downloads/download-tasks/${taskId}/play-token`
+  );
   return data;
 }
 

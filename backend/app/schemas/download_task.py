@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 
 from pydantic import BaseModel, Field, PrivateAttr, computed_field, model_validator
 
@@ -44,13 +43,16 @@ class DownloadTaskRead(BaseModel):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def has_file(self) -> bool:
-        """True when a local file exists for this task."""
+        """True when a local file path is recorded and task is completed.
+
+        Uses DB state (local_path + status) instead of filesystem I/O to avoid
+        blocking the event loop with synchronous Path.is_file() calls during
+        list serialization. The file-serving endpoint already checks
+        Path.is_file() and returns 404 if the file is missing from disk.
+        """
         if not self._local_path:
             return False
-        try:
-            return Path(self._local_path).is_file()
-        except (OSError, ValueError):
-            return False
+        return self.status == "COMPLETED"
 
     @model_validator(mode="after")
     def _sync_local_path(self) -> DownloadTaskRead:
