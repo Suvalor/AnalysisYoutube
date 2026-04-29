@@ -46,6 +46,8 @@ type TabState = {
   activeTabId: string | null;
   /** 固定标签 ID 集合（来自 navDefs 的标签不可被批量关闭） */
   pinnedTabIds: Set<string>;
+  /** 当 openTab 改变 activeTabId 时置 true，阻止 TabSync useEffect 回拉 URL */
+  _suppressNavigation: boolean;
   openTab: (tab: TabItem) => void;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
@@ -65,6 +67,7 @@ export const useTabStore = create<TabState>((set, get) => ({
   tabs: [],
   activeTabId: null,
   pinnedTabIds: new Set<string>(),
+  _suppressNavigation: false,
 
   registerPinnedIds: (ids) => {
     set({ pinnedTabIds: new Set(ids) });
@@ -98,17 +101,20 @@ export const useTabStore = create<TabState>((set, get) => ({
               }
             : t
         );
-        set({ tabs: nextTabs, activeTabId: mergedId });
+        // openTab 触发的 activeTabId 变化 → 设置 suppress 标志，阻止 TabSync 回拉 URL
+        set({ tabs: nextTabs, activeTabId: mergedId, _suppressNavigation: true });
         return;
       }
     }
 
     const idx = tabs.findIndex((t) => t.id === tab.id);
     if (idx >= 0) {
-      set({ activeTabId: tab.id });
+      // 标签已打开，仅激活；设置 suppress 防止 TabSync 回拉
+      set({ activeTabId: tab.id, _suppressNavigation: true });
       return;
     }
-    set({ tabs: [...tabs, tab], activeTabId: tab.id });
+    // 新标签 → 设置 suppress 防止 TabSync 回拉
+    set({ tabs: [...tabs, tab], activeTabId: tab.id, _suppressNavigation: true });
   },
 
   closeTab: (id) => {
@@ -123,7 +129,7 @@ export const useTabStore = create<TabState>((set, get) => ({
     set({ tabs: next, activeTabId: nextActive });
   },
 
-  setActiveTab: (id) => set({ activeTabId: id }),
+  setActiveTab: (id) => set({ activeTabId: id, _suppressNavigation: true }),
 
   closeLeftTabs: (id) => {
     const { tabs, activeTabId, pinnedTabIds } = get();

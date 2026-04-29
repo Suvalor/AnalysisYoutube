@@ -224,17 +224,21 @@ export default function TabbedShell() {
   }, [registerPinnedIds]);
 
   // 批量关闭后，若活跃标签已变则自动导航
-  // 仅在 activeTabId 变化时触发（不监听 location.pathname），
-  // 避免 navigate 到新路径后 activeTabId 尚未更新就被拉回旧路径（反复横跳）
+  // 当 openTab 改变 activeTabId 时（由 location useEffect 触发），
+  // _suppressNavigation 为 true，跳过导航以避免反复横跳
   useEffect(() => {
     if (!activeTabId) return;
+    // openTab 触发的 activeTabId 变化 → 不导航（location 已经是目标路径）
+    if (useTabStore.getState()._suppressNavigation) {
+      useTabStore.setState({ _suppressNavigation: false });
+      return;
+    }
     const activeTab = tabs.find((t) => t.id === activeTabId);
     // 只比较 pathname 部分，忽略 search params（tab.path 可能含 ?tab=xxx）
     if (activeTab && location.pathname !== activeTab.path.split("?")[0]) {
       navigate(activeTab.path);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在 activeTabId/tabs 变化时触发，不监听 location.pathname
-  }, [activeTabId, tabs, navigate]);
+  }, [activeTabId, tabs, navigate, location.pathname]);
 
   useEffect(() => {
     if (location.pathname === "/" || location.pathname === "") {
