@@ -26,6 +26,11 @@ export interface DownloadTask {
   error_message: string;
   file_size: number;
   progress: number;
+  video_channel_title: string | null;
+  video_published_at: string | null;
+  video_view_count: number | null;
+  video_like_count: number | null;
+  video_comment_count: number | null;
   created_at: string;
   updated_at: string;
 }
