@@ -199,14 +199,13 @@ async def create_mix_task_endpoint(
     current_user: CurrentUserDep,
 ) -> dict:
     """Submit a video mix task. Returns immediately; processing runs in background."""
-    if payload.narration_text is None and payload.audio_file_id is None:
-        raise HTTPException(status_code=400, detail="必须提供 narration_text 或 audio_file_id")
+    audio_type = "tts" if payload.narration_text else ("file" if payload.audio_file_id else "none")
 
     row = await create_mix_task(
         db,
         user_id=current_user.id,
         source_video_ids=payload.video_ids,
-        audio_source_type="tts" if payload.narration_text else "file",
+        audio_source_type=audio_type,
         audio_source_ref=payload.narration_text or payload.audio_file_id or "",
         aspect_ratio=payload.aspect_ratio,
         use_highlights=payload.use_highlights,

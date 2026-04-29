@@ -56,15 +56,15 @@ def _is_safe_path(path_str: str) -> bool:
     return False
 
 
-async def _resolve_video_path(db: AsyncSession, user_id: int, vid_id: int) -> str | None:
+async def _resolve_video_path(db: AsyncSession, user_id: int, vid_id: str) -> str | None:
     """Resolve a video ID to a local file path via DownloadTask."""
     from app.models.download_task import DownloadTask, DownloadStatus
 
-    # First try: vid_id as DownloadTask.id
+    # First try: vid_id as YouTube video_id string
     result = await db.execute(
         select(DownloadTask).where(
-            DownloadTask.id == vid_id,
             DownloadTask.user_id == user_id,
+            DownloadTask.video_id == vid_id,
             DownloadTask.status == DownloadStatus.COMPLETED,
         )
     )
@@ -72,15 +72,21 @@ async def _resolve_video_path(db: AsyncSession, user_id: int, vid_id: int) -> st
     if dt and dt.local_path and _is_safe_path(dt.local_path):
         return dt.local_path
 
-    # Second try: vid_id as youtube_video_id — find any completed download
-    result = await db.execute(
-        select(DownloadTask).where(
-            DownloadTask.user_id == user_id,
-            DownloadTask.status == DownloadStatus.COMPLETED,
+    # Second try: vid_id as integer DownloadTask.id (if it's numeric)
+    try:
+        int_id = int(vid_id)
+    except (ValueError, TypeError):
+        pass
+    else:
+        result = await db.execute(
+            select(DownloadTask).where(
+                DownloadTask.id == int_id,
+                DownloadTask.user_id == user_id,
+                DownloadTask.status == DownloadStatus.COMPLETED,
+            )
         )
-    )
-    for dt in result.scalars().all():
-        if str(vid_id) == str(dt.video_id) and dt.local_path and _is_safe_path(dt.local_path):
+        dt = result.scalar_one_or_none()
+        if dt and dt.local_path and _is_safe_path(dt.local_path):
             return dt.local_path
 
     # Third try: check AssetLibrary if it exists
@@ -104,6 +110,25 @@ async def _resolve_video_path(db: AsyncSession, user_id: int, vid_id: int) -> st
 
 async def _resolve_audio(db: AsyncSession, user_id: int, task: MixTask) -> str | None:
     """Resolve audio source to a local file path."""
+    if task.audio_source_type == "none":
+        # No audio source specified — generate silent audio via ffmpeg
+        import subprocess
+        import tempfile
+        tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False, dir=str(MIX_OUTPUT_DIR))
+        tmp.close()
+        try:
+            subprocess.run(
+                ["ffmpeg", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono",
+                 "-t", "30", "-q:a", "9", "-acodec", "libmp3lame",
+                 tmp.name, "-y"],
+                capture_output=True, check=True, timeout=30,
+            )
+            return tmp.name
+        except Exception as exc:
+            logger.warning("Failed to create silent audio: %s", exc)
+            Path(tmp.name).unlink(missing_ok=True)
+            return None
+
     if task.audio_source_type == "file" and task.audio_source_ref:
         try:
             audio_id = int(task.audio_source_ref)

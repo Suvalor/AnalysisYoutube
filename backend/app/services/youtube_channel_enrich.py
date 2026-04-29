@@ -272,10 +272,12 @@ async def run_channel_detail_ai_analysis(
     """
     博主详情页：使用配置中心模型（解密 Key + Base URL）与可选智能体 Prompt，调用 LLM 后写入频道字段并插入 insights 历史。
     """
+    # 第1步：从配置中心获取用户指定的模型库配置（API Key、Base URL 等）
     ml = await get_by_user(session, ModelLibrary, user_id, model_library_id)
     if ml is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模型配置不存在或无权访问")
 
+    # 第2步：解密 API Key 并校验 Base URL 是否存在
     api_key = try_decrypt(ml.api_key_encrypted)
     base_url = (ml.api_base_url or "").strip().rstrip("/")
     if not api_key or not base_url:
@@ -284,11 +286,13 @@ async def run_channel_detail_ai_analysis(
             detail="该模型配置缺少 API Key 或 Base URL，请在配置中心补全",
         )
 
+    # 第3步：校验用户指定的模型名是否在该模型库的支持列表中
     name = llm_model_name.strip()
     if not name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="模型名不能为空")
     _ensure_llm_allowed_for_library(ml, name)
 
+    # 第4步：若指定了智能体（agent_id），则加载智能体的 Prompt 内容作为系统提示词前缀
     agent_prepend: str | None = None
     if agent_id is not None:
         pl = await get_by_user(session, PromptLibrary, user_id, agent_id)
@@ -296,7 +300,10 @@ async def run_channel_detail_ai_analysis(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="智能体不存在或无权访问")
         agent_prepend = pl.content
 
+    # 第5步：加载频道上下文数据——播放量 Top10 视频标题、合并视频标签、点赞 Top20 评论
     top_video_titles, merged_tags, hot_comments = await load_channel_ai_context(session, channel)
+
+    # 第6步：将频道信息与上下文组装成 LLM 对话消息列表（system + user）
     messages = build_channel_ai_messages(
         channel_title=channel.title,
         channel_description=channel.description,
@@ -306,6 +313,7 @@ async def run_channel_detail_ai_analysis(
         agent_system_prepend=agent_prepend,
     )
 
+    # 第7步：构建 LLM 客户端配置（API Key、Base URL、模型名、协议）
     factory = LLMClientFactory()
     protocol = (ml.protocol or "anthropic").strip()
     cfg = LLMClientConfig(
@@ -315,6 +323,7 @@ async def run_channel_detail_ai_analysis(
         protocol=protocol,
     )
 
+    # 第8步：从消息列表中提取 system_prompt 和 user_prompt，用于调用 LLM
     system_prompt = ""
     user_prompt = ""
     for msg in messages:
@@ -325,6 +334,7 @@ async def run_channel_detail_ai_analysis(
         elif role == "user":
             user_prompt = content
 
+    # 第9步：调用 LLM 获取 AI 分析结果（非流式），失败则返回 502
     try:
         raw_content = await factory.chat_completions_content(
             cfg=cfg,
@@ -340,6 +350,7 @@ async def run_channel_detail_ai_analysis(
             detail="AI 分析调用失败，请稍后重试",
         ) from exc
 
+    # 第10步：从 LLM 原始返回文本中提取 JSON 对象，格式异常则返回 502
     try:
         parsed = _extract_json_object(raw_content)
     except Exception as exc:
@@ -348,13 +359,16 @@ async def run_channel_detail_ai_analysis(
             detail="AI 返回格式异常，请重试或调整提示词",
         ) from exc
 
+    # 第11步：解析 JSON 为结构化字段（tags、expertise、age_group、summary）
     ai_result = _parse_insight_result(parsed)
 
+    # 第12步：提取各字段并设置默认值
     tags = list(ai_result["tags"]) if isinstance(ai_result.get("tags"), list) else []
     expertise = str(ai_result.get("expertise") or "")
     age_group = str(ai_result.get("age_group") or "未标注")
     summary = str(ai_result.get("summary") or "")
 
+    # 第13步：将 AI 分析结果写入频道主表（ai_tags / ai_audience_age / ai_summary / ai_expertise）
     analyzed_at = datetime.now(timezone.utc)
     await update_channel_ai_insight(
         session,
@@ -364,12 +378,14 @@ async def run_channel_detail_ai_analysis(
         ai_summary=summary,
         ai_expertise=expertise,
     )
+    # 第14步：记录本次分析使用的模型、智能体等元信息到频道主表
     channel.ai_analyzed_at = analyzed_at
     channel.ai_source_model_library_id = model_library_id
     channel.ai_source_llm_model_name = name
     channel.ai_source_agent_id = agent_id
     await session.flush()
 
+    # 第15步：插入一条 insight 历史记录，用于追踪每次 AI 分析的完整快照
     await create_youtube_channel_insight(
         session,
         channel_id=channel.id,
@@ -383,6 +399,7 @@ async def run_channel_detail_ai_analysis(
         ai_summary=summary,
     )
 
+    # 第16步：返回结构化分析结果给前端
     return {
         "tags": tags,
         "expertise": expertise,
