@@ -11,6 +11,7 @@ import {
   type DownloadTask,
   type DownloadStatus,
 } from "@/services/downloadApi";
+import { authFetch } from "@/services/apiClient";
 import { formatNumber } from "@/utils/format";
 
 dayjs.extend(relativeTime);
@@ -38,6 +39,8 @@ export default function DownloadList() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [playingTaskId, setPlayingTaskId] = useState<number | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
   const [retryingIds, setRetryingIds] = useState<Set<number>>(new Set());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -110,6 +113,29 @@ export default function DownloadList() {
         return next;
       });
     }
+  };
+
+  const handlePlay = async (taskId: number) => {
+    setPlayingTaskId(taskId);
+    setVideoLoading(true);
+    setVideoUrl(null);
+    try {
+      const resp = await authFetch(getDownloadFileUrl(taskId));
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const blob = await resp.blob();
+      setVideoUrl(URL.createObjectURL(blob));
+    } catch {
+      message.error("视频加载失败");
+      setPlayingTaskId(null);
+    } finally {
+      setVideoLoading(false);
+    }
+  };
+
+  const handleClosePlayer = () => {
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+    setVideoUrl(null);
+    setPlayingTaskId(null);
   };
 
   const columns: ColumnsType<DownloadTask> = [
@@ -217,7 +243,7 @@ export default function DownloadList() {
                 type="text"
                 size="small"
                 icon={<PlayCircleOutlined />}
-                onClick={() => setPlayingTaskId(record.id)}
+                onClick={() => void handlePlay(record.id)}
               />
             </Tooltip>
           )}
@@ -303,14 +329,19 @@ export default function DownloadList() {
       <Modal
         open={playingTaskId !== null}
         title={playingTask ? `播放视频 - ${playingTask.video_title ?? playingTask.video_id}` : "播放视频"}
-        onCancel={() => setPlayingTaskId(null)}
+        onCancel={handleClosePlayer}
         footer={null}
         width={800}
         destroyOnClose
       >
-        {playingTask && (
+        {videoLoading && (
+          <div className="flex items-center justify-center" style={{ height: 300 }}>
+            <Spin tip="视频加载中..." />
+          </div>
+        )}
+        {videoUrl && (
           <video
-            src={getDownloadFileUrl(playingTask.id)}
+            src={videoUrl}
             controls
             autoPlay
             style={{ width: "100%", maxHeight: "70vh", borderRadius: 8 }}

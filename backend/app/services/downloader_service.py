@@ -113,11 +113,13 @@ def download_youtube_video(
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+            info = ydl.extract_info(url, download=True)
+            video_title = info.get("title") if info else None
+            thumbnail_url = info.get("thumbnail") if info else None
     except yt_dlp.utils.DownloadError as exc:
         raise RuntimeError(f"下载失败 video_id={video_id}: {exc}") from exc
 
-    return str(output_path.resolve())
+    return str(output_path.resolve()), video_title, thumbnail_url
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +187,7 @@ async def run_download_task(task_id: int, user_id: int) -> None:
             flush_handle = asyncio.ensure_future(_flush_progress())
 
             # Run blocking yt-dlp download in a thread to avoid freezing the event loop.
-            local_path = await asyncio.to_thread(
+            local_path, yt_title, yt_thumbnail = await asyncio.to_thread(
                 download_youtube_video, task.video_id, _progress_cb,
             )
 
@@ -204,6 +206,11 @@ async def run_download_task(task_id: int, user_id: int) -> None:
             task.local_path = local_path
             task.file_size = file_size
             task.progress = 100.0
+            # Save video metadata from yt-dlp if not already present.
+            if yt_title and not task.video_title:
+                task.video_title = yt_title
+            if yt_thumbnail and not task.thumbnail_url:
+                task.thumbnail_url = yt_thumbnail
             await db.commit()
 
         except Exception as exc:

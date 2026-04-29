@@ -173,7 +173,7 @@ async def get_download_task(
     )
     row = vid_row.first()
     if row:
-        v_title, thumb, pub, views, likes, comments, ch_title = row._asdict() if hasattr(row, '_asdict') else row
+        v_title, thumb, pub, views, likes, comments, ch_title = row[0], row[1], row[2], row[3], row[4], row[5], row[6]
         if not d.video_title and v_title:
             d.video_title = v_title
         if not d.thumbnail_url and thumb:
