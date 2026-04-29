@@ -3,8 +3,7 @@ import { Button, Checkbox, DatePicker, Input, InputNumber, Modal, Pagination, Se
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { Eye, MessageCircle, ThumbsUp } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { listYouTubeChannelsApi, listYouTubeVideosAllApi, scrapeVideoCommentsApi, batchCheckVideoAnalysisApi, type VideoListItem, type BatchAnalysisStatusItem } from "@/services/authApi";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
 import { analyzeYouTubeVideoApi, getYouTubeVideoAnalysisApi, extractVideoHighlightsApi, getVideoHighlightsApi, type YouTubeVideoAnalysisResponse, type VideoHighlight } from "@/services/videosApi";
@@ -86,10 +85,6 @@ function toModelOptions(rows: ModelItem[]): ModelOption[] {
 }
 
 export default function GlobalVideoList() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const highlightYtVideoId = searchParams.get("video_id");
-  const highlightRef = useRef<HTMLDivElement>(null);
-
   const [videos, setVideos] = useState<VideoListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -258,22 +253,8 @@ export default function GlobalVideoList() {
 
   useEffect(() => {
     void loadVideos(1, 20, filters);
-    // 仅首次挂载拉取；后续由筛选按钮或分页触发
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Scroll to highlighted video when navigating from DownloadList
-  useEffect(() => {
-    if (!highlightYtVideoId || loading || videos.length === 0) return;
-    const found = videos.find((v) => v.yt_video_id === highlightYtVideoId);
-    if (found) {
-      setTimeout(() => {
-        highlightRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-        // Clear the query param after scrolling
-        setSearchParams({}, { replace: true });
-      }, 100);
-    }
-  }, [highlightYtVideoId, videos, loading, setSearchParams]);
 
   const openScrape = (videoId: number) => {
     setScrapeVideoId(videoId);
@@ -500,8 +481,7 @@ export default function GlobalVideoList() {
             return (
               <div
                 key={video.id}
-                ref={highlightYtVideoId && video.yt_video_id === highlightYtVideoId ? highlightRef : undefined}
-                className={`bg-white border rounded-lg p-3 shadow-sm relative ${selectedVideoIds.has(video.yt_video_id) ? 'border-blue-400 ring-2 ring-blue-400' : highlightYtVideoId && video.yt_video_id === highlightYtVideoId ? 'border-amber-400 ring-2 ring-amber-300' : 'border-slate-200'}`}
+                className={`bg-white border rounded-lg p-3 shadow-sm relative ${selectedVideoIds.has(video.yt_video_id) ? 'border-blue-400 ring-2 ring-blue-400' : 'border-slate-200'}`}
               >
                 <div className="absolute top-2 left-2 z-10">
                   <Checkbox

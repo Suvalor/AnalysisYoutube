@@ -1,10 +1,8 @@
-import { CloudDownloadOutlined, DeleteOutlined, PlayCircleOutlined, RedoOutlined, ReloadOutlined } from "@ant-design/icons";
-import { Button, Modal, Progress, Select, Space, Spin, Table, Tag, Tooltip, message } from "antd";
-import type { ColumnsType } from "antd/es/table";
+import { CloudDownloadOutlined, PlayCircleOutlined, RedoOutlined, ReloadOutlined } from "@ant-design/icons";
+import { Button, Modal, Progress, Select, Space, Tag, Tooltip, message } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   listDownloadTasks,
   getDownloadFileUrl,
@@ -12,7 +10,6 @@ import {
   type DownloadTask,
   type DownloadStatus,
 } from "@/services/downloadApi";
-import { useTabStore } from "@/store/useTabStore";
 
 dayjs.extend(relativeTime);
 
@@ -41,8 +38,6 @@ export default function DownloadList() {
   const [playingTaskId, setPlayingTaskId] = useState<number | null>(null);
   const [retryingIds, setRetryingIds] = useState<Set<number>>(new Set());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const navigate = useNavigate();
-  const openTab = useTabStore((s) => s.openTab);
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
@@ -115,132 +110,6 @@ export default function DownloadList() {
     }
   };
 
-  const handleRowClick = (record: DownloadTask) => {
-    openTab({
-      id: "global-videos",
-      title: "全局视频",
-      path: "/global-videos",
-      type: "global-videos",
-    });
-    navigate(`/global-videos?video_id=${record.video_id}`);
-  };
-
-  const columns: ColumnsType<DownloadTask> = [
-    {
-      title: "视频",
-      key: "video",
-      width: 320,
-      render: (_: unknown, record: DownloadTask) => (
-        <div className="flex items-center gap-3">
-          {record.thumbnail_url ? (
-            <img
-              src={record.thumbnail_url}
-              alt=""
-              className="w-24 h-14 object-cover rounded shrink-0"
-            />
-          ) : (
-            <div className="w-24 h-14 bg-slate-100 rounded shrink-0 flex items-center justify-center text-slate-400 text-xs">
-              无缩略图
-            </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-slate-900 truncate" title={record.video_title ?? undefined}>
-              {record.video_title || record.video_id}
-            </div>
-            <a
-              href={`https://www.youtube.com/watch?v=${record.video_id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-slate-400 hover:text-blue-500"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {record.video_id}
-            </a>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: "状态",
-      dataIndex: "status",
-      key: "status",
-      width: 100,
-      render: (status: DownloadStatus) => {
-        const cfg = STATUS_CONFIG[status];
-        return <Tag color={cfg.color}>{cfg.label}</Tag>;
-      },
-    },
-    {
-      title: "进度",
-      dataIndex: "progress",
-      key: "progress",
-      width: 180,
-      render: (progress: number, record: DownloadTask) => {
-        if (record.status === "COMPLETED") return <Progress percent={100} size="small" />;
-        if (record.status === "FAILED") return <Progress percent={progress} status="exception" size="small" />;
-        if (record.status === "PENDING") return <Progress percent={0} size="small" />;
-        return <Progress percent={Math.round(progress)} size="small" />;
-      },
-    },
-    {
-      title: "文件大小",
-      dataIndex: "file_size",
-      key: "file_size",
-      width: 110,
-      render: (size: number) => formatFileSize(size),
-    },
-    {
-      title: "时间",
-      dataIndex: "created_at",
-      key: "created_at",
-      width: 140,
-      render: (t: string) => dayjs(t).fromNow(),
-    },
-    {
-      title: "操作",
-      key: "actions",
-      width: 160,
-      render: (_: unknown, record: DownloadTask) => (
-        <Space size="small">
-          {record.status === "COMPLETED" && record.has_file && (
-            <Tooltip title="播放视频">
-              <Button
-                type="text"
-                size="small"
-                icon={<PlayCircleOutlined />}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setPlayingTaskId(record.id);
-                }}
-              />
-            </Tooltip>
-          )}
-          {record.status === "FAILED" && (
-            <>
-              <Tooltip title="重试下载">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<RedoOutlined />}
-                  loading={retryingIds.has(record.id)}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void handleRetry(record.id);
-                  }}
-                />
-              </Tooltip>
-              <Tooltip title={record.error_message}>
-                <Tag color="error" style={{ cursor: "help", maxWidth: 120 }} className="truncate">
-                  错误
-                </Tag>
-              </Tooltip>
-            </>
-          )}
-        </Space>
-      ),
-    },
-  ];
-
   const playingTask = tasks.find((t) => t.id === playingTaskId);
 
   return (
@@ -274,31 +143,149 @@ export default function DownloadList() {
         </Space>
       </div>
 
-      {/* Table */}
-      <Spin spinning={loading}>
-        <Table
-          dataSource={tasks}
-          columns={columns}
-          rowKey="id"
-          size="small"
-          onRow={(record) => ({
-            onClick: () => handleRowClick(record),
-            style: { cursor: "pointer" },
-          })}
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            showTotal: (t) => `共 ${t} 条`,
-            onChange: (p, ps) => {
-              setPage(p);
-              setPageSize(ps);
-            },
-          }}
-          style={{ flex: 1 }}
-        />
-      </Spin>
+      {/* Card Grid */}
+      <div className="flex-1 overflow-auto">
+        {loading && tasks.length === 0 ? (
+          <div className="flex items-center justify-center py-20 text-slate-400">加载中...</div>
+        ) : tasks.length === 0 ? (
+          <div className="flex items-center justify-center py-20 text-slate-400">暂无下载任务</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {tasks.map((task) => {
+              const cfg = STATUS_CONFIG[task.status];
+              return (
+                <div
+                  key={task.id}
+                  className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden"
+                >
+                  {/* Thumbnail */}
+                  <div className="relative aspect-video bg-slate-100">
+                    {task.thumbnail_url ? (
+                      <img
+                        src={task.thumbnail_url}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">
+                        无缩略图
+                      </div>
+                    )}
+                    {/* Status badge on thumbnail */}
+                    <Tag color={cfg.color} className="absolute top-2 left-2 m-0">
+                      {cfg.label}
+                    </Tag>
+                    {/* Play overlay for completed tasks */}
+                    {task.status === "COMPLETED" && task.has_file && (
+                      <button
+                        className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors group"
+                        onClick={() => setPlayingTaskId(task.id)}
+                      >
+                        <PlayCircleOutlined className="text-white text-3xl opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="p-3">
+                    <div
+                      className="text-sm font-medium text-slate-900 line-clamp-2 mb-2"
+                      title={task.video_title ?? undefined}
+                    >
+                      {task.video_title || task.video_id}
+                    </div>
+
+                    {/* Progress bar */}
+                    {task.status !== "COMPLETED" && (
+                      <Progress
+                        percent={task.status === "PENDING" ? 0 : Math.round(task.progress)}
+                        status={task.status === "FAILED" ? "exception" : "active"}
+                        size="small"
+                        className="mb-2"
+                      />
+                    )}
+
+                    {/* Meta row */}
+                    <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+                      <span>{formatFileSize(task.file_size)}</span>
+                      <span>{dayjs(task.created_at).fromNow()}</span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {task.status === "COMPLETED" && task.has_file && (
+                        <Tooltip title="播放视频">
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<PlayCircleOutlined />}
+                            onClick={() => setPlayingTaskId(task.id)}
+                          />
+                        </Tooltip>
+                      )}
+                      {task.status === "FAILED" && (
+                        <>
+                          <Tooltip title="重试下载">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<RedoOutlined />}
+                              loading={retryingIds.has(task.id)}
+                              onClick={() => void handleRetry(task.id)}
+                            />
+                          </Tooltip>
+                          <Tooltip title={task.error_message}>
+                            <Tag color="error" style={{ cursor: "help", maxWidth: 120 }} className="truncate text-xs">
+                              错误
+                            </Tag>
+                          </Tooltip>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {total > 0 && (
+          <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
+            <span className="text-sm text-slate-400">共 {total} 条</span>
+            <Space>
+              <Button
+                size="small"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                上一页
+              </Button>
+              <span className="text-sm text-slate-500">
+                {page} / {Math.max(1, Math.ceil(total / pageSize))}
+              </span>
+              <Button
+                size="small"
+                disabled={page >= Math.ceil(total / pageSize)}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                下一页
+              </Button>
+              <Select
+                size="small"
+                value={pageSize}
+                onChange={(v) => { setPageSize(v); setPage(1); }}
+                options={[
+                  { value: 12, label: "12 条/页" },
+                  { value: 20, label: "20 条/页" },
+                  { value: 40, label: "40 条/页" },
+                ]}
+                style={{ width: 110 }}
+              />
+            </Space>
+          </div>
+        )}
+      </div>
 
       {/* Video Player Modal */}
       <Modal
