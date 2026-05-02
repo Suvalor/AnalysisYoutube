@@ -151,7 +151,7 @@ export default function LoginPage() {
         </Form.Item>
         <Form.Item>
           <div className="flex items-center justify-between">
-            <Checkbox
+            <Checkbox className="text-slate-400 text-sm"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
             >

@@ -157,9 +157,9 @@ function parseModelNames(supportedModelsJson: string | null | undefined): ModelN
 }
 
 function matchScoreColor(score: number): string {
-  if (score >= 80) return "#22c55e";
-  if (score >= 50) return "#f59e0b";
-  return "#ef4444";
+  if (score >= 80) return "var(--color-success)";
+  if (score >= 50) return "var(--color-warning)";
+  return "var(--color-danger)";
 }
 
 /** 配额仪表盘 */
@@ -184,11 +184,11 @@ function QuotaDashboardCard({ quotaCheck }: { quotaCheck: QuotaCheckInfo | null 
   const isLow = remaining < total * 0.2;
 
   return (
-    <Card className="!bg-white !border-slate-200 !shadow-sm" title="API 配额仪表盘" size="small">
+    <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm" title="API 配额仪表盘" size="small">
       <div className="grid grid-cols-3 gap-4 mb-3">
         <Statistic title="今日总量" value={total.toLocaleString()} />
         <Statistic title="已用" value={used.toLocaleString()} />
-        <Statistic title="剩余" value={remaining.toLocaleString()} valueStyle={{ color: isLow ? "#cf1322" : "#3f8600" }} />
+        <Statistic title="剩余" value={remaining.toLocaleString()} valueStyle={{ color: isLow ? "var(--color-danger)" : "var(--color-success)" }} />
       </div>
       <Progress percent={pct} status={isLow ? "exception" : "normal"} format={(p) => `${p}%`} />
       {isLow && <Text type="danger" className="block mt-2"><WarningOutlined /> 配额不足 20%</Text>}
@@ -199,7 +199,7 @@ function QuotaDashboardCard({ quotaCheck }: { quotaCheck: QuotaCheckInfo | null 
 /** 配额消耗明细 */
 function QuotaBreakdown({ usage }: { usage: NavigationQuotaUsage }) {
   return (
-    <div className="text-sm text-slate-600 space-y-1">
+    <div className="text-sm text-yc-text-secondary space-y-1">
       <div>search.list × {usage.search_calls} (100点/次) = {usage.search_calls * 100} 点</div>
       <div>channels.list × {usage.channels_calls} (1点/次) = {usage.channels_calls} 点</div>
       <div className="font-medium border-t pt-1 mt-1">本次合计：{usage.total_points} 点</div>
@@ -213,7 +213,7 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
 
   return (
     <Card
-      className={`!border-slate-200 !shadow-sm hover:!shadow-md transition-shadow duration-200 ${isHighGrowth ? "!border-amber-200 !bg-amber-50/30" : ""}`}
+      className={`!border-yc-border !shadow-sm hover:!shadow-md transition-shadow duration-200 ${isHighGrowth ? "!border-yc-warning !bg-yc-warning-bg/30" : ""}`}
       bodyStyle={{ padding: 24 }}
     >
       {/* 顶部：品类名称 + 匹配度进度条 */}
@@ -221,11 +221,11 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
         <div className="flex-1 mr-4">
           <div className="flex items-center gap-2 mb-1">
             {isHighGrowth && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yc-warning-bg text-yc-warning">
                 <RocketOutlined className="mr-1" />高增长潜力
               </span>
             )}
-            <Title level={4} style={{ margin: 0, color: "#0f172a" }}>{rec.niche_title}</Title>
+            <Title level={4} style={{ margin: 0, color: "var(--color-text-primary)" }}>{rec.niche_title}</Title>
           </div>
         </div>
         <div className="flex-shrink-0 w-28">
@@ -236,7 +236,7 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
             strokeColor={matchScoreColor(rec.match_score)}
             format={(p) => <span className="text-sm font-semibold">{p}</span>}
           />
-          <div className="text-center text-xs text-slate-500 mt-1">匹配度</div>
+          <div className="text-center text-xs text-yc-text-tertiary mt-1">匹配度</div>
         </div>
       </div>
 
@@ -246,34 +246,34 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
           <Text type="secondary" className="text-xs uppercase tracking-wider">市场热度</Text>
           <div className="flex items-center gap-2 mt-1">
             <Rate disabled value={rec.market_heat_stars} className="!text-sm" />
-            <span className="text-sm text-slate-600">{rec.market_heat_desc}</span>
+            <span className="text-sm text-yc-text-secondary">{rec.market_heat_desc}</span>
           </div>
         </div>
         <div>
           <Text type="secondary" className="text-xs uppercase tracking-wider">竞争强度</Text>
           <div className="flex items-center gap-2 mt-1">
             <Rate disabled value={rec.competition_stars} className="!text-sm" />
-            <span className="text-sm text-slate-600">{rec.competition_desc}</span>
+            <span className="text-sm text-yc-text-secondary">{rec.competition_desc}</span>
           </div>
         </div>
         <div>
           <Text type="secondary" className="text-xs uppercase tracking-wider">内容缺口</Text>
-          <div className="text-sm text-slate-700 mt-1">{rec.content_gap}</div>
+          <div className="text-sm text-yc-text-primary mt-1">{rec.content_gap}</div>
         </div>
         <div>
           <Text type="secondary" className="text-xs uppercase tracking-wider">预估冷启动期</Text>
-          <div className="text-sm text-slate-700 mt-1">{rec.cold_start_period}</div>
+          <div className="text-sm text-yc-text-primary mt-1">{rec.cold_start_period}</div>
         </div>
         <div>
           <Text type="secondary" className="text-xs uppercase tracking-wider">对标频道</Text>
-          <div className="text-sm text-slate-700 mt-1">{rec.target_channel_example}</div>
+          <div className="text-sm text-yc-text-primary mt-1">{rec.target_channel_example}</div>
         </div>
         {rec.estimated_monthly_income && (
           <div>
             <Text type="secondary" className="text-xs uppercase tracking-wider">
               <DollarOutlined className="mr-1" />预估月收入
             </Text>
-            <div className="text-base font-semibold text-emerald-600 mt-1">{rec.estimated_monthly_income}</div>
+            <div className="text-base font-semibold text-yc-success mt-1">{rec.estimated_monthly_income}</div>
           </div>
         )}
       </div>
@@ -289,10 +289,10 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
               color: "blue",
               children: (
                 <div>
-                  <div className="text-sm font-medium text-slate-800">
+                  <div className="text-sm font-medium text-yc-text-primary">
                     Day {step.day_range}：{step.task}
                   </div>
-                  <div className="text-xs text-slate-500 mt-0.5">预期：{step.expected_result}</div>
+                  <div className="text-xs text-yc-text-tertiary mt-0.5">预期：{step.expected_result}</div>
                 </div>
               ),
             }))}
@@ -301,9 +301,9 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
       )}
 
       {/* 执行建议 */}
-      <div className="bg-slate-50 rounded-lg p-4 mb-5">
+      <div className="bg-yc-bg-inset rounded-lg p-4 mb-5">
         <Text type="secondary" className="text-xs uppercase tracking-wider block mb-1">执行建议</Text>
-        <Paragraph className="!mb-0 text-sm text-slate-800 leading-relaxed">{rec.action_advice}</Paragraph>
+        <Paragraph className="!mb-0 text-sm text-yc-text-primary leading-relaxed">{rec.action_advice}</Paragraph>
       </div>
 
       {/* CTA：一键导入蓝海雷达 */}
@@ -322,15 +322,15 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
 /** 避坑卡片 — 精致警告色调 */
 function AvoidNicheCard({ avoid }: { avoid: AvoidNiche }) {
   return (
-    <Card className="!border-red-200 !bg-gradient-to-r !from-red-50 !to-orange-50 !shadow-sm" bodyStyle={{ padding: 20 }}>
+    <Card className="!border-yc-danger !bg-yc-danger-bg/30 !shadow-sm" bodyStyle={{ padding: 20 }}>
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
-          <WarningOutlined style={{ color: "#dc2626", fontSize: 16 }} />
+        <div className="w-8 h-8 rounded-full bg-yc-danger-bg flex items-center justify-center">
+          <WarningOutlined style={{ color: "var(--color-danger)", fontSize: 16 }} />
         </div>
-        <Title level={5} style={{ margin: 0, color: "#dc2626" }}>避坑提示</Title>
+        <Title level={5} style={{ margin: 0, color: "var(--color-danger)" }}>避坑提示</Title>
       </div>
-      <div className="text-base font-medium text-red-700 mb-1">{avoid.niche_title}</div>
-      <div className="text-sm text-red-600/80">{avoid.reason}</div>
+      <div className="text-base font-medium text-yc-danger mb-1">{avoid.niche_title}</div>
+      <div className="text-sm text-yc-danger/80">{avoid.reason}</div>
     </Card>
   );
 }
@@ -381,8 +381,8 @@ function ChatArea({
   if (!conversationId) return null;
 
   return (
-    <Card className="!bg-white !border-slate-200 !shadow-sm" bodyStyle={{ padding: 20 }}>
-      <Title level={5} style={{ color: "#0f172a", marginBottom: 12 }}>
+    <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm" bodyStyle={{ padding: 20 }}>
+      <Title level={5} style={{ color: "var(--color-text-primary)", marginBottom: 12 }}>
         <RobotOutlined className="mr-2" />追问 AI 分析师
       </Title>
       <Text type="secondary" className="text-xs block mb-3">
@@ -394,13 +394,13 @@ function ChatArea({
         <div ref={scrollRef} className="max-h-64 overflow-y-auto space-y-3 mb-4 pr-2">
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
-                  msg.role === "user"
-                    ? "bg-blue-500 text-white"
-                    : "bg-slate-100 text-slate-800"
-                }`}
-              >
+	              <div
+	                className={`max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
+	                  msg.role === "user"
+	                    ? "bg-yc-primary text-yc-text-inverse"
+	                    : "bg-yc-bg-inset text-yc-text-primary"
+	                }`}
+	              >
                 <span className="mr-1 opacity-60">
                   {msg.role === "user" ? <UserOutlined /> : <RobotOutlined />}
                 </span>
@@ -528,11 +528,11 @@ function RadarInlinePanel({
 
   return (
     <Card
-      className="!border-blue-200 !bg-blue-50/20 !shadow-md"
+      className="!border-yc-primary-border !bg-yc-primary-bg/20 !shadow-md"
       title={
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2">
-            <RadarChartOutlined style={{ color: "#3b82f6" }} />
+            <RadarChartOutlined style={{ color: "var(--color-primary)" }} />
             <span>蓝海雷达深度分析：{keyword}</span>
             {anyLoading && <Spin size="small" />}
           </span>
@@ -580,12 +580,12 @@ function RadarInlinePanel({
                       title="成功率"
                       value={(catOppResult.newcomer_stats.success_rate * 100).toFixed(1)}
                       suffix="%"
-                      valueStyle={{ color: catOppResult.newcomer_stats.success_rate > 0.2 ? "#3f8600" : "#cf1322" }}
+                      valueStyle={{ color: catOppResult.newcomer_stats.success_rate > 0.2 ? "var(--color-success)" : "var(--color-danger)" }}
                     />
                   </Col>
                 </Row>
                 {catOppResult.top_channels_growth.length > 0 && (
-                  <Card size="small" title="头部频道增速" className="!border-slate-200">
+                  <Card size="small" title="头部频道增速" className="!border-yc-border">
                     <Table
                       dataSource={catOppResult.top_channels_growth}
                       rowKey="channel_id"
@@ -601,7 +601,7 @@ function RadarInlinePanel({
                   </Card>
                 )}
                 {catOppResult.content_gaps.length > 0 && (
-                  <Card size="small" title="内容缺口" className="!border-slate-200">
+                  <Card size="small" title="内容缺口" className="!border-yc-border">
                     <Table
                       dataSource={catOppResult.content_gaps}
                       rowKey="duration_bucket"
@@ -643,7 +643,7 @@ function RadarInlinePanel({
                   ]}
                 />
                 {crossResult.ai_recommendation && (
-                  <Card size="small" title="AI 推荐" className="!border-slate-200">
+                  <Card size="small" title="AI 推荐" className="!border-yc-border">
                     <Text>{crossResult.ai_recommendation}</Text>
                   </Card>
                 )}
@@ -802,15 +802,15 @@ export default function NavigationGuide() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] p-6 md:p-10 text-slate-900">
+    <div className="min-h-screen bg-yc-bg-base p-6 md:p-10 text-yc-text-primary">
       <div className="max-w-5xl mx-auto space-y-6">
         <QuotaDashboardCard quotaCheck={quotaCheck} />
 
         {/* 页面标题 */}
         <div className="mb-2 flex items-start justify-between">
           <div>
-            <Title level={3} style={{ color: "#0f172a", marginBottom: 4 }}>出海导航</Title>
-            <Text style={{ color: "#64748b" }}>
+            <Title level={3} style={{ color: "var(--color-text-primary)", marginBottom: 4 }}>出海导航</Title>
+            <Text style={{ color: "var(--color-text-secondary)" }}>
               输入你的完整资源画像，AI 为你推演最适合的 YouTube 细分品类组合，并给出避坑建议。
             </Text>
           </div>
@@ -824,7 +824,7 @@ export default function NavigationGuide() {
         </div>
 
         {/* 表单 — 分组布局 */}
-        <Card className="!bg-white !border-slate-200 !shadow-sm" bodyStyle={{ padding: 24 }}>
+        <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm" bodyStyle={{ padding: 24 }}>
           <Form
             form={form}
             layout="vertical"
@@ -839,8 +839,8 @@ export default function NavigationGuide() {
           >
             {/* ── 基础画像 ── */}
             <div className="mb-2">
-              <Text strong className="text-sm text-slate-500 uppercase tracking-wider">基础画像</Text>
-              <div className="h-px bg-slate-200 mt-1 mb-4" />
+              <Text strong className="text-sm text-yc-text-tertiary uppercase tracking-wider">基础画像</Text>
+              <div className="h-px bg-yc-border-light mt-1 mb-4" />
             </div>
 
             <Form.Item name="languages" label="语言能力" rules={[{ required: true, message: "请选择至少一种语言" }]}>
@@ -855,8 +855,8 @@ export default function NavigationGuide() {
 
             {/* ── 个性化画像 ── */}
             <div className="mb-2 mt-6">
-              <Text strong className="text-sm text-slate-500 uppercase tracking-wider">个性化画像</Text>
-              <div className="h-px bg-slate-200 mt-1 mb-4" />
+              <Text strong className="text-sm text-yc-text-tertiary uppercase tracking-wider">个性化画像</Text>
+              <div className="h-px bg-yc-border-light mt-1 mb-4" />
             </div>
 
             <Form.Item
@@ -879,8 +879,8 @@ export default function NavigationGuide() {
 
             {/* ── 已有频道 ── */}
             <div className="mb-2 mt-6">
-              <Text strong className="text-sm text-slate-500 uppercase tracking-wider">已有频道（可选）</Text>
-              <div className="h-px bg-slate-200 mt-1 mb-4" />
+              <Text strong className="text-sm text-yc-text-tertiary uppercase tracking-wider">已有频道（可选）</Text>
+              <div className="h-px bg-yc-border-light mt-1 mb-4" />
             </div>
 
             <Form.Item
@@ -893,8 +893,8 @@ export default function NavigationGuide() {
 
             {/* ── AI 配置 ── */}
             <div className="mb-2 mt-6">
-              <Text strong className="text-sm text-slate-500 uppercase tracking-wider">AI 配置</Text>
-              <div className="h-px bg-slate-200 mt-1 mb-4" />
+              <Text strong className="text-sm text-yc-text-tertiary uppercase tracking-wider">AI 配置</Text>
+              <div className="h-px bg-yc-border-light mt-1 mb-4" />
             </div>
 
             <Space wrap className="w-full" size="large">
@@ -947,18 +947,18 @@ export default function NavigationGuide() {
 
         {/* 频道信息摘要 */}
         {!loading && channelInfo && (
-          <Card className="!bg-blue-50/50 !border-blue-200 !shadow-sm" size="small" bodyStyle={{ padding: 16 }}>
+          <Card className="!bg-yc-primary-bg/50 !border-yc-primary-border !shadow-sm" size="small" bodyStyle={{ padding: 16 }}>
             <div className="flex items-center gap-2 mb-1">
-              <Text strong className="text-sm text-blue-700">已识别频道</Text>
+              <Text strong className="text-sm text-yc-primary">已识别频道</Text>
             </div>
-            <div className="text-sm text-slate-700">
+            <div className="text-sm text-yc-text-primary">
               {String(channelInfo.title)} — {Number(channelInfo.subscriber_count).toLocaleString()} 订阅 · {Number(channelInfo.video_count)} 个视频
             </div>
           </Card>
         )}
 
         {!loading && aiSummary && (
-          <Card className="!bg-white !border-slate-200 !shadow-sm" bodyStyle={{ padding: 16 }}>
+          <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm" bodyStyle={{ padding: 16 }}>
             <Text>{aiSummary}</Text>
           </Card>
         )}
@@ -966,7 +966,7 @@ export default function NavigationGuide() {
         {/* 推荐结果 */}
         {!loading && recommendations.length > 0 && (
           <div className="space-y-5">
-            <Title level={4} style={{ color: "#0f172a" }}>推荐品类</Title>
+            <Title level={4} style={{ color: "var(--color-text-primary)" }}>推荐品类</Title>
             {recommendations.map((rec, i) => {
               const isExpanded = expandedRadarIndex === i;
               // 从 niche_title 提取关键词和地区
@@ -1018,7 +1018,7 @@ export default function NavigationGuide() {
 
         {/* 配额消耗明细 */}
         {!loading && quotaUsage && (
-          <Card className="!bg-white !border-slate-200 !shadow-sm" title="本次 API 消耗明细" size="small">
+          <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm" title="本次 API 消耗明细" size="small">
             <QuotaBreakdown usage={quotaUsage} />
           </Card>
         )}
@@ -1045,21 +1045,21 @@ export default function NavigationGuide() {
           ) : (
             <div className="space-y-5">
               {/* 请求参数摘要 */}
-              <Card size="small" title="推荐参数" className="!border-slate-200">
+              <Card size="small" title="推荐参数" className="!border-yc-border">
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div><Text type="secondary">语言：</Text>{(historyDetail.request_params.languages as string[])?.join("、") ?? "-"}</div>
                   <div><Text type="secondary">预算：</Text>{(historyDetail.request_params.budget_level as string) ?? "-"}</div>
                   <div><Text type="secondary">技能：</Text>{(historyDetail.request_params.core_skills as string[])?.join("、") ?? "-"}</div>
                   <div><Text type="secondary">形式：</Text>{(historyDetail.request_params.content_format as string[])?.join("、") ?? "-"}</div>
                 </div>
-                <div className="text-xs text-slate-400 mt-2">
+                <div className="text-xs text-yc-text-muted mt-2">
                   {new Date(historyDetail.created_at).toLocaleString("zh-CN")}
                 </div>
               </Card>
 
               {/* AI 摘要 */}
               {historyDetail.result.ai_summary && (
-                <Card size="small" className="!border-slate-200 !bg-slate-50">
+                <Card size="small" className="!border-yc-border !bg-yc-bg-inset">
                   <Text>{historyDetail.result.ai_summary}</Text>
                 </Card>
               )}
@@ -1093,15 +1093,15 @@ export default function NavigationGuide() {
                 {historyList.map((item) => (
                   <div
                     key={item.id}
-                    className="group rounded-lg border border-slate-200 p-3 hover:border-blue-300 hover:bg-blue-50/30 transition-all cursor-pointer"
+                    className="group rounded-lg border border-yc-border p-3 hover:border-yc-primary-border hover:bg-yc-primary-bg/30 transition-all cursor-pointer"
                     onClick={() => void viewRecordDetail(item.id)}
                   >
                     <div className="flex items-start justify-between mb-1">
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-slate-800 truncate">
+                        <div className="text-sm font-medium text-yc-text-primary truncate">
                           {item.top_niche_title ?? "推荐结果"}
                         </div>
-                        <div className="text-xs text-slate-500 mt-0.5">
+                        <div className="text-xs text-yc-text-tertiary mt-0.5">
                           {(item.request_params.core_skills as string[])?.join("、")}
                           {item.top_match_score != null && (
                             <Tag color="blue" className="ml-2">匹配度 {item.top_match_score}</Tag>
@@ -1137,7 +1137,7 @@ export default function NavigationGuide() {
                         </Popconfirm>
                       </div>
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-xs text-yc-text-muted">
                       {new Date(item.created_at).toLocaleString("zh-CN")}
                     </div>
                   </div>

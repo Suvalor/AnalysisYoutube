@@ -18,7 +18,7 @@ export default function MarkdownPreview({ children, className = "" }: Props) {
   const normalized = normalizeMarkdownForGfm(raw);
 
   return (
-    <div className={`markdown-body text-slate-800 text-sm leading-relaxed ${className}`.trim()}>
+    <div className={`markdown-preview markdown-body text-sm leading-relaxed ${className}`.trim()}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>{normalized}</ReactMarkdown>
     </div>
   );

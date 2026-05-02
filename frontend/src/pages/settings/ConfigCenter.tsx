@@ -626,7 +626,7 @@ export default function ConfigCenter() {
   return (
     <div className="p-4 md:p-6">
       <Spin spinning={loading}>
-        <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+        <div className="bg-yc-bg-card border border-yc-border rounded-lg p-4 shadow-sm">
           <Tabs
             activeKey={activeTab}
             onChange={(k) => {
@@ -685,7 +685,7 @@ export default function ConfigCenter() {
                 label: "云存储与外部 API",
                 children: (
                   <Spin spinning={integrationLoading}>
-                    <p className="text-slate-600 text-sm mb-3">
+                    <p className="text-yc-text-secondary text-sm mb-3">
                       配置归属组织：<strong>{integrationMeta?.org_name || "—"}</strong>
                       （org_id: {integrationMeta?.org_id ?? "—"}）。<strong>组织库内配置优先于环境变量</strong>
                       ；同组织成员共享。每页仅提交当前 Tab 的字段（增量合并）。请勿将接口返回的{" "}
@@ -871,10 +871,10 @@ export default function ConfigCenter() {
                                 </Button>
                               </div>
                               <Form form={cvForm} layout="vertical" disabled={integrationLoading}>
-                                <div className="text-slate-600 text-sm font-medium mb-2">
+                                <div className="text-yc-text-secondary text-sm font-medium mb-2">
                                   智能视觉 CV（去水印 / 图像修补）
                                 </div>
-                                <p className="text-slate-500 text-xs mb-2">
+                                <p className="text-yc-text-tertiary text-xs mb-2">
                                   AccessKey（ID）+ SecretAccessKey，用于火山 CV Img2ImgInpainting。
                                   配置后将优先于 OpenAI 兼容通道；未配置时可仅用「图像修复」模型库。
                                 </p>
@@ -913,8 +913,8 @@ export default function ConfigCenter() {
                                 >
                                   <Input placeholder="i2i_inpainting" />
                                 </Form.Item>
-                                <div className="text-slate-600 text-sm font-medium mt-4 mb-2">去水印（AI 修复）组织默认</div>
-                                <p className="text-slate-500 text-xs mb-2">
+                                <div className="text-yc-text-secondary text-sm font-medium mt-4 mb-2">去水印（AI 修复）组织默认</div>
+                                <p className="text-yc-text-tertiary text-xs mb-2">
                                   可选：在「模型管理」新增用途为「图像修复」的条目，填写 OpenAI 兼容 Base URL 与 images.edit 模型 ID。
                                   若已配置火山 CV，将优先走火山；否则走该条目。以下为提示词与视频帧数上限。
                                 </p>

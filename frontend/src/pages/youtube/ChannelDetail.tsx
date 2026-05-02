@@ -365,26 +365,26 @@ export default function ChannelDetail({ channelId }: Props) {
             </Button>
             <div className="flex items-center gap-2">
               <Youtube className="text-red-600" size={28} />
-              <h2 className="text-xl font-bold text-slate-900">{channel?.title ?? "…"}</h2>
+              <h2 className="text-xl font-bold text-yc-text-primary">{channel?.title ?? "…"}</h2>
             </div>
           </div>
 
-          <div className="border-2 border-red-500 rounded-lg p-4 bg-white shadow-sm max-w-3xl">
+          <div className="border-2 border-red-500 rounded-lg p-4 bg-yc-bg-card shadow-sm max-w-3xl">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
               <div>
-                <div className="text-xs text-slate-500">订阅数</div>
-                <div className="text-xl font-semibold text-slate-900">{formatNumber(channel?.subscriber_count ?? 0)}</div>
+                <div className="text-xs text-yc-text-secondary">订阅数</div>
+                <div className="text-xl font-semibold text-yc-text-primary">{formatNumber(channel?.subscriber_count ?? 0)}</div>
               </div>
               <div>
-                <div className="text-xs text-slate-500">总视频数</div>
-                <div className="text-xl font-semibold text-slate-900">{formatNumber(channel?.video_count ?? 0)}</div>
+                <div className="text-xs text-yc-text-secondary">总视频数</div>
+                <div className="text-xl font-semibold text-yc-text-primary">{formatNumber(channel?.video_count ?? 0)}</div>
               </div>
               <div>
-                <div className="text-xs text-slate-500">总播放量</div>
-                <div className="text-xl font-semibold text-slate-900">{formatNumber(channel?.total_views ?? 0)}</div>
+                <div className="text-xs text-yc-text-secondary">总播放量</div>
+                <div className="text-xl font-semibold text-yc-text-primary">{formatNumber(channel?.total_views ?? 0)}</div>
               </div>
             </div>
-            <div className="text-center text-xs text-slate-400 mt-3">
+            <div className="text-center text-xs text-yc-text-tertiary mt-3">
               数据更新：{hoursAgo !== null ? `${hoursAgo} 小时前` : "—"}
             </div>
           </div>
@@ -415,7 +415,7 @@ export default function ChannelDetail({ channelId }: Props) {
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+      <div className="bg-yc-bg-card border border-yc-border rounded-lg p-3 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
           <Input
             placeholder="搜索标题"
@@ -469,13 +469,13 @@ export default function ChannelDetail({ channelId }: Props) {
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+      <div className="bg-yc-bg-card border border-yc-border rounded-lg p-4 shadow-sm">
         <div className="flex items-center gap-2 mb-3">
-          <Sparkles size={18} className="text-violet-500" />
-          <div className="text-base font-semibold text-slate-900">AI 深度洞察 (AI Insight)</div>
+          <Sparkles size={18} className="text-yc-accent" />
+          <div className="text-base font-semibold text-yc-text-primary">AI 深度洞察 (AI Insight)</div>
         </div>
         {channel?.ai_analyzed_at ? (
-          <div className="text-xs text-slate-500 mb-3">
+          <div className="text-xs text-yc-text-secondary mb-3">
             最近分析时间：
             {dayjs(channel.ai_analyzed_at).format("YYYY-MM-DD HH:mm")}
             {channel.ai_source_llm_model_name ? ` · 模型：${channel.ai_source_llm_model_name}` : ""}
@@ -484,40 +484,40 @@ export default function ChannelDetail({ channelId }: Props) {
 
         {hasAiInsight ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
-            <div className="rounded-lg border border-slate-200 p-3">
-              <div className="text-sm font-medium text-slate-700 mb-2">核心标签</div>
+            <div className="rounded-lg border border-yc-border p-3">
+              <div className="text-sm font-medium text-yc-text-secondary mb-2">核心标签</div>
               <div className="flex flex-wrap gap-2">
                 {aiTags.length ? (
                   aiTags.map((tag, idx) => (
                     <Tag
                       key={`${tag}-${idx}`}
-                      className="!rounded-full !px-3 !py-0.5 !m-0 !border-transparent !text-white"
+                      className="!rounded-full !px-3 !py-0.5 !m-0 !border-transparent !text-yc-text-inverse"
                       color={["magenta", "purple", "blue", "cyan", "green"][idx % 5]}
                     >
                       {tag}
                     </Tag>
                   ))
                 ) : (
-                  <div className="text-slate-400 text-sm">暂无标签</div>
+                  <div className="text-yc-text-tertiary text-sm">暂无标签</div>
                 )}
               </div>
             </div>
-            <div className="rounded-lg border border-amber-200 p-3 bg-amber-50/70">
-              <div className="text-sm font-medium text-slate-700 mb-2">擅长内容</div>
-              <div className="text-sm text-slate-800 leading-6">{channel?.ai_expertise?.trim() || "暂无"}</div>
+            <div className="rounded-lg border border-yc-warning-bg p-3 bg-yc-warning-bg">
+              <div className="text-sm font-medium text-yc-text-secondary mb-2">擅长内容</div>
+              <div className="text-sm text-yc-text-primary leading-6">{channel?.ai_expertise?.trim() || "暂无"}</div>
             </div>
-            <div className="rounded-lg border border-slate-200 p-3 bg-indigo-50/60">
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
-                <Users size={16} className="text-indigo-600" />
+            <div className="rounded-lg border border-yc-border p-3 bg-yc-info-bg">
+              <div className="flex items-center gap-2 text-sm font-medium text-yc-text-secondary mb-2">
+                <Users size={16} className="text-yc-info" />
                 受众画像
               </div>
-              <div className="text-slate-800 text-sm leading-6">
+              <div className="text-yc-text-primary text-sm leading-6">
                 受众推断：{channel?.ai_audience_age || "暂无推断结果"}
               </div>
             </div>
-            <div className="rounded-lg border border-slate-200 p-3 bg-slate-50">
-              <div className="text-sm font-medium text-slate-700 mb-2">内容定位与套路</div>
-              <div className="text-sm text-slate-700 leading-6">{channel?.ai_summary || "暂无分析总结"}</div>
+            <div className="rounded-lg border border-yc-border p-3 bg-yc-bg-inset">
+              <div className="text-sm font-medium text-yc-text-secondary mb-2">内容定位与套路</div>
+              <div className="text-sm text-yc-text-secondary leading-6">{channel?.ai_summary || "暂无分析总结"}</div>
             </div>
           </div>
         ) : null}
@@ -525,14 +525,14 @@ export default function ChannelDetail({ channelId }: Props) {
         <div
           className={
             hasAiInsight
-              ? "rounded-lg border border-slate-200 bg-slate-50/80 p-4 space-y-3"
-              : "rounded-lg border border-dashed border-violet-300 bg-violet-50 p-6"
+              ? "rounded-lg border border-yc-border bg-yc-bg-inset p-4 space-y-3"
+              : "rounded-lg border border-dashed border-yc-border bg-yc-accent-bg p-6"
           }
         >
           {!hasAiInsight ? (
-            <div className="text-sm text-slate-600 text-center mb-2">选择模型与智能体后运行分析（结果会写入数据库并与频道列表同步）</div>
+            <div className="text-sm text-yc-text-secondary text-center mb-2">选择模型与智能体后运行分析（结果会写入数据库并与频道列表同步）</div>
           ) : (
-            <div className="text-sm font-medium text-slate-700">重新分析</div>
+            <div className="text-sm font-medium text-yc-text-secondary">重新分析</div>
           )}
           <Space wrap className="w-full" size="middle">
             <Select
@@ -581,21 +581,21 @@ export default function ChannelDetail({ channelId }: Props) {
               size="large"
               loading={aiAnalyzing}
               disabled={!libraryModels.some((m) => m.has_api_key)}
-              className="!bg-violet-600 !border-violet-600 hover:!bg-violet-500 hover:!border-violet-500"
+              className="!bg-yc-primary !border-yc-primary hover:!bg-yc-primary-hover hover:!border-yc-primary-hover"
               onClick={() => void runAiDeepAnalysis()}
             >
               {hasAiInsight ? "重新运行 AI 深度分析" : "运行 AI 深度分析"}
             </Button>
           </Space>
           {!libraryModels.some((m) => m.has_api_key) ? (
-            <div className="text-xs text-amber-700">请先在「设置中心 → 模型管理」添加至少一条带 API Key 的模型配置。</div>
+            <div className="text-xs text-yc-warning">请先在「设置中心 → 模型管理」添加至少一条带 API Key 的模型配置。</div>
           ) : null}
         </div>
       </div>
 
       <div className="space-y-2">
         {loading && !videos.length ? (
-          <div className="text-slate-500">加载中...</div>
+          <div className="text-yc-text-secondary">加载中...</div>
         ) : (
           videos.map((video) => {
             const hasAnalyzed = video.has_analysis || !!videoAnalysisStatusOverride[video.id]?.has_analysis;
@@ -614,7 +614,7 @@ export default function ChannelDetail({ channelId }: Props) {
             const agentIdForVideo = selectedAgentByVideoId[video.id] ?? selectedAgentId ?? promptAgents[0]?.id;
 
             return (
-              <div key={video.id} className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+              <div key={video.id} className="bg-yc-bg-card border border-yc-border rounded-lg p-3 shadow-sm">
                 <div className="flex flex-col md:flex-row gap-4">
                   {/* 缩略图 */}
                   <div className="relative w-full md:w-64 shrink-0">
@@ -630,7 +630,7 @@ export default function ChannelDetail({ channelId }: Props) {
                     ) : (
                       <img src={video.thumbnail_url || ""} alt="" className="w-full h-36 object-cover rounded opacity-90" />
                     )}
-                    <div className="absolute right-2 bottom-2 text-xs px-2 py-0.5 rounded bg-black/60 text-white">
+                    <div className="absolute right-2 bottom-2 text-xs px-2 py-0.5 rounded bg-yc-overlay text-yc-text-inverse">
                       {video.duration_str}
                     </div>
                   </div>
@@ -640,16 +640,16 @@ export default function ChannelDetail({ channelId }: Props) {
                       <button
                         type="button"
                         onClick={openYouTube}
-                        className="font-semibold text-slate-900 truncate w-full p-0 border-0 bg-transparent cursor-pointer hover:text-blue-700 transition-colors"
+                        className="font-semibold text-yc-text-primary truncate w-full p-0 border-0 bg-transparent cursor-pointer hover:text-yc-text-link transition-colors"
                       >
                         {video.title}
                       </button>
                     ) : (
-                      <div className="font-semibold text-slate-900 truncate">{video.title}</div>
+                      <div className="font-semibold text-yc-text-primary truncate">{video.title}</div>
                     )}
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <Tag className="!border-slate-200 !bg-white !text-slate-700">{video.definition.toUpperCase()}</Tag>
-                      <Tag className="!border-slate-200 !bg-white !text-slate-700">{video.privacy_status}</Tag>
+                      <Tag className="!border-yc-border !bg-yc-bg-card !text-yc-text-secondary">{video.definition.toUpperCase()}</Tag>
+                      <Tag className="!border-yc-border !bg-yc-bg-card !text-yc-text-secondary">{video.privacy_status}</Tag>
                       {hasAnalyzed && (
                         <Tag
                           color="success"
@@ -661,15 +661,15 @@ export default function ChannelDetail({ channelId }: Props) {
                         </Tag>
                       )}
                     </div>
-                    <div className="text-slate-500 text-sm mt-2">
+                    <div className="text-yc-text-secondary text-sm mt-2">
                       发布于 {video.published_at ? dayjs(video.published_at).format("YYYY-MM-DD HH:mm") : "-"} ·{" "}
                       {video.published_at ? dayjs(video.published_at).fromNow() : ""}
                     </div>
                     {/* 统计数据 */}
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm">
-                      <span className="text-blue-600 flex items-center gap-1"><Eye className="h-4 w-4 shrink-0" aria-hidden />播放量：{formatNumber(video.view_count)}</span>
-                      <span className="text-emerald-600 flex items-center gap-1"><ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />点赞：{formatNumber(video.like_count)}</span>
-                      <span className="text-orange-500 flex items-center gap-1"><MessageCircle className="h-4 w-4 shrink-0" aria-hidden />评论：{formatNumber(video.comment_count)}</span>
+                      <span className="text-yc-text-link flex items-center gap-1"><Eye className="h-4 w-4 shrink-0" aria-hidden />播放量：{formatNumber(video.view_count)}</span>
+                      <span className="text-yc-stat-positive flex items-center gap-1"><ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />点赞：{formatNumber(video.like_count)}</span>
+                      <span className="text-yc-accent flex items-center gap-1"><MessageCircle className="h-4 w-4 shrink-0" aria-hidden />评论：{formatNumber(video.comment_count)}</span>
                     </div>
                   </div>
                 </div>
@@ -717,7 +717,7 @@ export default function ChannelDetail({ channelId }: Props) {
                       icon={<CheckCircleOutlined />}
                       onClick={() => void handleViewVideoAnalysis(video.id)}
                       disabled={Boolean(videoAnalysisLoadingById[video.id])}
-                      style={videoAnalysisPanelOpenId !== video.id ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
+                      className={videoAnalysisPanelOpenId !== video.id ? "!bg-yc-success !border-yc-success" : undefined}
                     >
                       查看结果{analyzedAt ? `(${dayjs(analyzedAt).fromNow()})` : ''}
                     </Button>
@@ -725,16 +725,16 @@ export default function ChannelDetail({ channelId }: Props) {
                 </div>
 
                 {videoAnalysisPanelOpenId === video.id ? (
-                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                  <div className="mt-3 rounded-lg border border-yc-border bg-yc-bg-inset p-3">
                     {videoAnalysisLoadingById[video.id] ? (
-                      <div className="flex items-center gap-2 text-slate-600">
+                      <div className="flex items-center gap-2 text-yc-text-secondary">
                         <Spin size="small" />
                         分析中…
                       </div>
                     ) : videoAnalysisContentById[video.id] ? (
                       <MarkdownPreview>{videoAnalysisContentById[video.id]}</MarkdownPreview>
                     ) : (
-                      <div className="text-slate-500 text-sm">
+                      <div className="text-yc-text-secondary text-sm">
                         {hasAnalyzed
                           ? "暂无缓存展示。请点击「查看结果」拉取已保存的分析内容。"
                           : "暂无分析结果。点击「一键 AI 深度分析」生成内容。"}
