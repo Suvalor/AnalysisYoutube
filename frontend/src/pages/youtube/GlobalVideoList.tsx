@@ -333,7 +333,7 @@ export default function GlobalVideoList() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
+      <div className="bg-yc-bg-card border border-yc-border rounded-lg p-3 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-2">
           <Input
             placeholder="标题关键词"
@@ -375,14 +375,14 @@ export default function GlobalVideoList() {
               { label: "私密", value: "private" },
             ]}
           />
-          <div className="col-span-1 md:col-span-4 lg:col-span-6 space-y-2 pt-1 border-t border-slate-100 mt-1">
-            <p className="text-xs text-slate-400">
+          <div className="col-span-1 md:col-span-4 lg:col-span-6 space-y-2 pt-1 border-t border-yc-border-light mt-1">
+            <p className="text-xs text-yc-text-tertiary">
               以下四列可同时参与排序；数据库优先级为：发布时间 → 播放量 → 点赞数 → 评论数（先按第一列排，相同再按下一列）。
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
               {VIDEO_SORT_METRICS.map(({ field, stateKey, label, options }) => (
                 <div key={field} className="flex flex-col gap-1 min-w-0">
-                  <span className="text-xs text-slate-500">{label}</span>
+                  <span className="text-xs text-yc-text-tertiary">{label}</span>
                   <Select
                     allowClear
                     placeholder={`按${label}`}
@@ -434,9 +434,9 @@ export default function GlobalVideoList() {
       </div>
 
       {selectedVideoIds.size > 0 && (
-        <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-          <CloudDownloadOutlined className="text-blue-500 text-lg" />
-          <span className="text-sm text-blue-700">已选 {selectedVideoIds.size} 个视频</span>
+        <div className="flex items-center gap-3 bg-yc-info-bg border border-yc-info rounded-lg px-4 py-2">
+          <CloudDownloadOutlined className="text-yc-info text-lg" />
+          <span className="text-sm text-yc-info">已选 {selectedVideoIds.size} 个视频</span>
           <Button
             type="primary"
             size="small"
@@ -464,7 +464,7 @@ export default function GlobalVideoList() {
 
       <div className="space-y-2">
         {loading ? (
-          <div className="text-slate-500">加载中...</div>
+          <div className="text-yc-text-tertiary">加载中...</div>
         ) : (
           videos.map((video) => {
             const hasAnalyzed = video.has_analysis || !!analysisStatusOverride[video.id]?.has_analysis;
@@ -481,7 +481,7 @@ export default function GlobalVideoList() {
             return (
               <div
                 key={video.id}
-                className={`bg-white border rounded-lg p-3 shadow-sm relative ${selectedVideoIds.has(video.yt_video_id) ? 'border-blue-400 ring-2 ring-blue-400' : 'border-slate-200'}`}
+                className={`bg-yc-bg-card border rounded-lg p-3 shadow-sm relative ${selectedVideoIds.has(video.yt_video_id) ? 'border-yc-border-selected ring-2 ring-yc-border-selected' : 'border-yc-border'}`}
               >
                 <div className="absolute top-2 left-2 z-10">
                   <Checkbox
@@ -509,7 +509,7 @@ export default function GlobalVideoList() {
                     ) : (
                       <img src={video.thumbnail_url || ""} alt="" className="w-full h-36 object-cover rounded opacity-90" />
                     )}
-                    <div className="absolute right-2 bottom-2 text-xs px-2 py-0.5 rounded bg-black/60 text-white pointer-events-none">
+                    <div className="absolute right-2 bottom-2 text-xs px-2 py-0.5 rounded bg-yc-overlay text-yc-text-inverse pointer-events-none">
                       {video.duration_str}
                     </div>
                   </div>
@@ -519,18 +519,18 @@ export default function GlobalVideoList() {
                       <button
                         type="button"
                         onClick={openYouTube}
-                        className="font-semibold text-slate-900 truncate text-left w-full p-0 border-0 bg-transparent cursor-pointer hover:text-blue-700 transition-colors"
+                        className="font-semibold text-yc-text-primary truncate text-left w-full p-0 border-0 bg-transparent cursor-pointer hover:text-yc-primary-hover transition-colors"
                       >
                         {video.title}
                       </button>
                     ) : (
-                      <div className="font-semibold text-slate-900 truncate">{video.title}</div>
+                      <div className="font-semibold text-yc-text-primary truncate">{video.title}</div>
                     )}
                     
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {video.channel_title && <div className="text-xs text-slate-500 mt-0.5 truncate">频道：{video.channel_title}</div>}
-                      <Tag className="!border-slate-200 !bg-white !text-slate-700">{video.definition.toUpperCase()}</Tag>
-                      <Tag className="!border-slate-200 !bg-white !text-slate-700">{video.privacy_status}</Tag>
+                      {video.channel_title && <div className="text-xs text-yc-text-tertiary mt-0.5 truncate">频道：{video.channel_title}</div>}
+                      <Tag className="!border-yc-border !bg-yc-bg-card !text-yc-text-secondary">{video.definition.toUpperCase()}</Tag>
+                      <Tag className="!border-yc-border !bg-yc-bg-card !text-yc-text-secondary">{video.privacy_status}</Tag>
                       {hasAnalyzed && (
                         <Tag
                           color="success"
@@ -542,7 +542,7 @@ export default function GlobalVideoList() {
                         </Tag>
                       )}
                     </div>
-                    <div className="text-slate-500 text-sm mt-2">
+                    <div className="text-yc-text-tertiary text-sm mt-2">
                       发布于 {video.published_at ? dayjs(video.published_at).format("YYYY-MM-DD HH:mm") : "-"} ·{" "}
                       {video.published_at ? dayjs(video.published_at).fromNow() : ""}
                     </div>
@@ -557,9 +557,9 @@ export default function GlobalVideoList() {
                     )}
                     {/* 统计数据 */}
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm">
-                      <span className="text-blue-600 flex items-center gap-1"><Eye className="h-4 w-4 shrink-0" aria-hidden />播放量：{formatNumber(video.view_count)}</span>
-                      <span className="text-emerald-600 flex items-center gap-1"><ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />点赞：{formatNumber(video.like_count)}</span>
-                      <span className="text-orange-500 flex items-center gap-1"><MessageCircle className="h-4 w-4 shrink-0" aria-hidden />评论：{formatNumber(video.comment_count)}</span>
+                      <span className="text-yc-info flex items-center gap-1"><Eye className="h-4 w-4 shrink-0" aria-hidden />播放量：{formatNumber(video.view_count)}</span>
+                      <span className="text-yc-success flex items-center gap-1"><ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />点赞：{formatNumber(video.like_count)}</span>
+                      <span className="text-yc-warning flex items-center gap-1"><MessageCircle className="h-4 w-4 shrink-0" aria-hidden />评论：{formatNumber(video.comment_count)}</span>
                     </div>
                     {/* 操作按钮栏 */}
                     <div className="mt-3 flex flex-wrap gap-2 items-center">
@@ -605,7 +605,7 @@ export default function GlobalVideoList() {
                           icon={<CheckCircleOutlined />}
                           onClick={() => void handleViewAnalysis(video.id)}
                           disabled={Boolean(panelLoading[video.id])}
-                          style={panelOpenVideoId !== video.id ? { backgroundColor: '#52c41a', borderColor: '#52c41a' } : undefined}
+                          className={panelOpenVideoId !== video.id ? "!bg-yc-success !border-yc-success" : undefined}
                         >
                           查看结果{analyzedAt ? `(${dayjs(analyzedAt).fromNow()})` : ''}
                         </Button>
@@ -615,15 +615,15 @@ export default function GlobalVideoList() {
                 </div>
 
                 {panelOpenVideoId === video.id ? (
-                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                  <div className="mt-3 rounded-lg border border-yc-border bg-yc-bg-inset p-3">
                     {panelLoading[video.id] ? (
-                      <div className="flex items-center gap-2 text-slate-600">
+                      <div className="flex items-center gap-2 text-yc-text-secondary">
                         <Spin size="small" /> 分析中…
                       </div>
                     ) : panelContentByVideoId[video.id] ? (
                       <MarkdownPreview>{panelContentByVideoId[video.id]}</MarkdownPreview>
                     ) : (
-                      <div className="text-slate-500 text-sm">
+                      <div className="text-yc-text-tertiary text-sm">
                         {hasAnalyzed
                           ? "暂无缓存展示。请点击「查看结果」拉取已保存的分析内容。"
                           : "暂无分析结果。点击「一键 AI 视频分析」生成内容。"}
@@ -637,7 +637,7 @@ export default function GlobalVideoList() {
         )}
       </div>
 
-      <div className="flex justify-end bg-white border border-slate-200 rounded-lg p-3">
+      <div className="flex justify-end bg-yc-bg-card border border-yc-border rounded-lg p-3">
         <Pagination
           current={page}
           pageSize={pageSize}
@@ -655,7 +655,7 @@ export default function GlobalVideoList() {
         confirmLoading={scrapeLoading}
         okText="开始抓取"
       >
-        <p className="text-sm text-slate-600 mb-2">将使用 YouTube commentThreads 接口按关键字搜索评论（最多 100 条）。</p>
+        <p className="text-sm text-yc-text-secondary mb-2">将使用 YouTube commentThreads 接口按关键字搜索评论（最多 100 条）。</p>
         <Input placeholder="搜索关键字" value={scrapeKeyword} onChange={(e) => setScrapeKeyword(e.target.value)} />
       </Modal>
 
@@ -683,10 +683,10 @@ export default function GlobalVideoList() {
         okText="提交混剪"
       >
         <div className="space-y-3">
-          <p className="text-sm text-slate-600">
+          <p className="text-sm text-yc-text-secondary">
             将对选中的 {selectedVideoIds.size} 个视频执行 AI 混剪，优先使用已提取的精彩片段。
           </p>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-yc-text-tertiary">
             混剪为后台任务，提交后可在任务中心查看进度与结果。
           </p>
         </div>

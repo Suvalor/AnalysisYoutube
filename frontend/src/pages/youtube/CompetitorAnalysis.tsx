@@ -13,6 +13,7 @@ import {
 import { compareCompetitorsApi, listYouTubeChannelsApi } from "@/services/authApi";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
 import apiClient from "@/services/apiClient";
+import { useChartColors } from "@/hooks/useChartColors";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -25,9 +26,8 @@ type PoolItem = {
   };
 };
 
-const lineColors = ["#60a5fa", "#34d399", "#f59e0b", "#f472b6"];
-
 export default function CompetitorAnalysis() {
+  const chartColors = useChartColors();
   const [pool, setPool] = useState<PoolItem[]>([]);
   const [selectedChannelIds, setSelectedChannelIds] = useState<number[]>([]);
   const [days, setDays] = useState(30);
@@ -125,13 +125,13 @@ export default function CompetitorAnalysis() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] p-6 md:p-10 text-slate-900">
+    <div className="min-h-screen bg-yc-bg-page p-6 md:p-10 text-yc-text-primary">
       <div className="max-w-7xl mx-auto space-y-6">
-        <Card className="!bg-white !border-slate-200 !shadow-sm">
-          <Title level={3} style={{ color: "#0f172a", marginBottom: 8 }}>
+        <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm">
+          <Title level={3} className="text-yc-text-primary" style={{ marginBottom: 8 }}>
             竞对洞察
           </Title>
-          <Text style={{ color: "#64748b" }}>
+          <Text className="text-yc-text-secondary">
             勾选 2-3 个监控频道，生成总播放量与订阅量增长趋势图。
           </Text>
           <div className="mt-4 flex flex-col gap-4">
@@ -142,15 +142,15 @@ export default function CompetitorAnalysis() {
             >
               {pool.map((item) => (
                 <Checkbox key={item.pool_id} value={item.channel.id}>
-                  <span className="text-slate-800">
+                  <span className="text-yc-text-primary">
                     {item.channel.title}
-                    <span className="text-slate-500 ml-1">({item.group_name})</span>
+                    <span className="text-yc-text-secondary ml-1">({item.group_name})</span>
                   </span>
                 </Checkbox>
               ))}
             </Checkbox.Group>
             <div className="flex items-center gap-3">
-              <span className="text-slate-700">回溯天数</span>
+              <span className="text-yc-text-secondary">回溯天数</span>
               <InputNumber min={7} max={180} value={days} onChange={(v) => setDays(Number(v ?? 30))} />
               <Button type="primary" onClick={onAnalyze} loading={loading}>
                 生成对比图
@@ -190,29 +190,29 @@ export default function CompetitorAnalysis() {
 
         <Spin spinning={loading}>
           {chartData.length === 0 ? (
-            <Card className="!bg-white !border-slate-200 !shadow-sm">
+            <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm">
               <Empty description="暂无图表数据，请先选择频道并生成" />
             </Card>
           ) : (
             <>
               <Card
-                title={<span className="text-slate-900">播放量增长趋势（total_views）</span>}
-                className="!bg-white !border-slate-200 !shadow-sm"
+                title={<span className="text-yc-text-primary">播放量增长趋势（total_views）</span>}
+                className="!bg-yc-bg-card !border-yc-border !shadow-sm"
               >
                 <div className="h-[360px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="date" stroke="#64748b" />
-                      <YAxis stroke="#64748b" />
-                      <Tooltip />
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                      <XAxis dataKey="date" stroke={chartColors.axis} />
+                      <YAxis stroke={chartColors.axis} />
+                      <Tooltip contentStyle={{ backgroundColor: chartColors.tooltip.bg, border: `1px solid ${chartColors.tooltip.border}`, color: chartColors.tooltip.text }} />
                       <Legend />
                       {selectedChannels.map((item, idx) => (
                         <Line
                           key={`${item.channel.id}-views`}
                           type="monotone"
                           dataKey={`${item.channel.title}_views`}
-                          stroke={lineColors[idx % lineColors.length]}
+                          stroke={chartColors.series[idx % chartColors.series.length]}
                           strokeWidth={2}
                           dot={false}
                         />
@@ -223,23 +223,23 @@ export default function CompetitorAnalysis() {
               </Card>
 
               <Card
-                title={<span className="text-slate-900">订阅量增长趋势（subscriber_count）</span>}
-                className="!bg-white !border-slate-200 !shadow-sm"
+                title={<span className="text-yc-text-primary">订阅量增长趋势（subscriber_count）</span>}
+                className="!bg-yc-bg-card !border-yc-border !shadow-sm"
               >
                 <div className="h-[360px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="date" stroke="#64748b" />
-                      <YAxis stroke="#64748b" />
-                      <Tooltip />
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                      <XAxis dataKey="date" stroke={chartColors.axis} />
+                      <YAxis stroke={chartColors.axis} />
+                      <Tooltip contentStyle={{ backgroundColor: chartColors.tooltip.bg, border: `1px solid ${chartColors.tooltip.border}`, color: chartColors.tooltip.text }} />
                       <Legend />
                       {selectedChannels.map((item, idx) => (
                         <Line
                           key={`${item.channel.id}-subs`}
                           type="monotone"
                           dataKey={`${item.channel.title}_subscriber_count`}
-                          stroke={lineColors[idx % lineColors.length]}
+                          stroke={chartColors.series[idx % chartColors.series.length]}
                           strokeWidth={2}
                           dot={false}
                         />
@@ -254,7 +254,7 @@ export default function CompetitorAnalysis() {
 
         {/* AI 竞争分析结果 */}
         {aiInsight && (
-          <Card title="AI 竞争格局分析" className="!bg-white !border-slate-200 !shadow-sm">
+          <Card title="AI 竞争格局分析" className="!bg-yc-bg-card !border-yc-border !shadow-sm">
             <div className="space-y-4">
               {aiInsight.positioning_diff && (
                 <div><Text strong>定位差异</Text><Paragraph className="!mb-0">{aiInsight.positioning_diff}</Paragraph></div>

@@ -91,7 +91,7 @@ export default function BlueOceanRadar() {
               {row.title?.slice(0, 1) ?? "?"}
             </Avatar>
             <div className="min-w-0">
-              <div className="font-medium text-slate-900 truncate max-w-[200px]">{row.title}</div>
+              <div className="font-medium text-yc-text-primary truncate max-w-[200px]">{row.title}</div>
               <Text type="secondary" className="text-xs">
                 {row.yt_channel_id}
               </Text>
@@ -366,13 +366,13 @@ export default function BlueOceanRadar() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] p-6 md:p-10 text-slate-900">
+    <div className="min-h-screen bg-yc-bg-base p-6 md:p-10 text-yc-text-primary">
       <div className="max-w-7xl mx-auto space-y-6">
-        <Card className="!bg-white !border-slate-200 !shadow-sm">
-          <Title level={3} style={{ color: "#0f172a", marginBottom: 8 }}>
+        <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm">
+          <Title level={3} style={{ color: "var(--color-text-primary)", marginBottom: 8 }}>
             蓝海雷达
           </Title>
-          <Text style={{ color: "#64748b" }}>
+          <Text style={{ color: "var(--color-text-secondary)" }}>
             自动发现粉丝量相对较低、但近期出现超高播放爆款视频的潜力对标频道。扫描结果仅保存在本页，不会写入数据库。
           </Text>
         </Card>
@@ -385,7 +385,7 @@ export default function BlueOceanRadar() {
               label: "深度扫描",
               children: (
                 <>
-                  <Card className="!bg-white !border-slate-200 !shadow-sm" title="搜索控制台">
+                  <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm" title="搜索控制台">
                     <Form
                       form={form}
                       layout="vertical"
@@ -471,7 +471,7 @@ export default function BlueOceanRadar() {
                           </Button>
                           <Button
                             size="large"
-                            className="!text-purple-600 !border-purple-200 hover:!border-purple-400 hover:!text-purple-700"
+                            className="!text-yc-accent !border-yc-accent-bg hover:!border-yc-accent hover:!text-yc-accent"
                             onClick={() => void openAiDrawer()}
                           >
                             ✨ AI 参数自进化
@@ -492,7 +492,7 @@ export default function BlueOceanRadar() {
                   )}
 
                   <Card
-                    className="!bg-white !border-slate-200 !shadow-sm"
+                    className="!bg-yc-bg-card !border-yc-border !shadow-sm"
                     title="雷达扫描结果"
                     extra={
                       items.length > 0 ? (
@@ -517,7 +517,7 @@ export default function BlueOceanRadar() {
               key: "category-opportunity",
               label: "品类机会",
               children: (
-                <Card className="!bg-white !border-slate-200 !shadow-sm" title="品类机会报告">
+                <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm" title="品类机会报告">
                   <Space wrap className="mb-4">
                     <Input
                       value={catOppKeyword}
@@ -545,7 +545,7 @@ export default function BlueOceanRadar() {
                   </Space>
                   {catOppResult && (
                     <div className="space-y-4">
-                      <Card size="small" title="头部频道增速" className="!border-slate-200">
+                      <Card size="small" title="头部频道增速" className="!border-yc-border">
                         <Table
                           dataSource={catOppResult.top_channels_growth}
                           rowKey="channel_id"
@@ -559,7 +559,7 @@ export default function BlueOceanRadar() {
                           ]}
                         />
                       </Card>
-                      <Card size="small" title="内容缺口" className="!border-slate-200">
+                      <Card size="small" title="内容缺口" className="!border-yc-border">
                         <Table
                           dataSource={catOppResult.content_gaps}
                           rowKey="duration_bucket"
@@ -573,7 +573,7 @@ export default function BlueOceanRadar() {
                           ]}
                         />
                       </Card>
-                      <Card size="small" title="新入局者统计" className="!border-slate-200">
+                      <Card size="small" title="新入局者统计" className="!border-yc-border">
                         <Space size="large">
                           <Text>新频道：{catOppResult.newcomer_stats.total_new_channels}</Text>
                           <Text>成功频道：{catOppResult.newcomer_stats.successful_channels}</Text>
@@ -581,7 +581,7 @@ export default function BlueOceanRadar() {
                         </Space>
                       </Card>
                       {catOppResult.ai_summary && (
-                        <Card size="small" title="AI 总结" className="!border-slate-200">
+                        <Card size="small" title="AI 总结" className="!border-yc-border">
                           <Text>{catOppResult.ai_summary}</Text>
                         </Card>
                       )}
@@ -594,7 +594,7 @@ export default function BlueOceanRadar() {
               key: "cross-region",
               label: "跨地区对比",
               children: (
-                <Card className="!bg-white !border-slate-200 !shadow-sm" title="跨地区对比">
+                <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm" title="跨地区对比">
                   <Space wrap className="mb-4">
                     <Input
                       value={crossRegionKeyword}
@@ -644,7 +644,7 @@ export default function BlueOceanRadar() {
                     />
                   )}
                   {crossRegionResult?.ai_recommendation && (
-                    <Card size="small" title="AI 推荐" className="!border-slate-200 mt-4">
+                    <Card size="small" title="AI 推荐" className="!border-yc-border mt-4">
                       <Text>{crossRegionResult.ai_recommendation}</Text>
                     </Card>
                   )}
@@ -670,10 +670,10 @@ export default function BlueOceanRadar() {
           <Alert type="error" showIcon message="复盘失败" description={aiError} />
         ) : aiResult ? (
           <div className="space-y-4">
-            <Card size="small" title="复盘摘要" className="!border-slate-200">
+            <Card size="small" title="复盘摘要" className="!border-yc-border">
               <Text>{aiResult.analysis_summary}</Text>
             </Card>
-            <Card size="small" title="推荐关键词" className="!border-slate-200">
+            <Card size="small" title="推荐关键词" className="!border-yc-border">
               <Space wrap>
                 {aiResult.recommended_parameters.suggested_keywords.length > 0 ? (
                   aiResult.recommended_parameters.suggested_keywords.map((kw) => (
@@ -691,7 +691,7 @@ export default function BlueOceanRadar() {
                 )}
               </Space>
             </Card>
-            <Card size="small" title="推荐参数" className="!border-slate-200">
+            <Card size="small" title="推荐参数" className="!border-yc-border">
               <div className="space-y-2">
                 <div>
                   <Text type="secondary">粉丝上限：</Text>

@@ -56,10 +56,10 @@ function SortableTaskCard({ task }: { task: BoardTask }) {
       style={style}
       {...attributes}
       {...listeners}
-      className="rounded-xl border border-slate-700 bg-slate-900 p-3 shadow-md cursor-grab active:cursor-grabbing"
+      className="rounded-xl border border-yc-border bg-yc-bg-column-card p-3 shadow-md cursor-grab active:cursor-grabbing"
     >
-      <h4 className="font-medium text-slate-100">{task.title}</h4>
-      <div className="mt-2 text-xs text-slate-400 space-y-1">
+      <h4 className="font-medium text-yc-text-primary">{task.title}</h4>
+      <div className="mt-2 text-xs text-yc-text-secondary space-y-1">
         <div>截止日期：{task.due_date ?? "未设置"}</div>
         {task.script_id ? <div>已关联剧本</div> : <div>未关联剧本</div>}
       </div>
@@ -80,14 +80,14 @@ function BoardColumn({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: columnId(status) });
   return (
-    <div className="w-[300px] shrink-0 rounded-2xl border border-slate-800 bg-slate-900/70 p-3 shadow-xl">
+    <div className="w-[300px] shrink-0 rounded-2xl border border-yc-border bg-yc-bg-column p-3 shadow-xl">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold">{title}</h3>
-        <button onClick={onCreate} className="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700">
+        <h3 className="font-semibold text-yc-text-column">{title}</h3>
+        <button onClick={onCreate} className="text-xs px-2 py-1 rounded bg-yc-bg-inset hover:bg-yc-bg-card text-yc-text-secondary">
           + 新建项目
         </button>
       </div>
-      <div ref={setNodeRef} className={`min-h-[120px] space-y-2 rounded-xl p-1 ${isOver ? "bg-slate-800/40" : ""}`}>
+      <div ref={setNodeRef} className={`min-h-[120px] space-y-2 rounded-xl p-1 transition-colors ${isOver ? "bg-yc-bg-inset" : ""}`}>
         <SortableContext items={tasks.map((t) => taskId(t.id))} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
             <SortableTaskCard key={task.id} task={task} />
@@ -223,7 +223,7 @@ export default function VideoBoard() {
   return (
     <div className="p-6 md:p-8">
       {/* AI 策略建议区域 */}
-      <Card className="!bg-white !border-slate-200 !shadow-sm mb-6" title="AI 内容策略建议">
+      <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm mb-6" title="AI 内容策略建议">
         <div className="flex items-center gap-3 flex-wrap mb-3">
           <Select
             style={{ width: 200 }}
@@ -274,18 +274,18 @@ export default function VideoBoard() {
                 onCreate={() => setCreatingForStatus(col.id)}
               />
               {creatingForStatus === col.id && (
-                <div className="mt-2 rounded-xl border border-slate-800 bg-slate-900 p-3 w-[300px]">
+                <div className="mt-2 rounded-xl border border-yc-border bg-yc-bg-column-card p-3 w-[300px]">
                   <input
-                    className="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-sm"
+                    className="w-full rounded-md bg-yc-bg-column-input border border-yc-border px-3 py-2 text-sm"
                     placeholder="输入项目标题"
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                   />
                   <div className="flex justify-end gap-2 mt-2">
-                    <button className="px-3 py-1 text-sm rounded bg-slate-700" onClick={() => setCreatingForStatus(null)}>
+                    <button className="px-3 py-1 text-sm rounded bg-yc-bg-inset text-yc-text-secondary" onClick={() => setCreatingForStatus(null)}>
                       取消
                     </button>
-                    <button className="px-3 py-1 text-sm rounded bg-indigo-500" onClick={() => submitCreate(col.id)}>
+                    <button className="px-3 py-1 text-sm rounded bg-yc-primary text-yc-text-inverse" onClick={() => submitCreate(col.id)}>
                       创建
                     </button>
                   </div>
