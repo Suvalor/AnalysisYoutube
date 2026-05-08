@@ -33,7 +33,7 @@ YouTube Compass helps you discover untapped YouTube market opportunities before 
 git clone https://github.com/<owner>/youtube-compass.git
 cd youtube-compass
 
-# 2. Copy and edit environment variables (SECRET_KEY, DATABASE_URL, YOUTUBE_API_KEY are required)
+# 2. Copy and edit the environment variables (SECRET_KEY, DATABASE_URL are required)
 cp .env.example .env
 
 # 3. Start services
@@ -85,7 +85,6 @@ cp .env.example .env
 |----------|-------------|
 | `SECRET_KEY` | JWT signing key (strong random string >= 32 chars) |
 | `DATABASE_URL` | MySQL connection string: `mysql+asyncmy://user:pass@host:3306/db` |
-| `YOUTUBE_API_KEY` | YouTube Data API v3 key |
 
 #### Full Configuration
 
@@ -105,8 +104,6 @@ cp .env.example .env
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token expiry (minutes) | 1440 |
 | **CORS** | | |
 | `BACKEND_CORS_ORIGINS` | Allowed frontend origins, comma-separated | http://localhost:5173 |
-| **YouTube** | | |
-| `YOUTUBE_API_KEY` | YouTube Data API v3 key | - |
 | **Object Storage** | | |
 | `ACTIVE_STORAGE_PROVIDER` | Storage provider: ALIYUN / TENCENT | TENCENT |
 | `ALIYUN_ACCESS_KEY_ID` | Aliyun AccessKey ID | - |
