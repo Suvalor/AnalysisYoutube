@@ -68,7 +68,8 @@ alembic revision --autogenerate -m "desc"    # generate from model changes
     model_library_id)` 获取模型库配置 → `try_decrypt(ml.api_key_encrypted)` 解密 API
     Key → `LLMClientFactory().chat_completions_content(cfg=LLMClientConfig(...))`     
     发起调用。协议感知由 `llm_openai_factory.py` 自动处理（Coding Plan URL
-    自动注入默认模型等）。
+    自动注入默认模型等）。LLM 不再使用静态环境变量，所有配置均通过前端智能体管理界面
+    写入 `model_libraries` 表。
 
 
 
@@ -82,12 +83,10 @@ Backend reads from `.env` (see `backend/.env.example`). Critical ones:
 - `ACCESS_TOKEN_EXPIRE_MINUTES` — Token expiry (default: 1440)
 - `BACKEND_CORS_ORIGINS` — Allowed frontend origins, comma-separated
 - `YOUTUBE_API_KEY` — YouTube Data API v3
-- `VOLCENGINE_API_KEY`, `VOLCENGINE_ENDPOINT_ID`, `VOLCENGINE_BASE_URL`, `VOLCENGINE_MODEL_GEMINI` — LLM (Ark platform)
 - `VOLC_CV_ACCESS_KEY_ID`, `VOLC_CV_SECRET_ACCESS_KEY`, `VOLC_CV_REGION`, `VOLC_CV_HOST` — Volcengine CV (image inpainting)
 - `ALIYUN_ACCESS_KEY_ID`, `ALIYUN_ACCESS_KEY_SECRET`, `ALIYUN_OSS_BUCKET_NAME`, `ALIYUN_OSS_ENDPOINT`, `ALIYUN_CUSTOM_DOMAIN` — Aliyun OSS storage
 - `TENCENT_COS_SECRET_ID`, `TENCENT_COS_SECRET_KEY`, `TENCENT_COS_REGION`, `TENCENT_COS_BUCKET`, `TENCENT_CUSTOM_DOMAIN` — Tencent COS storage
 - `ACTIVE_STORAGE_PROVIDER` — Storage provider switch (ALIYUN or TENCENT, default: TENCENT)
-- `JIMENG_API_BASE_URL`, `JIMENG_API_KEY`, `JIMENG_AUTH_TOKEN` — Jimeng AI (image generation)
 - `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` — Google OAuth (optional)
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_USE_SSL` — SMTP email (optional)
 - `FRONTEND_BASE_URL` — Frontend URL for password reset links (default: http://localhost:5173)
