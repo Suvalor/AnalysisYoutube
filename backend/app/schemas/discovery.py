@@ -42,6 +42,21 @@ class DiscoverChannelItem(BaseModel):
     viral_video_url: str
 
 
+class QuickTrackRequest(BaseModel):
+    """追踪博主请求：仅需 YouTube 频道 ID。"""
+
+    channel_id: str = Field(..., min_length=1, max_length=64, description="YouTube 频道 ID")
+
+
+class QuickTrackResponse(BaseModel):
+    """追踪博主响应：成功 / 已存在 / 失败。"""
+
+    success: bool
+    message: str
+    pool_id: int | None = None
+    channel_title: str | None = None
+
+
 class ChannelDiscoverResponse(BaseModel):
     items: list[DiscoverChannelItem]
     warnings: list[str] = Field(default_factory=list)

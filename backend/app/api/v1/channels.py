@@ -7,13 +7,14 @@ import re
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.models.youtube import YouTubeChannel, UserCompetitorPool
-from app.schemas.discovery import ChannelDiscoverRequest, ChannelDiscoverResponse, DiscoverChannelItem
+from app.schemas.discovery import ChannelDiscoverRequest, ChannelDiscoverResponse, DiscoverChannelItem, QuickTrackRequest, QuickTrackResponse
 from app.services.config_manager import resolve_integration_config
 from app.services.quota_service import record_api_quota_usage
-from app.services.youtube_service import discover_channels_by_keyword
+from app.services.youtube_service import discover_channels_by_keyword, fetch_channel_info
 from app.crud.youtube import ensure_competitor_pool, upsert_channel
 
 router = APIRouter()
@@ -142,3 +143,117 @@ async def discover_channels(
 
     items = [DiscoverChannelItem.model_validate(x) for x in result.items]
     return ChannelDiscoverResponse(items=items, warnings=result.warnings)
+
+
+@router.post(
+    "/quick-track",
+    response_model=QuickTrackResponse,
+    summary="快速追踪博主（从视频列表一键入库）",
+)
+async def quick_track_channel(
+    body: QuickTrackRequest,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> QuickTrackResponse:
+    """
+    通过 YouTube 频道 ID 快速追踪博主。
+    1. 调用 YouTube API 获取频道最新信息
+    2. 更新或创建 YouTubeChannel 记录
+    3. 添加到当前用户的监控池（如果尚未存在）
+    """
+    channel_id_str = body.channel_id.strip()
+
+    # Step 1: 查找已有频道记录
+    stmt = select(YouTubeChannel).where(YouTubeChannel.yt_channel_id == channel_id_str)
+    result = await db.execute(stmt)
+    channel = result.scalar_one_or_none()
+
+    # Step 2: 如果频道不存在，调用 YouTube API 获取信息
+    if channel is None:
+        try:
+            icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+            api_item = await fetch_channel_info(
+                {"channel_id": channel_id_str},
+                youtube_api_key=icfg.youtube_api_key,
+            )
+        except HTTPException:
+            # YouTube API 不可用或频道不存在，用最小信息入库
+            channel = YouTubeChannel(
+                yt_channel_id=channel_id_str,
+                title=channel_id_str,
+            )
+            db.add(channel)
+            await db.flush()
+        else:
+            snippet = api_item.get("snippet", {})
+            statistics = api_item.get("statistics", {})
+            channel = YouTubeChannel(
+                yt_channel_id=channel_id_str,
+                title=snippet.get("title", "") or channel_id_str,
+                description=snippet.get("description", "") or "",
+                thumbnail_url=(snippet.get("thumbnails", {}).get("high", {}) or {}).get("url"),
+                subscriber_count=int(statistics.get("subscriberCount", 0) or 0),
+                total_views=int(statistics.get("viewCount", 0) or 0),
+                video_count=int(statistics.get("videoCount", 0) or 0),
+            )
+            db.add(channel)
+            await db.flush()
+    else:
+        # 频道已存在，尝试从 YouTube API 更新信息（best-effort）
+        try:
+            icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+            api_item = await fetch_channel_info(
+                {"channel_id": channel_id_str},
+                youtube_api_key=icfg.youtube_api_key,
+            )
+            snippet = api_item.get("snippet", {})
+            statistics = api_item.get("statistics", {})
+            new_title = snippet.get("title", "")
+            if new_title:
+                channel.title = new_title
+            new_thumb = (snippet.get("thumbnails", {}).get("high", {}) or {}).get("url")
+            if new_thumb:
+                channel.thumbnail_url = new_thumb
+            new_sub = int(statistics.get("subscriberCount", 0) or 0)
+            if new_sub > 0:
+                channel.subscriber_count = new_sub
+            await db.flush()
+        except HTTPException:
+            # API 调用失败不影响入库流程
+            pass
+
+    # Step 3: 检查是否已在监控池
+    pool_stmt = select(UserCompetitorPool).where(
+        UserCompetitorPool.user_id == current_user.id,
+        UserCompetitorPool.channel_id == channel.id,
+    )
+    pool_result = await db.execute(pool_stmt)
+    existing_pool = pool_result.scalar_one_or_none()
+
+    if existing_pool:
+        return QuickTrackResponse(
+            success=True,
+            message=f"频道「{channel.title}」已在监控池中",
+            pool_id=existing_pool.id,
+            channel_title=channel.title,
+        )
+
+    # Step 4: 添加到监控池
+    try:
+        pool = await ensure_competitor_pool(
+            session=db,
+            user_id=current_user.id,
+            channel_id=channel.id,
+            group_name="全局视频列表",
+        )
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Channel already in tracking pool")
+
+    return QuickTrackResponse(
+        success=True,
+        message=f"频道「{channel.title}」已入库追踪",
+        pool_id=pool.id,
+        channel_title=channel.title,
+    )

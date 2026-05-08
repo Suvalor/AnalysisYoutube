@@ -13,6 +13,7 @@ import {
   Select,
   Space,
   Spin,
+  Tag,
   Typography,
   Upload,
   message,
@@ -27,7 +28,7 @@ import {
 } from "@ant-design/icons";
 import { type Dayjs } from "dayjs";
 import dayjs from "dayjs";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   deleteAssetApi,
   listModelsApi,
@@ -38,6 +39,12 @@ import {
 } from "@/services/libraryApi";
 import useModelPreference from "@/hooks/useModelPreference";
 import MixConfigModal from "@/components/MixConfigModal";
+import {
+  listMixTasks,
+  downloadMixResult,
+  type MixTask,
+  type MixTaskStatus,
+} from "@/services/downloadApi";
 
 const { Text } = Typography;
 
@@ -107,6 +114,44 @@ export default function AssetLibraryPage() {
   const [thumbErrorIds, setThumbErrorIds] = useState<Record<number, boolean>>({});
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [mixModalOpen, setMixModalOpen] = useState(false);
+  const [mixTasks, setMixTasks] = useState<MixTask[]>([]);
+  const [mixTasksLoading, setMixTasksLoading] = useState(false);
+  const [downloadingTaskId, setDownloadingTaskId] = useState<number | null>(null);
+
+  const loadMixTasks = useCallback(async () => {
+    setMixTasksLoading(true);
+    try {
+      const resp = await listMixTasks({ limit: 20 });
+      setMixTasks(resp.items ?? []);
+    } catch {
+      message.error("加载混剪任务列表失败");
+    } finally {
+      setMixTasksLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMixTasks();
+  }, [loadMixTasks]);
+
+  const handleDownloadMixResult = useCallback(async (taskId: number) => {
+    setDownloadingTaskId(taskId);
+    try {
+      await downloadMixResult(taskId);
+      message.success("下载已开始");
+    } catch {
+      message.error("下载混剪结果失败");
+    } finally {
+      setDownloadingTaskId(null);
+    }
+  }, []);
+
+  const MIX_TASK_STATUS_MAP: Record<MixTaskStatus, { color: string; label: string }> = {
+    PENDING: { color: "default", label: "等待中" },
+    PROCESSING: { color: "processing", label: "处理中" },
+    COMPLETED: { color: "success", label: "已完成" },
+    FAILED: { color: "error", label: "失败" },
+  };
 
   const sortApi = useMemo(() => sortPresetToApi(sortPreset), [sortPreset]);
   const { value: watermarkPrefModelId, setValue: setWatermarkPrefModelId } =
@@ -534,6 +579,65 @@ export default function AssetLibraryPage() {
           </div>
         ) : null}
       </div>
+
+      {/* 混剪任务列表 */}
+      <Card
+        title="混剪任务"
+        size="small"
+        style={{ marginTop: 16, maxWidth: 1280, marginLeft: "auto", marginRight: "auto" }}
+        extra={
+          <Button size="small" onClick={loadMixTasks} loading={mixTasksLoading}>
+            刷新
+          </Button>
+        }
+      >
+        {mixTasks.length === 0 ? (
+          <Empty description="暂无混剪任务" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {mixTasks.map((task) => {
+              const statusInfo = MIX_TASK_STATUS_MAP[task.status];
+              return (
+                <div
+                  key={task.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 12px",
+                    borderRadius: 6,
+                    border: "1px solid #f0f0f0",
+                  }}
+                >
+                  <Space>
+                    <span style={{ color: "#666" }}>#{task.id}</span>
+                    <Tag color={statusInfo.color}>{statusInfo.label}</Tag>
+                    <span style={{ color: "#999", fontSize: 12 }}>
+                      {new Date(task.created_at).toLocaleString()}
+                    </span>
+                  </Space>
+                  {task.status === "COMPLETED" && (
+                    <Button
+                      type="link"
+                      size="small"
+                      loading={downloadingTaskId === task.id}
+                      onClick={() => handleDownloadMixResult(task.id)}
+                    >
+                      下载混剪结果
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      <MixConfigModal
+        open={mixModalOpen}
+        onClose={() => setMixModalOpen(false)}
+        selectedAssets={selectedAssets}
+      />
 
       <Modal
         title="上传素材"

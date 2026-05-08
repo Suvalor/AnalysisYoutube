@@ -1,4 +1,4 @@
-import { CloudDownloadOutlined, DeleteOutlined, PlayCircleOutlined, RedoOutlined, ReloadOutlined } from "@ant-design/icons";
+import { CloudDownloadOutlined, DeleteOutlined, MergeOutlined, PlayCircleOutlined, RedoOutlined, ReloadOutlined } from "@ant-design/icons";
 import { Button, Modal, Popconfirm, Progress, Select, Space, Spin, Table, Tag, Tooltip, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
@@ -10,6 +10,7 @@ import {
   getDownloadFileUrl,
   retryDownloadTaskApi,
   deleteDownloadTaskApi,
+  submitMix,
   type DownloadTask,
   type DownloadStatus,
 } from "@/services/downloadApi";
@@ -43,6 +44,9 @@ export default function DownloadList() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [retryingIds, setRetryingIds] = useState<Set<number>>(new Set());
   const [loadingPlayId, setLoadingPlayId] = useState<number | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Set<number>>(new Set());
+  const [mixModalOpen, setMixModalOpen] = useState(false);
+  const [mixSubmitting, setMixSubmitting] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchTasks = useCallback(async () => {
@@ -152,6 +156,32 @@ export default function DownloadList() {
     setVideoUrl(null);
     setPlayingTaskId(null);
   };
+
+  const handleMixSubmit = async () => {
+    setMixSubmitting(true);
+    try {
+      const res = await submitMix({
+        video_ids: Array.from(selectedRowKeys).map(String),
+        aspect_ratio: "9:16",
+        use_highlights: true,
+      });
+      message.success(res.message || "混剪任务已提交");
+      setMixModalOpen(false);
+      setSelectedRowKeys(new Set());
+    } catch (err: unknown) {
+      const d =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          : undefined;
+      message.error(typeof d === "string" ? d : "混剪提交失败");
+    } finally {
+      setMixSubmitting(false);
+    }
+  };
+
+  const completedTaskIds = new Set(
+    tasks.filter((t) => t.status === "COMPLETED" && t.has_file).map((t) => t.id),
+  );
 
   const columns: ColumnsType<DownloadTask> = [
     {
@@ -334,6 +364,27 @@ export default function DownloadList() {
         </Space>
       </div>
 
+      {/* Batch action bar for selected tasks */}
+      {selectedRowKeys.size > 0 && (
+        <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+          <span className="text-sm text-blue-600">已选 {selectedRowKeys.size} 个已完成视频</span>
+          <Button
+            type="primary"
+            size="small"
+            icon={<MergeOutlined />}
+            onClick={() => setMixModalOpen(true)}
+          >
+            AI 混剪
+          </Button>
+          <Button
+            size="small"
+            onClick={() => setSelectedRowKeys(new Set())}
+          >
+            清除选择
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       <Spin spinning={loading}>
         <Table
@@ -341,6 +392,14 @@ export default function DownloadList() {
           columns={columns}
           rowKey="id"
           size="small"
+          rowSelection={{
+            selectedRowKeys: Array.from(selectedRowKeys),
+            onChange: (keys) => setSelectedRowKeys(new Set(keys as number[])),
+            getCheckboxProps: (record) => ({
+              disabled: !completedTaskIds.has(record.id),
+              name: record.video_title ?? String(record.video_id),
+            }),
+          }}
           pagination={{
             current: page,
             pageSize,
@@ -373,6 +432,25 @@ export default function DownloadList() {
             style={{ width: "100%", maxHeight: "70vh", borderRadius: 8 }}
           />
         )}
+      </Modal>
+
+      {/* Mix confirmation modal */}
+      <Modal
+        title="AI 混剪"
+        open={mixModalOpen}
+        onCancel={() => setMixModalOpen(false)}
+        onOk={() => void handleMixSubmit()}
+        okText="提交混剪"
+        confirmLoading={mixSubmitting}
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-slate-600">
+            将对选中的 {selectedRowKeys.size} 个已完成视频执行 AI 混剪，优先使用已提取的精彩片段。
+          </p>
+          <p className="text-xs text-slate-400">
+            混剪为后台任务，提交后可在素材库查看进度与结果。
+          </p>
+        </div>
       </Modal>
     </div>
   );
