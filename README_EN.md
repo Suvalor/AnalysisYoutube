@@ -107,11 +107,6 @@ cp .env.example .env
 | `BACKEND_CORS_ORIGINS` | Allowed frontend origins, comma-separated | http://localhost:5173 |
 | **YouTube** | | |
 | `YOUTUBE_API_KEY` | YouTube Data API v3 key | - |
-| **LLM** | | |
-| `VOLCENGINE_API_KEY` | Volcengine API Key | - |
-| `VOLCENGINE_ENDPOINT_ID` | Ark model endpoint ID | - |
-| `VOLCENGINE_BASE_URL` | Ark API base URL (configure for manual deploy; Docker deploy auto-loads via env_file) | https://ark.cn-beijing.volces.com/api/coding/v3 |
-| `VOLCENGINE_MODEL_GEMINI` | Gemini model name | gemini-1.5-pro |
 | **Object Storage** | | |
 | `ACTIVE_STORAGE_PROVIDER` | Storage provider: ALIYUN / TENCENT | TENCENT |
 | `ALIYUN_ACCESS_KEY_ID` | Aliyun AccessKey ID | - |
@@ -141,12 +136,6 @@ cp .env.example .env
 | `VOLC_CV_REGION` | Volcengine CV region | cn-north-1 |
 | `VOLC_CV_HOST` | Volcengine CV Host | - |
 | `VOLC_CV_INPAINT_REQ_KEY` | Volcengine CV Inpainting request key | i2i_inpainting |
-| **Jimeng AI (optional)** | | |
-| `JIMENG_API_BASE_URL` | Jimeng AI API base URL | - |
-| `JIMENG_API_KEY` | Jimeng AI API Key | - |
-| `JIMENG_AUTH_TOKEN` | Jimeng AI Auth Token | - |
-| `JIMENG_SUBMIT_PATH` | Jimeng AI submit path | /v1/tasks |
-| `JIMENG_STATUS_PATH_TEMPLATE` | Jimeng AI status query path template | /v1/tasks/{task_id} |
 
 #### Frontend Environment Variables
 

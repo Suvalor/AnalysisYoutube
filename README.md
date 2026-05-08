@@ -119,11 +119,6 @@ cp .env.example .env
 | `BACKEND_CORS_ORIGINS` | 允许的前端地址，逗号分隔 | http://localhost:5173 |
 | **YouTube** | | |
 | `YOUTUBE_API_KEY` | YouTube Data API v3 密钥 | - |
-| **LLM** | | |
-| `VOLCENGINE_API_KEY` | 火山引擎 API Key | - |
-| `VOLCENGINE_ENDPOINT_ID` | Ark 模型端点 ID | - |
-| `VOLCENGINE_BASE_URL` | Ark API 基础 URL（手动部署时配置；Docker 部署通过 env_file 自动加载） | https://ark.cn-beijing.volces.com/api/coding/v3 |
-| `VOLCENGINE_MODEL_GEMINI` | Gemini 模型名 | gemini-1.5-pro |
 | **对象存储** | | |
 | `ACTIVE_STORAGE_PROVIDER` | 存储提供商：ALIYUN / TENCENT | TENCENT |
 | `ALIYUN_ACCESS_KEY_ID` | 阿里云 AccessKey ID | - |
@@ -153,12 +148,6 @@ cp .env.example .env
 | `VOLC_CV_REGION` | 火山引擎 CV 区域 | cn-north-1 |
 | `VOLC_CV_HOST` | 火山引擎 CV Host | - |
 | `VOLC_CV_INPAINT_REQ_KEY` | 火山引擎 CV Inpainting 请求 Key | i2i_inpainting |
-| **即梦 AI（可选）** | | |
-| `JIMENG_API_BASE_URL` | 即梦 AI API 基础 URL | - |
-| `JIMENG_API_KEY` | 即梦 AI API Key | - |
-| `JIMENG_AUTH_TOKEN` | 即梦 AI Auth Token | - |
-| `JIMENG_SUBMIT_PATH` | 即梦 AI 提交路径 | /v1/tasks |
-| `JIMENG_STATUS_PATH_TEMPLATE` | 即梦 AI 状态查询路径模板 | /v1/tasks/{task_id} |
 
 ### 前端环境变量
 
