@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-YouTube Compass — a YouTube overseas decision tool. Helps users discover untapped market opportunities before creating content. Bilingual codebase (Chinese primary, English secondary).
+YouTube Compass — an open-source YouTube overseas decision tool (BSL 1.1). Helps users discover untapped market opportunities before creating content. Bilingual codebase (Chinese primary, English secondary).
 
 ## Architecture
 
@@ -76,10 +76,25 @@ alembic revision --autogenerate -m "desc"    # generate from model changes
 
 Backend reads from `.env` (see `backend/.env.example`). Critical ones:
 - `DATABASE_URL` or `MYSQL_*` group for DB connection
+- `SECRET_KEY` — JWT signing (must be set, use strong random string >= 32 chars)
+- `FIELD_ENCRYPTION_SECRET` — Field-level encryption salt (optional, falls back to SECRET_KEY)
+- `ALGORITHM` — JWT algorithm (default: HS256)
+- `ACCESS_TOKEN_EXPIRE_MINUTES` — Token expiry (default: 1440)
+- `BACKEND_CORS_ORIGINS` — Allowed frontend origins, comma-separated
 - `YOUTUBE_API_KEY` — YouTube Data API v3
-- `VOLCENGINE_API_KEY`, `VOLCENGINE_ENDPOINT_ID` — LLM (Ark platform)
-- `ALIYUN_*` — Aliyun OSS storage
-- `TENCENT_COS_*` — Tencent COS storage
-- `SECRET_KEY` — JWT signing (default empty, must be set in production)
+- `VOLCENGINE_API_KEY`, `VOLCENGINE_ENDPOINT_ID`, `VOLCENGINE_BASE_URL`, `VOLCENGINE_MODEL_GEMINI` — LLM (Ark platform)
+- `VOLC_CV_ACCESS_KEY_ID`, `VOLC_CV_SECRET_ACCESS_KEY`, `VOLC_CV_REGION`, `VOLC_CV_HOST` — Volcengine CV (image inpainting)
+- `ALIYUN_ACCESS_KEY_ID`, `ALIYUN_ACCESS_KEY_SECRET`, `ALIYUN_OSS_BUCKET_NAME`, `ALIYUN_OSS_ENDPOINT`, `ALIYUN_CUSTOM_DOMAIN` — Aliyun OSS storage
+- `TENCENT_COS_SECRET_ID`, `TENCENT_COS_SECRET_KEY`, `TENCENT_COS_REGION`, `TENCENT_COS_BUCKET`, `TENCENT_CUSTOM_DOMAIN` — Tencent COS storage
+- `ACTIVE_STORAGE_PROVIDER` — Storage provider switch (ALIYUN or TENCENT, default: TENCENT)
+- `JIMENG_API_BASE_URL`, `JIMENG_API_KEY`, `JIMENG_AUTH_TOKEN` — Jimeng AI (image generation)
+- `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` — Google OAuth (optional)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_USE_SSL` — SMTP email (optional)
+- `FRONTEND_BASE_URL` — Frontend URL for password reset links (default: http://localhost:5173)
+- `DOWNLOAD_PROXY` — yt-dlp download proxy (optional)
 
 Frontend: `VITE_API_BASE_URL` (defaults to `http://localhost:8000`), `VITE_FEATURE_*` flags for creator modules.
+
+## License
+
+This project is licensed under Business Source License 1.1. Non-commercial self-deployment is allowed (personal projects, education, research, internal business use); providing as a third-party service is prohibited. On 2028-05-08 the license automatically changes to GPLv3. See [LICENSE](LICENSE) for full text.
