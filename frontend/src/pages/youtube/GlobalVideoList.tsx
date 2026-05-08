@@ -1,10 +1,10 @@
-import { CheckCircleOutlined, CloudDownloadOutlined, MergeOutlined, ThunderboltOutlined } from "@ant-design/icons";
-import { Button, Checkbox, DatePicker, Input, InputNumber, Modal, Pagination, Select, Spin, Tag, message } from "antd";
+import { CheckCircleOutlined, CloudDownloadOutlined, MergeOutlined, ThunderboltOutlined, UserAddOutlined } from "@ant-design/icons";
+import { Button, Checkbox, DatePicker, Input, InputNumber, Modal, Pagination, Select, Spin, Tag, Tooltip, message } from "antd";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { Eye, MessageCircle, ThumbsUp } from "lucide-react";
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
-import { listYouTubeChannelsApi, listYouTubeVideosAllApi, scrapeVideoCommentsApi, batchCheckVideoAnalysisApi, type VideoListItem, type BatchAnalysisStatusItem } from "@/services/authApi";
+import { listYouTubeChannelsApi, listYouTubeVideosAllApi, scrapeVideoCommentsApi, batchCheckVideoAnalysisApi, quickTrackChannelApi, type VideoListItem, type BatchAnalysisStatusItem } from "@/services/authApi";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
 import { analyzeYouTubeVideoApi, getYouTubeVideoAnalysisApi, extractVideoHighlightsApi, getVideoHighlightsApi, type YouTubeVideoAnalysisResponse, type VideoHighlight } from "@/services/videosApi";
 import { submitDownload, submitMix } from "@/services/downloadApi";
@@ -125,6 +125,8 @@ export default function GlobalVideoList() {
   const [mixModalOpen, setMixModalOpen] = useState(false);
   const [highlightsByVideoId, setHighlightsByVideoId] = useState<Record<number, VideoHighlight[]>>({});
   const [extractingHighlights, setExtractingHighlights] = useState<Record<number, boolean>>({});
+  const [trackingChannelIds, setTrackingChannelIds] = useState<Set<string>>(new Set());
+  const [trackedChannelIds, setTrackedChannelIds] = useState<Set<string>>(new Set());
 
   const toggleVideoSelect = (ytVideoId: string) => {
     setSelectedVideoIds((prev) => {
@@ -155,6 +157,30 @@ export default function GlobalVideoList() {
       message.error(typeof d === 'string' ? d : '批量下载提交失败');
     } finally {
       setDownloadLoading(false);
+    }
+  };
+
+  const handleTrackChannel = async (channelId: string, e?: MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (trackedChannelIds.has(channelId) || trackingChannelIds.has(channelId)) return;
+    setTrackingChannelIds((prev) => new Set(prev).add(channelId));
+    try {
+      const res = await quickTrackChannelApi({ channel_id: channelId });
+      if (res.success) {
+        message.success(res.message);
+        setTrackedChannelIds((prev) => new Set(prev).add(channelId));
+      } else {
+        message.warning(res.message);
+      }
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      message.error(detail || "追踪博主失败");
+    } finally {
+      setTrackingChannelIds((prev) => {
+        const next = new Set(prev);
+        next.delete(channelId);
+        return next;
+      });
     }
   };
 
@@ -563,6 +589,15 @@ export default function GlobalVideoList() {
                     </div>
                     {/* 操作按钮栏 */}
                     <div className="mt-3 flex flex-wrap gap-2 items-center">
+                      <Button
+                        size="small"
+                        icon={<UserAddOutlined />}
+                        loading={trackingChannelIds.has(video.yt_channel_id ?? "")}
+                        disabled={!video.yt_channel_id || trackedChannelIds.has(video.yt_channel_id ?? "") || trackingChannelIds.has(video.yt_channel_id ?? "")}
+                        onClick={(e) => video.yt_channel_id && void handleTrackChannel(video.yt_channel_id, e)}
+                      >
+                        {trackedChannelIds.has(video.yt_channel_id ?? "") ? "已追踪" : "追踪博主"}
+                      </Button>
                       <Button type="primary" size="small" onClick={() => openScrape(video.id)}>
                         抓取评论
                       </Button>

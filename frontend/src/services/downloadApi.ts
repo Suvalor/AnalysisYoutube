@@ -53,6 +53,28 @@ export interface MixResponse {
   task_id: number;
 }
 
+export type MixTaskStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
+export interface MixTask {
+  id: number;
+  user_id: number;
+  status: MixTaskStatus;
+  source_video_ids: number[] | null;
+  audio_source_type: string;
+  audio_source_ref: string;
+  aspect_ratio: string;
+  use_highlights: boolean;
+  has_output: boolean;
+  error_message: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MixTaskListResponse {
+  items: MixTask[];
+  total: number;
+}
+
 // ---------------------------------------------------------------------------
 // API calls
 // ---------------------------------------------------------------------------
@@ -106,4 +128,29 @@ export async function retryDownloadTaskApi(taskId: number): Promise<DownloadTask
 export async function submitMix(payload: MixRequest): Promise<MixResponse> {
   const { data } = await apiClient.post<MixResponse>('/api/v1/materials/mix', payload);
   return data;
+}
+
+/** List mix tasks for the current user. */
+export async function listMixTasks(params?: {
+  offset?: number;
+  limit?: number;
+}): Promise<MixTaskListResponse> {
+  const { data } = await apiClient.get<MixTaskListResponse>('/api/v1/materials/mix-tasks', { params });
+  return data;
+}
+
+/** Download the output file of a completed mix task via authenticated fetch. */
+export async function downloadMixResult(taskId: number): Promise<void> {
+  const response = await apiClient.get(`/api/v1/materials/mix-tasks/${taskId}/download`, {
+    responseType: 'blob',
+  });
+  const blob = response.data as Blob;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `mix_${taskId}.mp4`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

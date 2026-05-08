@@ -96,8 +96,9 @@ def _videos_to_read(rows: list[tuple[YouTubeVideo, bool]]) -> list[YouTubeVideoR
     for x, has_analysis in rows:
         ch = getattr(x, "channel", None)
         ch_title = ch.title if ch is not None else None
+        ch_yt_id = ch.yt_channel_id if ch is not None else None
         base = _video_to_read(x)
-        items.append(base.model_copy(update={"channel_title": ch_title, "has_analysis": has_analysis}))
+        items.append(base.model_copy(update={"channel_title": ch_title, "yt_channel_id": ch_yt_id, "has_analysis": has_analysis}))
     return items
 
 

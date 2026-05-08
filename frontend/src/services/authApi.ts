@@ -275,6 +275,7 @@ export async function batchUpdateChannelsApi() {
 
 export type VideoListItem = YouTubeAnalyzeResponse["videos"][number] & {
   channel_title?: string | null;
+  yt_channel_id?: string | null;
   /** 列表接口附带：当前组织是否已有持久化视频 AI 分析（仅布尔，正文仍走独立 GET） */
   has_analysis?: boolean;
 };
@@ -884,6 +885,20 @@ export async function addChannelByIdApi(payload: {
 }) {
   const res = await apiClient.post("/api/channels/add-by-channel-id", payload);
   return res.data as AddChannelByIdResponse;
+}
+
+// ── 快速追踪博主 API ──
+
+export type QuickTrackResponse = {
+  success: boolean;
+  message: string;
+  pool_id: number | null;
+  channel_title: string | null;
+};
+
+export async function quickTrackChannelApi(payload: { channel_id: string }) {
+  const res = await apiClient.post("/api/channels/quick-track", payload);
+  return res.data as QuickTrackResponse;
 }
 
 // ── 关键词历史 API ──
