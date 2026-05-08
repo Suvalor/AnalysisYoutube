@@ -82,7 +82,6 @@ Backend reads from `.env` (see `backend/.env.example`). Critical ones:
 - `ALGORITHM` — JWT algorithm (default: HS256)
 - `ACCESS_TOKEN_EXPIRE_MINUTES` — Token expiry (default: 1440)
 - `BACKEND_CORS_ORIGINS` — Allowed frontend origins, comma-separated
-- `YOUTUBE_API_KEY` — YouTube Data API v3
 - `VOLC_CV_ACCESS_KEY_ID`, `VOLC_CV_SECRET_ACCESS_KEY`, `VOLC_CV_REGION`, `VOLC_CV_HOST` — Volcengine CV (image inpainting)
 - `ALIYUN_ACCESS_KEY_ID`, `ALIYUN_ACCESS_KEY_SECRET`, `ALIYUN_OSS_BUCKET_NAME`, `ALIYUN_OSS_ENDPOINT`, `ALIYUN_CUSTOM_DOMAIN` — Aliyun OSS storage
 - `TENCENT_COS_SECRET_ID`, `TENCENT_COS_SECRET_KEY`, `TENCENT_COS_REGION`, `TENCENT_COS_BUCKET`, `TENCENT_CUSTOM_DOMAIN` — Tencent COS storage
