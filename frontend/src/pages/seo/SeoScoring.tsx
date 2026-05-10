@@ -41,19 +41,26 @@ import {
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 
-const SEO_COLORS: Record<string, string> = {
-  excellent: "#52c41a",
-  good: "#1890ff",
-  fair: "#faad14",
-  poor: "#ff4d4f",
+const SEO_TAG_COLORS: Record<string, string> = {
+  excellent: "success",
+  good: "processing",
+  fair: "warning",
+  poor: "error",
 };
 
-function getSeoLevel(score: number, max: number): { label: string; color: string } {
+const SEO_STROKE_COLORS: Record<string, string> = {
+  excellent: "var(--color-success)",
+  good: "var(--color-primary)",
+  fair: "var(--color-warning)",
+  poor: "var(--color-danger)",
+};
+
+function getSeoLevel(score: number, max: number): { label: string; tagColor: string; strokeColor: string } {
   const pct = score / max;
-  if (pct >= 0.8) return { label: "优秀", color: SEO_COLORS.excellent };
-  if (pct >= 0.6) return { label: "良好", color: SEO_COLORS.good };
-  if (pct >= 0.4) return { label: "一般", color: SEO_COLORS.fair };
-  return { label: "需优化", color: SEO_COLORS.poor };
+  if (pct >= 0.8) return { label: "优秀", tagColor: SEO_TAG_COLORS.excellent, strokeColor: SEO_STROKE_COLORS.excellent };
+  if (pct >= 0.6) return { label: "良好", tagColor: SEO_TAG_COLORS.good, strokeColor: SEO_STROKE_COLORS.good };
+  if (pct >= 0.4) return { label: "一般", tagColor: SEO_TAG_COLORS.fair, strokeColor: SEO_STROKE_COLORS.fair };
+  return { label: "需优化", tagColor: SEO_TAG_COLORS.poor, strokeColor: SEO_STROKE_COLORS.poor };
 }
 
 export default function SeoScoring() {
@@ -236,11 +243,11 @@ export default function SeoScoring() {
                   format={(p) => (
                     <span style={{ fontSize: 28, fontWeight: 700 }}>{p}</span>
                   )}
-                  strokeColor={totalLevel?.color}
+                  strokeColor={totalLevel?.strokeColor}
                   size={160}
                 />
                 <div style={{ marginTop: 8 }}>
-                  <Tag color={totalLevel?.color} style={{ fontSize: 14, padding: "2px 12px" }}>
+                  <Tag color={totalLevel?.tagColor} style={{ fontSize: 14, padding: "2px 12px" }}>
                     {totalLevel?.label}
                   </Tag>
                 </div>
@@ -253,7 +260,7 @@ export default function SeoScoring() {
                         type="circle"
                         percent={Math.round((dim.score / dim.max) * 100)}
                         format={() => `${dim.score}/${dim.max}`}
-                        strokeColor={getSeoLevel(dim.score, dim.max).color}
+                        strokeColor={getSeoLevel(dim.score, dim.max).strokeColor}
                         size={80}
                       />
                       <div style={{ marginTop: 4 }}>
@@ -419,7 +426,7 @@ export default function SeoScoring() {
                 key: "total_score",
                 width: 80,
                 render: (v: number) => (
-                  <Tag color={getSeoLevel(v, 100).color}>{v}</Tag>
+                  <Tag color={getSeoLevel(v, 100).tagColor}>{v}</Tag>
                 ),
               },
               {

@@ -17,6 +17,7 @@ const config: Config = {
         "yc-bg-sidebar": "var(--color-bg-sidebar)",
         "yc-bg-header": "var(--color-bg-header)",
         "yc-bg-card": "var(--color-bg-card)",
+        "yc-bg-secondary": "var(--color-bg-secondary)",
         "yc-bg-tab": "var(--color-bg-tab)",
         "yc-bg-tab-active": "var(--color-bg-tab-active)",
         "yc-bg-code": "var(--color-bg-code)",

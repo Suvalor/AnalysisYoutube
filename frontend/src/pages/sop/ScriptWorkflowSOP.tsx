@@ -728,24 +728,24 @@ export default function ScriptWorkflowSOP() {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-white">
+      <div className="h-full flex items-center justify-center bg-yc-bg-card">
         <Spin />
       </div>
     );
   }
 
   return (
-    <div className="h-full bg-white p-4 md:p-6">
+    <div className="h-full bg-yc-bg-card p-4 md:p-6">
       <div className="max-w-[1400px] mx-auto space-y-4">
-        <div className="bg-white border border-slate-200 rounded-lg p-4">
+        <div className="bg-yc-bg-card border border-yc-border rounded-lg p-4">
           <Steps current={step} items={steps} />
         </div>
 
-        <Card className="!border-slate-200 !shadow-none">
+        <Card className="!border-yc-border !shadow-none">
           <Title level={4} className="!mb-3">
             步骤 1：剧本设定
           </Title>
-          <div className="mb-2 text-slate-700">
+          <div className="mb-2 text-yc-text-primary">
             <Text strong>标题：</Text>
             {sourceScript?.title ?? "-"}
           </div>
@@ -763,7 +763,7 @@ export default function ScriptWorkflowSOP() {
           </div>
         </Card>
 
-        <Card className="!border-slate-200 !shadow-none">
+        <Card className="!border-yc-border !shadow-none">
           <Title level={4} className="!mb-3">
             步骤 2：剧情拆解
           </Title>
@@ -798,13 +798,13 @@ export default function ScriptWorkflowSOP() {
             placeholder="点击“AI 智能拆解分镜”后，将在这里展示可编辑的 Markdown 结果"
           />
           {segments.length > 0 && (
-            <div className="mt-2 text-xs text-slate-500">
+            <div className="mt-2 text-xs text-yc-text-secondary">
               已保存片段数：{segments.length}（可继续在上方 Markdown 中人工调优后再次保存）
             </div>
           )}
         </Card>
 
-        <Card className="!border-slate-200 !shadow-none">
+        <Card className="!border-yc-border !shadow-none">
           <Title level={4} className="!mb-2">
             步骤 3：分镜与资产创作
           </Title>
@@ -844,7 +844,7 @@ export default function ScriptWorkflowSOP() {
                 />
               ))}
               {shots.length === 0 && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-slate-500">
+                <div className="rounded-lg border border-yc-border bg-yc-bg-secondary p-4 text-yc-text-secondary">
                   当前片段暂无分镜，请先点击“生成分镜草案”。
                 </div>
               )}
@@ -855,29 +855,29 @@ export default function ScriptWorkflowSOP() {
                   <DraggablePublicAsset key={asset.id} asset={asset} />
                 ))}
                 {publicAssets.length === 0 && (
-                  <div className="text-xs text-slate-500 border border-dashed border-slate-300 rounded p-3 text-center">暂无公共资产</div>
+                  <div className="text-xs text-yc-text-secondary border border-dashed border-yc-border rounded p-3 text-center">暂无公共资产</div>
                 )}
               </div>
-              <div className="mt-3 text-xs text-slate-500">拖拽右侧资产到左侧卡片“资产与媒体”区域，即可复制并关联到目标分镜。</div>
+              <div className="mt-3 text-xs text-yc-text-secondary">拖拽右侧资产到左侧卡片“资产与媒体”区域，即可复制并关联到目标分镜。</div>
             </Drawer>
             <DragOverlay>
               {activeDragAsset ? (
-                <div className="w-56 rounded-lg border border-blue-300 bg-white p-2 shadow-sm">
-                  <div className="text-sm font-medium text-slate-800 truncate">{activeDragAsset.name}</div>
-                  <div className="text-xs text-slate-500">拖拽中...</div>
+                <div className="w-56 rounded-lg border border-blue-300 bg-yc-bg-card p-2 shadow-sm">
+                  <div className="text-sm font-medium text-yc-text-primary truncate">{activeDragAsset.name}</div>
+                  <div className="text-xs text-yc-text-secondary">拖拽中...</div>
                 </div>
               ) : null}
             </DragOverlay>
           </DndContext>
         </Card>
 
-        <Card className="!border-slate-200 !shadow-none">
+        <Card className="!border-yc-border !shadow-none">
           <Title level={4} className="!mb-2">
             步骤 4：合成与发布
           </Title>
           <div className="space-y-3">
             <div className="flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
-              <div className="text-sm text-slate-600">
+              <div className="text-sm text-yc-text-secondary">
                 OAuth 状态：{oauthStatus?.connected ? `已连接（频道 ${oauthStatus.channel_id || "-"})` : "未连接"}
               </div>
               <div className="flex gap-2">
@@ -921,7 +921,7 @@ export default function ScriptWorkflowSOP() {
               ]}
             />
             {!allMediaDone && (
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-yc-text-secondary">
                 仅当全部媒体状态为 success/completed/done/ready 时，“发布到 YouTube”按钮可用。
               </div>
             )}
@@ -939,7 +939,7 @@ export default function ScriptWorkflowSOP() {
       >
         <div className="space-y-3">
           <div>
-            <div className="text-xs text-slate-500 mb-1">选择媒体</div>
+            <div className="text-xs text-yc-text-secondary mb-1">选择媒体</div>
             <Select
               value={publishMediaId ?? undefined}
               onChange={(v) => setPublishMediaId(v)}
@@ -951,11 +951,11 @@ export default function ScriptWorkflowSOP() {
             />
           </div>
           <div>
-            <div className="text-xs text-slate-500 mb-1">标题</div>
+            <div className="text-xs text-yc-text-secondary mb-1">标题</div>
             <Input value={publishTitle} onChange={(e) => setPublishTitle(e.target.value)} maxLength={100} />
           </div>
           <div>
-            <div className="text-xs text-slate-500 mb-1">描述</div>
+            <div className="text-xs text-yc-text-secondary mb-1">描述</div>
             <TextArea
               rows={4}
               value={publishDescription}
@@ -964,7 +964,7 @@ export default function ScriptWorkflowSOP() {
             />
           </div>
           <div>
-            <div className="text-xs text-slate-500 mb-1">隐私级别</div>
+            <div className="text-xs text-yc-text-secondary mb-1">隐私级别</div>
             <Select
               value={publishPrivacy}
               onChange={(v) => setPublishPrivacy(v)}
@@ -1006,23 +1006,23 @@ function ShotEditableCard({
       /\.(mp4|webm|mov|m4v)$/i.test(pathHint) ||
       /\.(mp4|webm|mov|m4v)$/i.test(asset.name);
     if (isVideo) {
-      return <video src={url} className="w-full h-24 object-cover rounded border border-slate-200 bg-black" />;
+      return <video src={url} className="w-full h-24 object-cover rounded border border-yc-border bg-black" />;
     }
     if (url) {
-      return <img src={url} alt={asset.name} className="w-full h-24 object-cover rounded border border-slate-200" />;
+      return <img src={url} alt={asset.name} className="w-full h-24 object-cover rounded border border-yc-border" />;
     }
-    return <div className="w-full h-24 rounded border border-slate-200 bg-slate-100 flex items-center justify-center text-xs text-slate-500">无预览</div>;
+    return <div className="w-full h-24 rounded border border-yc-border bg-yc-bg-secondary flex items-center justify-center text-xs text-yc-text-secondary">无预览</div>;
   };
 
   return (
-    <div className="border border-slate-200 rounded-lg bg-white p-3">
+    <div className="border border-yc-border rounded-lg bg-yc-bg-card p-3">
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-3">
         <div className="xl:col-span-3 flex flex-col min-h-[260px]">
           <div className="mb-2 flex items-center justify-between">
-            <div className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-sm font-semibold text-slate-700">
+            <div className="inline-flex items-center rounded-md border border-yc-border bg-yc-bg-secondary px-2 py-1 text-sm font-semibold text-yc-text-primary">
               镜头 #{String(shot.shot_no).padStart(2, "0")}
             </div>
-            {saving && <span className="text-xs text-slate-500">保存中...</span>}
+            {saving && <span className="text-xs text-yc-text-secondary">保存中...</span>}
           </div>
           <MarkdownEditorToggle
             className="flex-1"
@@ -1036,11 +1036,11 @@ function ShotEditableCard({
         <div
           ref={setNodeRef}
           className={`xl:col-span-2 rounded-md p-2 border transition-colors ${
-            isOver ? "border-blue-300 bg-blue-50" : "border-slate-200 bg-slate-50"
+            isOver ? "border-blue-300 bg-blue-50" : "border-yc-border bg-yc-bg-secondary"
           }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <div className="font-medium text-slate-800">资产与媒体</div>
+            <div className="font-medium text-yc-text-primary">资产与媒体</div>
             <div className="flex gap-2">
               <Upload
                 fileList={fileList}
@@ -1059,13 +1059,13 @@ function ShotEditableCard({
           </div>
           <div className="grid grid-cols-2 gap-2">
             {assets.map((a) => (
-              <div key={a.id} className="rounded border border-slate-200 p-1">
+              <div key={a.id} className="rounded border border-yc-border p-1">
                 {renderAssetThumb(a)}
-                <div className="text-xs text-slate-600 mt-1 truncate">{a.name}</div>
+                <div className="text-xs text-yc-text-secondary mt-1 truncate">{a.name}</div>
               </div>
             ))}
             {assets.length === 0 && (
-              <div className="col-span-2 text-xs text-slate-500 border border-dashed border-slate-300 rounded p-3 text-center">
+              <div className="col-span-2 text-xs text-yc-text-secondary border border-dashed border-yc-border rounded p-3 text-center">
                 暂无素材，点击“上传素材”
               </div>
             )}
@@ -1090,11 +1090,11 @@ function DraggablePublicAsset({ asset }: { asset: SopAsset }) {
       style={style}
       {...attributes}
       {...listeners}
-      className="rounded-lg border border-slate-200 bg-white p-2 cursor-grab active:cursor-grabbing"
+      className="rounded-lg border border-yc-border bg-yc-bg-card p-2 cursor-grab active:cursor-grabbing"
     >
-      <div className="text-sm text-slate-800 font-medium truncate">{asset.name}</div>
-      <div className="text-xs text-slate-500 mt-1">类型：{asset.asset_type}</div>
-      <div className="text-xs text-slate-500">来源资产ID：{asset.id}</div>
+      <div className="text-sm text-yc-text-primary font-medium truncate">{asset.name}</div>
+      <div className="text-xs text-yc-text-secondary mt-1">类型：{asset.asset_type}</div>
+      <div className="text-xs text-yc-text-secondary">来源资产ID：{asset.id}</div>
     </div>
   );
 }

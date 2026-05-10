@@ -16,7 +16,7 @@ export default function AuthLayout({ title, subtitle, children }: AuthLayoutProp
             C
           </div>
           <h1 className="mt-4 text-2xl font-semibold text-slate-50">{title}</h1>
-          {subtitle && <p className="mt-1 text-sm text-slate-300">{subtitle}</p>}
+          {subtitle && <p className="mt-1 text-sm text-yc-text-tertiary">{subtitle}</p>}
         </div>
         <div className="rounded-2xl border border-slate-800/80 bg-slate-900/80 shadow-2xl shadow-black/40 backdrop-blur-lg p-6">
           {children}

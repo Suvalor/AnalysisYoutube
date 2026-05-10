@@ -113,7 +113,7 @@ export default function FeishuDocList() {
         dataIndex: "created_at",
         width: 160,
         render: (v: string) => {
-          if (!v) return <span className="text-slate-400">-</span>;
+          if (!v) return <span className="text-yc-text-tertiary">-</span>;
           const dt = dayjs(v);
           return <span title={dt.format("YYYY-MM-DD HH:mm")}>{dt.fromNow()}</span>;
         },
@@ -208,7 +208,7 @@ export default function FeishuDocList() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm space-y-3">
+      <div className="bg-yc-bg-card border border-yc-border rounded-lg p-4 shadow-sm space-y-3">
         <div className="flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
           <div className="flex gap-2 items-center">
             <Input
@@ -237,7 +237,7 @@ export default function FeishuDocList() {
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-lg p-2 shadow-sm">
+      <div className="bg-yc-bg-card border border-yc-border rounded-lg p-2 shadow-sm">
         <Table<FeishuDocItem>
           rowKey="id"
           loading={loading}
@@ -268,11 +268,11 @@ export default function FeishuDocList() {
       >
         <div className="space-y-3">
           <div>
-            <div className="text-xs text-slate-600 mb-1">文档名称</div>
+            <div className="text-xs text-yc-text-secondary mb-1">文档名称</div>
             <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="例如：选题库 / 脚本模板库" />
           </div>
           <div>
-            <div className="text-xs text-slate-600 mb-1">飞书链接（URL）</div>
+            <div className="text-xs text-yc-text-secondary mb-1">飞书链接（URL）</div>
             <Input value={formUrl} onChange={(e) => setFormUrl(e.target.value)} placeholder="请输入飞书分享链接" />
           </div>
         </div>

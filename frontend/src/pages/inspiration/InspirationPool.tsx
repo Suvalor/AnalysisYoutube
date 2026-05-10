@@ -269,10 +269,10 @@ export default function InspirationPool() {
           <img
             src={row.image_access_url || row.image_url || ""}
             alt=""
-            className="w-11 h-11 rounded-md object-cover border border-slate-200"
+            className="w-11 h-11 rounded-md object-cover border border-yc-border"
           />
         ) : (
-          <div className="w-11 h-11 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-xs">
+          <div className="w-11 h-11 rounded-md bg-yc-bg-secondary border border-yc-border flex items-center justify-center text-yc-text-tertiary text-xs">
             文
           </div>
         ),
@@ -357,7 +357,7 @@ export default function InspirationPool() {
           <img
             src={row.image_access_url || row.image_url || ""}
             alt=""
-            className="max-h-48 w-full rounded-lg object-contain bg-slate-100 border border-slate-200"
+            className="max-h-48 w-full rounded-lg object-contain bg-yc-bg-secondary border border-yc-border"
           />
         </div>
       ) : null}
@@ -384,8 +384,8 @@ export default function InspirationPool() {
         <div className="flex items-center gap-2">
           <Lightbulb className="text-amber-500" size={26} />
           <div>
-            <h2 className="text-xl font-semibold text-slate-900">灵感中心</h2>
-            <p className="text-sm text-slate-500">记录灵感，一键进入 SOP 剧情拆解并自动关联。</p>
+            <h2 className="text-xl font-semibold text-yc-text-primary">灵感中心</h2>
+            <p className="text-sm text-yc-text-secondary">记录灵感，一键进入 SOP 剧情拆解并自动关联。</p>
           </div>
         </div>
         <Segmented
@@ -440,7 +440,7 @@ export default function InspirationPool() {
                 </Button>
               </Upload>
               {draftImageUrl ? (
-                <div className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 bg-slate-50 w-fit max-w-full">
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-yc-border bg-yc-bg-secondary w-fit max-w-full">
                   <img
                     src={draftImageUrl}
                     alt="预览"
@@ -503,11 +503,11 @@ export default function InspirationPool() {
             </Button>
           </div>
           <div
-            className="relative rounded-xl border border-slate-200 bg-gradient-to-br from-indigo-50 via-white to-amber-50 overflow-hidden"
+            className="relative rounded-xl border border-yc-border bg-gradient-to-br from-indigo-50 via-white to-amber-50 overflow-hidden"
             style={{ minHeight: 520 }}
           >
             {rows.length === 0 && !loading ? (
-              <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm">
+              <div className="absolute inset-0 flex items-center justify-center text-yc-text-tertiary text-sm">
                 暂无灵感，先在上方录入一条吧
               </div>
             ) : null}
@@ -521,7 +521,7 @@ export default function InspirationPool() {
                     type="button"
                     className={`absolute rounded-full shadow-md border-2 overflow-hidden flex items-center justify-center text-white text-xs font-medium cursor-pointer transition-transform hover:scale-110 hover:z-10 focus:outline-none focus:ring-2 focus:ring-violet-400 ${
                       done
-                        ? "bg-slate-400/80 border-slate-300 opacity-80"
+                        ? "bg-yc-text-tertiary/80 border-yc-border opacity-80"
                         : "border-white/40 bg-gradient-to-br from-violet-500 to-fuchsia-500"
                     }`}
                     style={{
@@ -549,7 +549,7 @@ export default function InspirationPool() {
             })}
           </div>
           {rows.some(isPlotDone) ? (
-            <div className="mt-2 text-xs text-slate-500">
+            <div className="mt-2 text-xs text-yc-text-secondary">
               灰色球体或带 ✓ 表示已关联剧情拆解；球内为缩略图时表示图片灵感。
             </div>
           ) : null}

@@ -457,7 +457,7 @@ export default function AssetLibraryPage() {
                           checked={selectedIds.has(asset.id)}
                           onChange={() => toggleSelect(asset.id)}
                           className="absolute top-2 left-2 z-10"
-                          style={{ accentColor: '#3b82f6' }}
+                          style={{ accentColor: 'var(--color-primary)' }}
                         />
                         {ft === "image" && (
                           <>
@@ -471,7 +471,7 @@ export default function AssetLibraryPage() {
                                 onError={() => markThumbError(asset.id)}
                               />
                             ) : (
-                              <div className="w-full h-52 flex items-center justify-center text-slate-500 text-xs px-3 text-center">
+                              <div className="w-full h-52 flex items-center justify-center text-yc-text-secondary text-xs px-3 text-center">
                                 图片无法加载。请确认 access_url 有效，或在 OSS/COS/CDN 配置 CORS 允许当前站点。
                               </div>
                             )}
@@ -488,7 +488,7 @@ export default function AssetLibraryPage() {
                                 playsInline
                               />
                             ) : (
-                              <div className="w-full h-52 flex items-center justify-center text-slate-500 text-xs px-3 text-center">
+                              <div className="w-full h-52 flex items-center justify-center text-yc-text-secondary text-xs px-3 text-center">
                                 暂无视频地址
                               </div>
                             )}
@@ -499,12 +499,12 @@ export default function AssetLibraryPage() {
                             {src ? (
                               <audio src={src} controls className="w-full" preload="metadata" />
                             ) : (
-                              <div className="text-slate-500 text-xs text-center px-2">暂无音频地址</div>
+                              <div className="text-yc-text-secondary text-xs text-center px-2">暂无音频地址</div>
                             )}
                           </div>
                         )}
                         {ft === "unknown" && (
-                          <div className="w-full h-52 flex items-center justify-center text-slate-500 text-xs px-3 text-center">
+                          <div className="w-full h-52 flex items-center justify-center text-yc-text-secondary text-xs px-3 text-center">
                             无法识别的素材类型，请刷新列表或联系管理员。
                           </div>
                         )}
@@ -523,7 +523,7 @@ export default function AssetLibraryPage() {
                         <h3 className="font-medium text-slate-100 text-sm line-clamp-2 min-h-[2.5rem]" title={asset.title}>
                           {asset.title}
                         </h3>
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-yc-text-tertiary">
                           {ft === "image" ? (
                             <FileImageOutlined className="text-cyan-400" aria-hidden />
                           ) : ft === "video" ? (
@@ -531,7 +531,7 @@ export default function AssetLibraryPage() {
                           ) : ft === "audio" ? (
                             <SoundOutlined className="text-amber-400" aria-hidden />
                           ) : (
-                            <FileImageOutlined className="text-slate-500" aria-hidden />
+                            <FileImageOutlined className="text-yc-text-secondary" aria-hidden />
                           )}
                           <span>
                             {ft === "image" ? "图片" : ft === "video" ? "视频" : ft === "audio" ? "音频" : "未知类型"}
@@ -606,13 +606,13 @@ export default function AssetLibraryPage() {
                     justifyContent: "space-between",
                     padding: "8px 12px",
                     borderRadius: 6,
-                    border: "1px solid #f0f0f0",
+                    border: "1px solid var(--color-border)",
                   }}
                 >
                   <Space>
-                    <span style={{ color: "#666" }}>#{task.id}</span>
+                    <span style={{ color: "var(--color-text-secondary)" }}>#{task.id}</span>
                     <Tag color={statusInfo.color}>{statusInfo.label}</Tag>
-                    <span style={{ color: "#999", fontSize: 12 }}>
+                    <span style={{ color: "var(--color-text-tertiary)", fontSize: 12 }}>
                       {new Date(task.created_at).toLocaleString()}
                     </span>
                   </Space>
@@ -696,7 +696,7 @@ export default function AssetLibraryPage() {
               notFoundContent={loadingWatermarkModels ? "加载中..." : "暂无可用图像去水印模型"}
             />
           ) : null}
-          {uploading ? <Text style={{ color: "#94a3b8" }}>上传处理中，请稍候...</Text> : null}
+          {uploading ? <Text style={{ color: "var(--color-text-tertiary)" }}>上传处理中，请稍候...</Text> : null}
         </div>
       </Modal>
 
@@ -726,7 +726,7 @@ export default function AssetLibraryPage() {
             </div>
           )}
           {previewAsset && normalizeAssetFileType(previewAsset.file_type) === "unknown" && (
-            <p className="text-slate-400 text-sm px-4">该素材类型不支持预览。</p>
+            <p className="text-yc-text-tertiary text-sm px-4">该素材类型不支持预览。</p>
           )}
         </div>
       </Modal>
