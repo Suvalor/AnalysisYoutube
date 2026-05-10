@@ -404,7 +404,7 @@ async def analyze_youtube_batch(
         )
 
     if not (icfg.youtube_api_key or "").strip():
-        raise HTTPException(status_code=400, detail="未配置 YouTube Data API Key（检查设置中心或环境变量 YOUTUBE_API_KEY）")
+        raise HTTPException(status_code=400, detail="未配置 YouTube Data API Key，请在设置中心填写")
 
     # 入队后台任务：控制器不再进行 YouTube/LLM 调用，避免 HTTP 超时
     background_tasks.add_task(
@@ -790,7 +790,7 @@ async def batch_update_channels(
         return SubmitTaskResponse(code=200, message="没有需要更新的频道（已跳过）")
 
     if not (icfg.youtube_api_key or "").strip():
-        raise HTTPException(status_code=400, detail="未配置 YouTube Data API Key（检查设置中心或环境变量 YOUTUBE_API_KEY）")
+        raise HTTPException(status_code=400, detail="未配置 YouTube Data API Key，请在设置中心填写")
 
     background_tasks.add_task(
         _process_batch_update_channels_task,

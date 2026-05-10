@@ -6,12 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUserDep
-from app.core.database import get_session
+from app.db.session import get_session
 from app.crud.library import get_by_user
 from app.models.library import ModelLibrary
 from app.schemas.jimeng import JimengQueryRequest, JimengSubmitRequest
 from app.services.jimeng_service import JimengConfig, query_task_status, submit_task
-from app.utils.crypto import try_decrypt
+from app.services.field_encryption import try_decrypt
 
 router = APIRouter()
 

@@ -36,10 +36,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
   };
 
   const SidebarContent = (
-    <aside className="h-full bg-white border-r border-slate-200 flex flex-col">
-      <div className="h-16 px-4 flex items-center border-b border-slate-200">
-        <div className="h-9 w-9 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">Y</div>
-        <span className="ml-3 font-semibold text-slate-900">YouTube Compass</span>
+    <aside className="h-full bg-yc-bg-sidebar border-r border-yc-border flex flex-col">
+      <div className="h-16 px-4 flex items-center border-b border-yc-border">
+        <div className="h-9 w-9 rounded-lg bg-yc-primary text-yc-text-inverse flex items-center justify-center font-bold">Y</div>
+        <span className="ml-3 font-semibold text-yc-text-primary">YouTube Compass</span>
       </div>
       <nav className="p-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
@@ -51,7 +51,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               to={item.key}
               onClick={() => setMobileOpen(false)}
               className={`flex items-center px-3 py-2 rounded-lg text-sm transition-colors ${
-                active ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-slate-50"
+                active ? "bg-yc-primary-bg text-yc-primary" : "text-yc-text-secondary hover:bg-yc-bg-secondary"
               }`}
             >
               <Icon size={16} />
@@ -64,15 +64,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
   );
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-slate-900 flex">
+    <div className="min-h-screen bg-yc-bg-layout text-yc-text-primary flex">
       <div className="hidden lg:block w-72 shrink-0">{SidebarContent}</div>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="h-16 border-b border-slate-200 bg-white px-4 md:px-6 flex items-center justify-between">
+        <header className="h-16 border-b border-yc-border bg-yc-bg-header px-4 md:px-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileOpen(true)}
-              className="lg:hidden p-2 rounded-md hover:bg-slate-100"
+              className="lg:hidden p-2 rounded-md hover:bg-yc-bg-secondary"
               aria-label="打开侧边栏"
             >
               <MenuIcon size={18} />
@@ -80,8 +80,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <h1 className="text-base md:text-lg font-semibold">{pageTitle}</h1>
           </div>
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-sm">U</div>
-            <button onClick={logout} className="px-3 py-1.5 rounded-md bg-slate-900 text-white hover:bg-slate-700 text-sm flex items-center">
+            <div className="h-8 w-8 rounded-full bg-yc-bg-inset flex items-center justify-center text-sm text-yc-text-secondary">U</div>
+            <button onClick={logout} className="px-3 py-1.5 rounded-md bg-yc-text-primary text-yc-text-inverse hover:bg-yc-text-secondary text-sm flex items-center">
               <LogOut size={14} className="mr-1.5" />
               登出
             </button>

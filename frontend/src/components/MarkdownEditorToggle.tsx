@@ -48,7 +48,7 @@ export default function MarkdownEditorToggle({
   );
 
   const previewBox = (
-    <div className="min-h-[220px] md:min-h-[280px] rounded-lg border border-slate-200 bg-slate-50 p-3 max-w-none overflow-x-auto overflow-y-auto">
+    <div className="min-h-[220px] md:min-h-[280px] rounded-lg border border-yc-border bg-yc-bg-secondary p-3 max-w-none overflow-x-auto overflow-y-auto">
       <MarkdownPreview>{value || "_暂无内容_"}</MarkdownPreview>
     </div>
   );

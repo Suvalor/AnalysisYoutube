@@ -22,7 +22,6 @@ class Settings(BaseSettings):
     field_encryption_secret: str = Field("", alias="FIELD_ENCRYPTION_SECRET")
     algorithm: str = Field("HS256", alias="ALGORITHM")
     access_token_expire_minutes: int = Field(1440, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
-    youtube_api_key: str = Field("", alias="YOUTUBE_API_KEY")
     # 智能视觉 CV（图像修补 Inpaint）：AccessKey + SecretKey
     volc_cv_access_key_id: str = Field("", alias="VOLC_CV_ACCESS_KEY_ID")
     volc_cv_secret_access_key: str = Field("", alias="VOLC_CV_SECRET_ACCESS_KEY")
@@ -64,7 +63,7 @@ class Settings(BaseSettings):
 
     # 支持单个 URL、逗号分隔字符串，或 JSON 数组字符串
     backend_cors_origins: str = Field(
-        "http://localhost:5173",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174",
         alias="BACKEND_CORS_ORIGINS",
     )
 

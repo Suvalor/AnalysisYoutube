@@ -9,6 +9,7 @@ export const lightTokens: TokenMap = {
   "--color-primary-border": "#91caff",
 
   "--color-bg-base": "#ffffff",
+  "--color-bg-secondary": "#f1f5f9",
   "--color-bg-layout": "#f8f9fa",
   "--color-bg-sidebar": "#ffffff",
   "--color-bg-header": "#ffffff",

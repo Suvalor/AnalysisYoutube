@@ -91,17 +91,17 @@ export default function AiModelSettings() {
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center bg-[#F8F9FA]">
+      <div className="h-full flex items-center justify-center bg-yc-bg-layout">
         <Spin />
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[#F8F9FA] p-4 md:p-8">
-      <div className="max-w-3xl mx-auto bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900 mb-1">模型与 API 配置</h2>
-        <p className="text-sm text-slate-600 mb-6">
+    <div className="h-full overflow-y-auto bg-yc-bg-layout p-4 md:p-8">
+      <div className="max-w-3xl mx-auto bg-yc-bg-card border border-yc-border rounded-lg p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-yc-text-primary mb-1">模型与 API 配置</h2>
+        <p className="text-sm text-yc-text-secondary mb-6">
           API Key 仅通过 HTTPS 提交，服务端加密后写入数据库；列表页永不回显明文。留空密钥表示不修改已保存的密钥。
         </p>
 

@@ -9,6 +9,7 @@ export const deepBlueTokens: TokenMap = {
   "--color-primary-border": "rgba(34,211,238,0.25)",
 
   "--color-bg-base": "#0c1929",
+  "--color-bg-secondary": "#122640",
   "--color-bg-layout": "#081422",
   "--color-bg-sidebar": "#0e1e33",
   "--color-bg-header": "#0e1e33",

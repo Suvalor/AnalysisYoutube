@@ -9,6 +9,7 @@ export const TOKEN = {
 
   // 背景色
   BG_BASE: "--color-bg-base",
+  BG_SECONDARY: "--color-bg-secondary",
   BG_LAYOUT: "--color-bg-layout",
   BG_SIDEBAR: "--color-bg-sidebar",
   BG_HEADER: "--color-bg-header",

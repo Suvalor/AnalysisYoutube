@@ -847,11 +847,11 @@ export default function ConfigCenter() {
                               <Form form={youtubeForm} layout="vertical" disabled={integrationLoading}>
                                 <Form.Item
                                   name="youtube_api_key"
-                                  label="YOUTUBE_API_KEY"
+                                  label="YouTube API Key"
                                   extra={
                                     integrationMeta?.has_youtube_api_key
                                       ? `已配置（${SECRET_MASK}），留空不修改；定时任务按组织使用该 Key`
-                                      : "未配置时使用环境变量"
+                                      : "未配置，请在下方填写"
                                   }
                                 >
                                   <Input.Password placeholder="粘贴新 Key 以覆盖组织配置" autoComplete="new-password" />
