@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SopScriptCreate(BaseModel):
@@ -166,6 +166,8 @@ class SopMediaRead(BaseModel):
 
 
 class SopAiSplitRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     outline_markdown: str = Field(..., min_length=1)
     model_id: str | None = Field(None, min_length=1, max_length=128)
     agent_id: int | None = None

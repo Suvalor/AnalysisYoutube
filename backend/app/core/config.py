@@ -63,7 +63,7 @@ class Settings(BaseSettings):
 
     # 支持单个 URL、逗号分隔字符串，或 JSON 数组字符串
     backend_cors_origins: str = Field(
-        "http://localhost:5173",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174",
         alias="BACKEND_CORS_ORIGINS",
     )
 
