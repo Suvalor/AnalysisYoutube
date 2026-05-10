@@ -3,6 +3,17 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class JimengSubmitRequest(BaseModel):
+    model_name: str = Field(..., min_length=1, max_length=255)
+    prompt: str = Field(..., min_length=1, max_length=5000)
+    negative_prompt: str | None = Field(default=None, max_length=5000)
+    params: dict[str, Any] | None = None
+
+
+class JimengQueryRequest(BaseModel):
+    task_id: str = Field(..., min_length=1)
+
+
 class JimengGenerateRequest(BaseModel):
     model_name: str = Field(..., min_length=1, max_length=255)
     prompt: str = Field(..., min_length=1, max_length=5000)
