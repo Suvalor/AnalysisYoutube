@@ -488,6 +488,212 @@ async def blue_ocean_radar_scan(
         ) from e
 
 
+@dataclass
+class BlueOceanRadarResult:
+    """蓝海雷达扫描结果：仅内存数据，不落库。"""
+
+    items: list[dict]
+    warnings: list[str]
+    search_calls: int
+    channels_list_calls: int
+    videos_list_calls: int
+
+
+async def blue_ocean_radar_scan(
+    *,
+    keyword: str,
+    published_after_days: int,
+    max_subscribers: int,
+    outlier_multiplier: float,
+    video_duration: str,
+    youtube_api_key: str,
+) -> BlueOceanRadarResult:
+    """
+    蓝海雷达核心逻辑：
+    Step 1: search.list (type=video, order=viewCount) 找高播放视频
+    Step 2: 对 channelId 去重 → 批量 channels.list (snippet+statistics)
+    Step 3: 数据清洗 → subscriberCount < max_subscribers 且 outlier_score >= outlier_multiplier
+    Step 4: 组装返回数据
+    """
+    _require_api_key(youtube_api_key)
+    kw = (keyword or "").strip()
+    if not kw:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="keyword 不能为空")
+
+    warnings: list[str] = []
+    now_utc = datetime.now(timezone.utc)
+    published_after_dt = now_utc - timedelta(days=max(1, int(published_after_days)))
+    published_after_iso = published_after_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    search_calls = 0
+    channels_list_calls = 0
+    videos_list_calls = 0
+
+    search_params: dict = {
+        "part": "snippet",
+        "type": "video",
+        "q": kw,
+        "order": "viewCount",
+        "publishedAfter": published_after_iso,
+        "maxResults": 50,
+        "key": youtube_api_key,
+    }
+    if video_duration and video_duration != "any":
+        search_params["videoDuration"] = video_duration
+
+    try:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+            # Step 1: search.list 找高播放量视频
+            resp = await client.get(f"{YOUTUBE_API_BASE}/search", params=search_params)
+            search_calls = 1
+            _raise_for_youtube_response(resp)
+            search_data = resp.json()
+
+            # 提取 videoId → channelId 映射（同一频道只保留首个视频）
+            channel_first_video: dict[str, str] = {}
+            for item in search_data.get("items", []):
+                vid = (item.get("id") or {}).get("videoId")
+                cid = (item.get("snippet") or {}).get("channelId")
+                if isinstance(vid, str) and vid.strip() and isinstance(cid, str) and cid.strip():
+                    cid = cid.strip()
+                    if cid not in channel_first_video:
+                        channel_first_video[cid] = vid.strip()
+
+            if not channel_first_video:
+                return BlueOceanRadarResult(
+                    items=[], warnings=warnings,
+                    search_calls=search_calls,
+                    channels_list_calls=0, videos_list_calls=0,
+                )
+
+            ordered_cids = list(channel_first_video.keys())
+
+            # Step 1 补充: videos.list 获取精确播放量
+            trigger_video_views_map: dict[str, int] = {}
+            ordered_video_ids: list[str] = list(dict.fromkeys(channel_first_video.values()))
+
+            for group in chunked(ordered_video_ids, MAX_IDS_PER_REQUEST):
+                videos_list_calls += 1
+                resp = await client.get(
+                    f"{YOUTUBE_API_BASE}/videos",
+                    params={
+                        "part": "statistics",
+                        "id": ",".join(group),
+                        "key": youtube_api_key,
+                    },
+                )
+                _raise_for_youtube_response(resp)
+                payload = resp.json()
+                for video in payload.get("items", []):
+                    vid_id = video.get("id")
+                    if not isinstance(vid_id, str) or not vid_id:
+                        continue
+                    try:
+                        trigger_views = int((video.get("statistics") or {}).get("viewCount", 0))
+                    except (TypeError, ValueError):
+                        trigger_views = 0
+                    trigger_video_views_map[vid_id] = trigger_views
+
+            # Step 2: 批量 channels.list
+            channel_rows: dict[str, dict] = {}
+            for group in chunked(ordered_cids, MAX_IDS_PER_REQUEST):
+                channels_list_calls += 1
+                resp = await client.get(
+                    f"{YOUTUBE_API_BASE}/channels",
+                    params={
+                        "part": "snippet,statistics",
+                        "id": ",".join(group),
+                        "key": youtube_api_key,
+                    },
+                )
+                _raise_for_youtube_response(resp)
+                payload = resp.json()
+                for ch in payload.get("items", []):
+                    cid = ch.get("id")
+                    if isinstance(cid, str) and cid:
+                        channel_rows[cid] = ch
+
+            # Step 3: 数据清洗 → 异常值过滤
+            items: list[dict] = []
+            for cid in ordered_cids:
+                video_id = channel_first_video[cid]
+                ch = channel_rows.get(cid)
+                if not ch:
+                    warnings.append(f"频道 {cid}：channels.list 未返回详情，已跳过")
+                    continue
+
+                stats = ch.get("statistics") or {}
+                sub_raw = stats.get("subscriberCount")
+                if sub_raw is None:
+                    warnings.append(f"频道 {cid}：订阅数未公开，已跳过")
+                    continue
+                try:
+                    sub = int(sub_raw)
+                except (TypeError, ValueError):
+                    warnings.append(f"频道 {cid}：订阅数字段异常，已跳过")
+                    continue
+
+                if sub >= max_subscribers:
+                    continue
+
+                trigger_views = trigger_video_views_map.get(video_id, 0)
+                outlier_score = trigger_views / max(sub, 1)
+
+                if outlier_score < outlier_multiplier:
+                    continue
+
+                try:
+                    total_views = int(stats.get("viewCount", 0))
+                except (TypeError, ValueError):
+                    total_views = 0
+
+                snippet = ch.get("snippet") or {}
+                title = snippet.get("title") or ""
+                thumbs = snippet.get("thumbnails") or {}
+                high = thumbs.get("high") or {}
+                default_thumb = thumbs.get("default") or {}
+                thumbnail_url = high.get("url") or default_thumb.get("url")
+
+                items.append(
+                    {
+                        "yt_channel_id": cid,
+                        "title": title,
+                        "thumbnail_url": thumbnail_url,
+                        "subscriber_count": sub,
+                        "channel_total_views": total_views,
+                        "trigger_video_id": video_id,
+                        "trigger_video_views": trigger_views,
+                        "outlier_score": round(outlier_score, 2),
+                        "channel_url": f"https://www.youtube.com/channel/{cid}",
+                        "viral_video_url": f"https://www.youtube.com/watch?v={video_id}",
+                    }
+                )
+
+            # 按 outlier_score 降序排列
+            items.sort(key=lambda x: x["outlier_score"], reverse=True)
+
+            return BlueOceanRadarResult(
+                items=items,
+                warnings=warnings,
+                search_calls=search_calls,
+                channels_list_calls=channels_list_calls,
+                videos_list_calls=videos_list_calls,
+            )
+
+    except HTTPException:
+        raise
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"访问 YouTube API 网络异常：{e}",
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"蓝海雷达扫描过程发生异常：{e}",
+        ) from e
+
+
 def enrich_video_items(items: list[dict]) -> None:
     """为 videos.list 返回的条目补充时长等派生字段（原地修改）。"""
     for item in items:

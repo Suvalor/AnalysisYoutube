@@ -1,4 +1,4 @@
-import { Alert, Button, Form, Input, InputNumber, Modal, Popconfirm, Popover, Select, Spin, Table, Tag, Typography, message } from "antd";
+import { Alert, Button, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Popover, Select, Spin, Table, Tag, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -7,10 +7,12 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import {
   analyzeYouTubeBatchApi,
   batchUpdateChannelsApi,
+  blueOceanRadarApi,
   deleteYouTubeChannelApi,
   discoverChannelsApi,
   getYouTubeQuotaDashboardApi,
   listYouTubeChannelsApi,
+  type BlueOceanChannelItem,
   type DiscoverChannelItem,
   type YouTubeAnalyzeResponse,
 } from "@/services/authApi";
@@ -31,6 +33,14 @@ type DiscoverFormValues = {
   published_after: 7 | 14 | 30;
   max_subscribers: number;
   max_results: number;
+};
+
+type BlueOceanFormValues = {
+  keyword: string;
+  published_after: number;
+  max_subscribers: number;
+  outlier_multiplier: number;
+  video_duration: string;
 };
 
 export default function ChannelList() {
@@ -54,6 +64,13 @@ export default function ChannelList() {
   const [discoverWarnings, setDiscoverWarnings] = useState<string[]>([]);
   const [addingDiscoverYtId, setAddingDiscoverYtId] = useState<string | null>(null);
   const [discoverForm] = Form.useForm<DiscoverFormValues>();
+  const [blueOceanOpen, setBlueOceanOpen] = useState(false);
+  const [blueOceanLoading, setBlueOceanLoading] = useState(false);
+  const [blueOceanItems, setBlueOceanItems] = useState<BlueOceanChannelItem[]>([]);
+  const [blueOceanWarnings, setBlueOceanWarnings] = useState<string[]>([]);
+  const [addingBlueOceanYtId, setAddingBlueOceanYtId] = useState<string | null>(null);
+  const [followedBlueOceanIds, setFollowedBlueOceanIds] = useState<Set<string>>(new Set());
+  const [blueOceanForm] = Form.useForm<BlueOceanFormValues>();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const monitoredYtIds = useMemo(() => new Set(allRows.map((r) => r.channel.yt_channel_id)), [allRows]);
@@ -229,6 +246,153 @@ export default function ChannelList() {
       setAddingDiscoverYtId(null);
     }
   };
+
+  const openBlueOceanDrawer = () => {
+    setBlueOceanItems([]);
+    setBlueOceanWarnings([]);
+    setFollowedBlueOceanIds(new Set());
+    blueOceanForm.resetFields();
+    blueOceanForm.setFieldsValue({
+      keyword: "",
+      published_after: 90,
+      max_subscribers: 30000,
+      outlier_multiplier: 10,
+      video_duration: "long",
+    });
+    setBlueOceanOpen(true);
+  };
+
+  const onBlueOceanSubmit = async (values: BlueOceanFormValues) => {
+    setBlueOceanLoading(true);
+    try {
+      const data = await blueOceanRadarApi({
+        keyword: values.keyword.trim(),
+        published_after: values.published_after,
+        max_subscribers: values.max_subscribers,
+        outlier_multiplier: values.outlier_multiplier,
+        video_duration: values.video_duration,
+      });
+      setBlueOceanItems(data.items);
+      setBlueOceanWarnings(data.warnings ?? []);
+      if (!data.items.length) {
+        message.info("未发现符合条件的蓝海频道，可尝试放宽粉丝上限或降低爆款系数要求");
+      }
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: unknown } } };
+      message.error(
+        typeof err.response?.data?.detail === "string" ? err.response.data.detail : "蓝海雷达扫描失败"
+      );
+    } finally {
+      setBlueOceanLoading(false);
+    }
+  };
+
+  const onBlueOceanAddFollow = async (row: BlueOceanChannelItem) => {
+    if (monitoredYtIds.has(row.yt_channel_id) || followedBlueOceanIds.has(row.yt_channel_id)) {
+      message.info("该频道已在关注列表中");
+      return;
+    }
+    setAddingBlueOceanYtId(row.yt_channel_id);
+    message.loading({ content: "正在提交入库任务…", key: "bo-add", duration: 0 });
+    try {
+      await analyzeYouTubeBatchApi({ urls: row.channel_url });
+      message.success({ content: "入库任务已提交后台，请稍后刷新列表查看。", key: "bo-add" });
+      setFollowedBlueOceanIds((prev) => new Set(prev).add(row.yt_channel_id));
+      await load();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: unknown } } };
+      message.error({
+        content: typeof err.response?.data?.detail === "string" ? err.response.data.detail : "入库失败",
+        key: "bo-add",
+      });
+    } finally {
+      setAddingBlueOceanYtId(null);
+    }
+  };
+
+  const blueOceanColumns: ColumnsType<BlueOceanChannelItem> = [
+    {
+      title: "频道信息",
+      key: "ch",
+      render: (_, r) => (
+        <div className="flex items-center gap-2 min-w-0">
+          <img src={r.thumbnail_url || ""} alt="" className="w-9 h-9 rounded-full border border-slate-200 shrink-0" />
+          <div className="min-w-0">
+            <Typography.Text ellipsis={{ tooltip: r.title }} className="font-medium text-slate-900 block">
+              {r.title}
+            </Typography.Text>
+            <Typography.Link
+              href={r.channel_url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs"
+              onClick={(e) => e.stopPropagation()}
+            >
+              打开频道
+            </Typography.Link>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "订阅数",
+      dataIndex: "subscriber_count",
+      width: 100,
+      sorter: (a, b) => a.subscriber_count - b.subscriber_count,
+      render: (v: number) => formatNumber(v),
+    },
+    {
+      title: "频道总播放",
+      dataIndex: "channel_total_views",
+      width: 120,
+      sorter: (a, b) => a.channel_total_views - b.channel_total_views,
+      render: (v: number) => formatNumber(v),
+    },
+    {
+      title: "爆款视频",
+      key: "vurl",
+      width: 180,
+      render: (_, r) => (
+        <div className="flex flex-col leading-tight">
+          <Typography.Link href={r.viral_video_url} target="_blank" rel="noreferrer">
+            打开视频
+          </Typography.Link>
+          <span className="text-xs text-slate-500">播放：{formatNumber(r.trigger_video_views)}</span>
+        </div>
+      ),
+    },
+    {
+      title: "爆款系数",
+      dataIndex: "outlier_score",
+      width: 110,
+      defaultSortOrder: "descend" as const,
+      sorter: (a, b) => a.outlier_score - b.outlier_score,
+      render: (v: number) => (
+        <Tag color={v >= 50 ? "red" : v >= 20 ? "orange" : "blue"} className="font-mono font-semibold text-sm">
+          {v.toFixed(1)}x
+        </Tag>
+      ),
+    },
+    {
+      title: "操作",
+      key: "op",
+      width: 110,
+      render: (_, r) => {
+        const already = monitoredYtIds.has(r.yt_channel_id) || followedBlueOceanIds.has(r.yt_channel_id);
+        return (
+          <Button
+            type="primary"
+            size="small"
+            disabled={already}
+            loading={addingBlueOceanYtId === r.yt_channel_id}
+            onClick={() => void onBlueOceanAddFollow(r)}
+          >
+            {already ? "已关注" : "入库关注"}
+          </Button>
+        );
+      },
+    },
+  ];
 
   const discoverColumns: ColumnsType<DiscoverChannelItem> = [
     {
@@ -456,6 +620,9 @@ export default function ChannelList() {
             <Button type="primary" ghost onClick={openDiscoverModal}>
               🔍 智能挖掘爆款小号
             </Button>
+            <Button type="primary" onClick={openBlueOceanDrawer}>
+              🌊 蓝海雷达挖掘
+            </Button>
             <Button type="primary" loading={updating} onClick={() => void onBatchUpdate()}>
               一键更新数据
             </Button>
@@ -589,6 +756,106 @@ export default function ChannelList() {
           />
         </Spin>
       </Modal>
+
+      <Drawer
+        title="🌊 蓝海雷达 — 低粉爆款频道挖掘"
+        open={blueOceanOpen}
+        onClose={() => setBlueOceanOpen(false)}
+        width={980}
+        destroyOnClose
+      >
+        <Alert
+          type="info"
+          showIcon
+          className="mb-4"
+          message="蓝海雷达会搜索粉丝量低但近期产出超级爆款的潜力频道。每次扫描约消耗 100+ 点 API 配额，请合理使用。"
+        />
+        <Spin spinning={blueOceanLoading}>
+          <Form<BlueOceanFormValues>
+            form={blueOceanForm}
+            layout="vertical"
+            className="mb-4"
+            initialValues={{
+              published_after: 90,
+              max_subscribers: 30000,
+              outlier_multiplier: 10,
+              video_duration: "long",
+            }}
+            onFinish={(v) => void onBlueOceanSubmit(v)}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
+              <Form.Item
+                name="keyword"
+                label="搜索关键词"
+                rules={[{ required: true, message: "请输入关键词" }]}
+              >
+                <Input allowClear placeholder="例如：AI 教程、健身、科技评测" maxLength={200} />
+              </Form.Item>
+              <Form.Item name="published_after" label="发布时间范围">
+                <Select
+                  options={[
+                    { value: 30, label: "近 1 个月" },
+                    { value: 90, label: "近 3 个月" },
+                    { value: 180, label: "近半年" },
+                  ]}
+                />
+              </Form.Item>
+              <Form.Item name="max_subscribers" label="最高粉丝限制">
+                <InputNumber min={0} max={999999999} className="w-full" />
+              </Form.Item>
+              <Form.Item name="outlier_multiplier" label="爆款系数要求（视频播放量 / 粉丝数）">
+                <InputNumber min={1} max={10000} step={1} className="w-full" />
+              </Form.Item>
+              <Form.Item name="video_duration" label="视频时长">
+                <Select
+                  options={[
+                    { value: "long", label: "长视频（> 20 分钟）" },
+                    { value: "medium", label: "中等（4-20 分钟）" },
+                    { value: "short", label: "短视频（< 4 分钟）" },
+                    { value: "any", label: "不限时长" },
+                  ]}
+                />
+              </Form.Item>
+            </div>
+            <Button type="primary" htmlType="submit" loading={blueOceanLoading}>
+              开始深度雷达扫描
+            </Button>
+          </Form>
+
+          {blueOceanWarnings.length > 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              className="mb-3"
+              message="部分条目已跳过"
+              description={
+                <ul className="list-disc pl-4 mb-0 text-sm">
+                  {blueOceanWarnings.slice(0, 8).map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+              }
+            />
+          )}
+
+          <div className="text-sm text-slate-600 mb-2">
+            扫描结果（未写入数据库，点击「入库关注」后才会持久化）
+            {blueOceanItems.length > 0 && (
+              <span className="ml-2 text-slate-400">共 {blueOceanItems.length} 个蓝海频道</span>
+            )}
+          </div>
+          <Table<BlueOceanChannelItem>
+            rowKey="yt_channel_id"
+            size="small"
+            columns={blueOceanColumns}
+            dataSource={blueOceanItems}
+            pagination={blueOceanItems.length > 10 ? { pageSize: 10 } : false}
+            locale={{
+              emptyText: blueOceanLoading ? "雷达扫描中…" : "暂无数据，请填写参数并点击「开始深度雷达扫描」",
+            }}
+          />
+        </Spin>
+      </Drawer>
     </div>
   );
 }

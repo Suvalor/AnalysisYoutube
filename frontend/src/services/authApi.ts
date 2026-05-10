@@ -146,6 +146,12 @@ export type BlueOceanChannelItem = {
   title: string;
   thumbnail_url: string | null;
   subscriber_count: number;
+  channel_total_views: number;
+  trigger_video_id: string;
+  trigger_video_views: number;
+  outlier_score: number;
+  channel_url: string;
+  viral_video_url: string;
   total_views: number;
   channel_url: string;
   viral_video_url: string;
@@ -157,6 +163,17 @@ export type BlueOceanRadarResponse = {
   items: BlueOceanChannelItem[];
   warnings: string[];
 };
+
+export async function blueOceanRadarApi(payload: {
+  keyword: string;
+  published_after?: number;
+  max_subscribers?: number;
+  outlier_multiplier?: number;
+  video_duration?: string;
+}) {
+  const res = await apiClient.post("/api/channels/blue-ocean-radar", payload);
+  return res.data as BlueOceanRadarResponse;
+}
 
 export type RadarAiRetrospectiveRequest = {
   lookback_days?: number;
