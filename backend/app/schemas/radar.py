@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class BlueOceanRadarRequest(BaseModel):
@@ -51,6 +51,7 @@ class BlueOceanRadarResponse(BaseModel):
 class RadarAiRetrospectiveRequest(BaseModel):
     """蓝海雷达 AI 复盘请求。"""
 
+    model_config = ConfigDict(protected_namespaces=())
     lookback_days: int = Field(default=14, ge=7, le=90, description="回看天数")
     top_n: int = Field(default=8, ge=3, le=20, description="高低样本各取 N 条")
     model_library_id: int = Field(..., ge=1, description="模型库 ID")
@@ -204,6 +205,7 @@ class ExportReportResponse(BaseModel):
 class NavigationGuideRequest(BaseModel):
     """出海导航请求。"""
 
+    model_config = ConfigDict(protected_namespaces=())
     languages: list[str] = Field(..., min_length=1, description="语言能力，如 ['中文', '英语']")
     content_format: list[str] = Field(default=["video"], description="内容形式，如 ['video', 'short']")
     budget_level: Literal["zero", "low", "medium", "high"] = Field(default="low", description="预算水平")
@@ -330,6 +332,7 @@ class NavigationGuideResponse(BaseModel):
 class NavigationChatRequest(BaseModel):
     """出海导航追问请求。"""
 
+    model_config = ConfigDict(protected_namespaces=())
     conversation_id: str = Field(..., min_length=1, description="对话 ID")
     user_message: str = Field(..., min_length=1, max_length=2000, description="用户追问内容")
     model_library_id: int | None = None
