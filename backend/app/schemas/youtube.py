@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class YouTubeAnalyzeRequest(BaseModel):
@@ -45,6 +45,7 @@ class YouTubeVideoRead(BaseModel):
     like_count: int
     comment_count: int
     channel_title: str | None = Field(default=None, description="所属频道标题（跨频道列表时填充）")
+    yt_channel_id: str | None = Field(default=None, description="所属频道 YouTube ID（跨频道列表时填充）")
     has_analysis: bool = Field(
         default=False,
         description="当前组织在 video_analyses 中是否已有该视频的 AI 分析记录（列表仅布尔，不含正文）",
@@ -79,6 +80,8 @@ class YouTubeChannelRead(BaseModel):
 
 class YouTubeChannelAiAnalyzeRequest(BaseModel):
     """博主详情页 AI 深度分析：使用配置中心模型与智能体。"""
+
+    model_config = ConfigDict(protected_namespaces=())
 
     model_library_id: int = Field(..., ge=1, description="model_libraries 表主键")
     llm_model_name: str = Field(..., min_length=1, max_length=128, description="该配置下要调用的具体模型名")
@@ -122,6 +125,8 @@ class CommentScrapeResponse(BaseModel):
 
 
 class YouTubeChannelAIAnalyzeResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     tags: list[str] = Field(default_factory=list, description="AI 推断的频道核心标签")
     expertise: str = Field(default="", description="AI 总结的擅长内容")
     age_group: str = Field(..., description="AI 推断的受众年龄段与性别倾向")
@@ -135,15 +140,35 @@ class YouTubeChannelAIAnalyzeResponse(BaseModel):
 class YouTubeVideoAnalyzeRequest(BaseModel):
     """一键 AI 深度分析：视频维度持久化写入。"""
 
+    model_config = ConfigDict(protected_namespaces=())
+
     video_id: int = Field(..., ge=1, description="youtube_videos 表主键 id")
     model_id: str = Field(..., min_length=1, max_length=128, description="LLM model 标识（来自模型库支持的 value）")
     agent_id: int | None = Field(default=None, description="prompt_libraries 表主键，可选")
 
 
+class BatchAnalysisStatusItem(BaseModel):
+    has_analysis: bool = False
+    analyzed_at: datetime | None = Field(None, description="最近一次分析时间 (updated_at)")
+
+
 class YouTubeVideoAnalysisResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     video_id: int
     model_id: str
     agent_id: int | None
     content: str
     updated_at: datetime
+
+
+class CompetitorAiInsightRequest(BaseModel):
+    """AI 竞争格局分析请求。"""
+
+    model_config = ConfigDict(protected_namespaces=())
+
+    channel_ids: list[int] = Field(..., min_length=2, description="至少选择 2 个频道")
+    model_library_id: int | None = Field(default=None, description="model_libraries 表主键")
+    llm_model_name: str | None = Field(default=None, description="LLM 模型名称")
+    agent_id: int | None = Field(default=None, description="prompt_libraries 表主键")
 

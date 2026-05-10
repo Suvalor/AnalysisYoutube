@@ -49,6 +49,8 @@ class ModelLibrary(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     # chat：对话/脚本工坊；image_inpaint：去水印等 OpenAI 兼容 images.edit
     library_kind: Mapped[str] = mapped_column(String(32), nullable=False, default="chat", server_default="chat")
+    # LLM 协议：anthropic（默认）/ openai
+    protocol: Mapped[str] = mapped_column(String(16), nullable=False, default="anthropic", server_default="anthropic")
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     api_base_url: Mapped[str] = mapped_column(String(512), nullable=False)
     api_key_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)

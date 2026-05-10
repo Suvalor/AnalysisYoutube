@@ -32,6 +32,7 @@ from app.crud.youtube import (
 from app.crud.quota import get_quota_by_date, list_quota_recent_days
 from app.models.youtube import YouTubeChannel, YouTubeComment, YouTubeVideo
 from app.schemas.youtube import (
+    CompetitorAiInsightRequest,
     CommentScrapeRequest,
     CommentScrapeResponse,
     QuotaDashboardResponse,
@@ -75,6 +76,10 @@ from app.services.youtube_service import (
 )
 from app.services.quota_service import record_api_quota_usage, record_bulk_pipeline_quota
 from app.services.config_manager import resolve_integration_config
+from app.services.llm_conversation_service import (
+    load_conversation_messages,
+    save_conversation_turn,
+)
 
 
 router = APIRouter()
@@ -91,8 +96,9 @@ def _videos_to_read(rows: list[tuple[YouTubeVideo, bool]]) -> list[YouTubeVideoR
     for x, has_analysis in rows:
         ch = getattr(x, "channel", None)
         ch_title = ch.title if ch is not None else None
+        ch_yt_id = ch.yt_channel_id if ch is not None else None
         base = _video_to_read(x)
-        items.append(base.model_copy(update={"channel_title": ch_title, "has_analysis": has_analysis}))
+        items.append(base.model_copy(update={"channel_title": ch_title, "yt_channel_id": ch_yt_id, "has_analysis": has_analysis}))
     return items
 
 
@@ -109,7 +115,7 @@ async def analyze_youtube_channel(
     icfg = await resolve_integration_config(db, org_id=current_user.org_id)
     identifier = parse_youtube_identifier(payload.youtube_url)
     item = await fetch_channel_info(identifier, youtube_api_key=icfg.youtube_api_key)
-    await record_api_quota_usage(db, "channels")
+    await record_api_quota_usage(db, "channels", part_count=2)
 
     snippet = item.get("snippet", {})
     statistics = item.get("statistics", {})
@@ -137,8 +143,11 @@ async def analyze_youtube_channel(
         db,
         for_handle_calls=0,
         channels_list_calls=fr_quota.channels_calls,
+        channels_part_count=1,
         playlist_items_calls=fr_quota.playlist_items_calls,
+        playlist_items_part_count=1,
         videos_list_calls=fr_quota.videos_list_calls,
+        videos_part_count=4,
     )
     for video in recent_videos_raw:
         video.setdefault("_parsed_published_at", parse_datetime(video.get("snippet", {}).get("publishedAt")))
@@ -161,7 +170,7 @@ async def analyze_youtube_channel(
     await db.commit()
     await db.refresh(channel)
 
-    if await enrich_youtube_channel_ai(db, channel, integration=icfg):
+    if await enrich_youtube_channel_ai(db, channel):
         await db.commit()
         await db.refresh(channel)
 
@@ -201,7 +210,7 @@ async def _process_analyze_youtube_batch_task(
                 identifier = parse_youtube_identifier(raw_url)
                 item = await fetch_channel_info(identifier, youtube_api_key=youtube_api_key)
 
-                await record_api_quota_usage(session, "channels")
+                await record_api_quota_usage(session, "channels", part_count=2)
 
                 snippet = item.get("snippet", {})
                 statistics = item.get("statistics", {})
@@ -226,7 +235,7 @@ async def _process_analyze_youtube_batch_task(
 
                 # AI 非流式打标签：失败也不应中断该 URL
                 try:
-                    await enrich_youtube_channel_info_ai_sync(session, channel, integration=icfg)
+                    await enrich_youtube_channel_info_ai_sync(session, channel, user_id=user_id)
                 except Exception:  # noqa: BLE001
                     await session.rollback()
                     logger.exception("后台批量添加：AI 打标签失败 raw_url=%r", raw_url)
@@ -242,8 +251,11 @@ async def _process_analyze_youtube_batch_task(
                     session,
                     for_handle_calls=0,
                     channels_list_calls=fr_quota.channels_calls,
+                    channels_part_count=1,
                     playlist_items_calls=fr_quota.playlist_items_calls,
+                    playlist_items_part_count=1,
                     videos_list_calls=fr_quota.videos_list_calls,
+                    videos_part_count=4,
                 )
 
                 for video in recent_videos_raw:
@@ -316,8 +328,11 @@ async def _process_batch_update_channels_task(
                 session,
                 for_handle_calls=0,
                 channels_list_calls=pipeline.channels_list_calls,
+                channels_part_count=3,
                 playlist_items_calls=pipeline.playlist_items_calls,
+                playlist_items_part_count=1,
                 videos_list_calls=pipeline.videos_list_calls,
+                videos_part_count=4,
             )
 
             yt_to_db = await bulk_upsert_channels_from_api_items(session, pipeline.channel_items)
@@ -354,7 +369,7 @@ async def _process_batch_update_channels_task(
                 if not channel_needs_ai_tag_fill(ch):
                     continue
                 try:
-                    await enrich_youtube_channel_info_ai_sync(session, ch, integration=icfg)
+                    await enrich_youtube_channel_info_ai_sync(session, ch, user_id=user_id)
                     ch.updated_at = datetime.now(timezone.utc)
                     await session.commit()
                 except Exception:  # noqa: BLE001
@@ -389,7 +404,7 @@ async def analyze_youtube_batch(
         )
 
     if not (icfg.youtube_api_key or "").strip():
-        raise HTTPException(status_code=400, detail="未配置 YouTube Data API Key（检查设置中心或环境变量 YOUTUBE_API_KEY）")
+        raise HTTPException(status_code=400, detail="未配置 YouTube Data API Key，请在设置中心填写")
 
     # 入队后台任务：控制器不再进行 YouTube/LLM 调用，避免 HTTP 超时
     background_tasks.add_task(
@@ -686,13 +701,30 @@ async def analyze_channel_ai(
         raise
     except Exception as exc:  # noqa: BLE001
         await db.rollback()
+        logger.exception("AI 分析失败 channel_id=%s", channel_id)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"AI 分析失败: {exc}",
+            detail="AI 分析服务异常，请稍后重试",
         ) from exc
 
     await db.commit()
     await db.refresh(channel)
+
+    # 保存对话记忆：频道 AI 分析结果
+    try:
+        await save_conversation_turn(
+            db,
+            user_id=current_user.id,
+            entity_type="channel_ai",
+            entity_id=str(channel_id),
+            user_content=f"分析频道：{channel.title or channel.yt_channel_id}",
+            assistant_content=str(result),
+            model_name=result.get("llm_model_name"),
+        )
+        await db.commit()
+    except Exception:  # noqa: BLE001
+        logger.exception("保存频道 AI 分析对话历史失败 channel_id=%s", channel_id)
+        await db.rollback()
 
     return YouTubeChannelAIAnalyzeResponse(
         tags=result["tags"],
@@ -758,7 +790,7 @@ async def batch_update_channels(
         return SubmitTaskResponse(code=200, message="没有需要更新的频道（已跳过）")
 
     if not (icfg.youtube_api_key or "").strip():
-        raise HTTPException(status_code=400, detail="未配置 YouTube Data API Key（检查设置中心或环境变量 YOUTUBE_API_KEY）")
+        raise HTTPException(status_code=400, detail="未配置 YouTube Data API Key，请在设置中心填写")
 
     background_tasks.add_task(
         _process_batch_update_channels_task,
@@ -814,6 +846,52 @@ async def competitors_compare(
     return [result_map[k] for k in sorted(result_map.keys())]
 
 
+@router.post("/competitors/ai-insight", summary="AI 竞争格局分析")
+async def competitors_ai_insight(
+    body: CompetitorAiInsightRequest,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> dict:
+    """基于选中的频道数据，调用 LLM 生成竞争格局分析。"""
+    from app.services.competitor_ai_service import generate_competitor_ai_insight
+    from app.services.llm_conversation_service import load_conversation_messages, save_conversation_turn
+
+    result = await generate_competitor_ai_insight(
+        db,
+        user_id=current_user.id,
+        channel_ids=body.channel_ids,
+        model_library_id=body.model_library_id,
+        llm_model_name=body.llm_model_name,
+        agent_id=body.agent_id,
+    )
+
+    # 保存对话历史
+    entity_type = "competitor_insight"
+    entity_id = ":".join(str(cid) for cid in sorted(body.channel_ids))
+    if result.get("_user_prompt") and result.get("_assistant_content"):
+        try:
+            await save_conversation_turn(
+                db,
+                user_id=current_user.id,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                user_content=result["_user_prompt"],
+                assistant_content=result["_assistant_content"],
+                system_content=result.get("_system_prompt"),
+                model_name=body.llm_model_name,
+            )
+            await db.commit()
+        except Exception:  # noqa: BLE001
+            import logging as _logging
+            _logging.getLogger(__name__).exception("保存竞对洞察对话历史失败")
+            await db.rollback()
+
+    return {
+        "insight": result.get("insight", {}),
+        "conversation_id": f"{entity_type}:{entity_id}",
+    }
+
+
 @router.get("/oauth/url", response_model=YouTubeOAuthUrlResponse, summary="生成 Google OAuth 授权地址")
 async def get_youtube_oauth_url(current_user: CurrentUserDep) -> YouTubeOAuthUrlResponse:
     _ = current_user
@@ -846,9 +924,10 @@ async def youtube_oauth_callback(
 ) -> YouTubeOAuthStatusResponse:
     if not settings.google_oauth_client_id or not settings.google_oauth_client_secret:
         raise HTTPException(status_code=500, detail="Google OAuth 配置不完整")
-    redirect_uri = (payload.redirect_uri or settings.google_oauth_redirect_uri or "").strip()
+    # 强制使用服务端配置的 redirect_uri，不接受客户端传入（防止开放重定向攻击）
+    redirect_uri = (settings.google_oauth_redirect_uri or "").strip()
     if not redirect_uri:
-        raise HTTPException(status_code=500, detail="缺少 redirect_uri")
+        raise HTTPException(status_code=500, detail="服务端未配置 GOOGLE_OAUTH_REDIRECT_URI")
 
     async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
         token_resp = await client.post(
@@ -862,7 +941,8 @@ async def youtube_oauth_callback(
             },
         )
         if token_resp.status_code >= 400:
-            raise HTTPException(status_code=400, detail=f"OAuth token 兑换失败: {token_resp.text}")
+            logger.warning("OAuth token 兑换失败 status=%s", token_resp.status_code)
+            raise HTTPException(status_code=400, detail="OAuth token 兑换失败，请重新授权")
         token_data = token_resp.json()
         access_token = str(token_data.get("access_token") or "").strip()
         refresh_token = str(token_data.get("refresh_token") or "").strip()
@@ -888,6 +968,8 @@ async def youtube_oauth_callback(
         current_user.youtube_refresh_token_encrypted = encrypt_plaintext(refresh_token)
     current_user.youtube_token_expires_at = expires_at
     current_user.youtube_channel_id = channel_id
+    # OAuth 回调中调用了 channels.list(mine=true)，记录配额消耗
+    await record_api_quota_usage(db, "channels", part_count=1)
     await db.commit()
     await db.refresh(current_user)
 

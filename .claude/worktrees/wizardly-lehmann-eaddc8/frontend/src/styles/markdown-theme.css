@@ -1,0 +1,139 @@
+/* ============================================================
+   Markdown 主题感知样式
+   使用 CSS 变量，自动跟随当前主题切换
+   作用域：.markdown-preview
+   ============================================================ */
+
+.markdown-preview {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* 标题 */
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
+  color: var(--color-text-primary);
+  font-weight: 600;
+  margin-top: 1.4em;
+  margin-bottom: 0.6em;
+}
+
+.markdown-preview h1 { font-size: 1.6em; }
+.markdown-preview h2 { font-size: 1.4em; }
+.markdown-preview h3 { font-size: 1.2em; }
+.markdown-preview h4 { font-size: 1.05em; }
+
+/* 段落 */
+.markdown-preview p {
+  margin-bottom: 1em;
+  color: var(--color-text-primary);
+}
+
+/* 链接 */
+.markdown-preview a {
+  color: var(--color-text-link);
+  text-decoration: none;
+}
+
+.markdown-preview a:hover {
+  text-decoration: underline;
+}
+
+/* 行内代码 */
+.markdown-preview code {
+  background: var(--color-bg-code);
+  color: var(--color-danger);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+/* 代码块 */
+.markdown-preview pre {
+  background: var(--color-bg-code);
+  border: 1px solid var(--color-border-light);
+  border-radius: 8px;
+  padding: 1em;
+  overflow-x: auto;
+  margin-bottom: 1em;
+}
+
+.markdown-preview pre code {
+  background: transparent;
+  color: var(--color-text-primary);
+  padding: 0;
+  font-size: 0.9em;
+}
+
+/* 引用块 */
+.markdown-preview blockquote {
+  border-left: 4px solid var(--color-primary);
+  background: var(--color-primary-bg);
+  padding: 0.6em 1em;
+  margin: 0 0 1em 0;
+  color: var(--color-text-secondary);
+}
+
+/* 表格 */
+.markdown-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1em;
+}
+
+.markdown-preview th,
+.markdown-preview td {
+  border: 1px solid var(--color-border);
+  padding: 0.5em 0.8em;
+  text-align: left;
+}
+
+.markdown-preview th {
+  background: var(--color-bg-inset);
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.markdown-preview tr:nth-child(even) td {
+  background: var(--color-bg-inset);
+}
+
+/* 分割线 */
+.markdown-preview hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 1.5em 0;
+}
+
+/* 列表 */
+.markdown-preview ul,
+.markdown-preview ol {
+  padding-left: 1.8em;
+  margin-bottom: 1em;
+}
+
+.markdown-preview li {
+  margin-bottom: 0.3em;
+  color: var(--color-text-primary);
+}
+
+/* 图片 */
+.markdown-preview img {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
+/* 加粗 / 斜体 */
+.markdown-preview strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.markdown-preview em {
+  color: var(--color-text-secondary);
+}

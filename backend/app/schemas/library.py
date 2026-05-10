@@ -2,7 +2,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.ssrf_guard import validate_url_against_ssrf
 
 
 class AssetFileTypeEnum(str, Enum):
@@ -63,6 +65,16 @@ class ModelCreate(BaseModel):
         max_length=32,
         description="chat=对话与脚本工坊；image_inpaint=去水印等 OpenAI 兼容 images.edit",
     )
+    protocol: str = Field(
+        default="anthropic",
+        max_length=16,
+        description="LLM 协议：anthropic（默认）/ openai",
+    )
+
+    @field_validator("api_base_url")
+    @classmethod
+    def _validate_base_url(cls, v: str) -> str:
+        return validate_url_against_ssrf(v)
 
 
 class ModelUpdate(BaseModel):
@@ -71,6 +83,14 @@ class ModelUpdate(BaseModel):
     api_key: str | None = Field(None, min_length=1, max_length=2048)
     supported_models_json: str | list[str | dict[str, str]] | None = None
     library_kind: str | None = Field(None, max_length=32)
+    protocol: str | None = Field(None, max_length=16, description="LLM 协议：anthropic / openai")
+
+    @field_validator("api_base_url")
+    @classmethod
+    def _validate_base_url(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return validate_url_against_ssrf(v)
 
 
 class ModelRead(BaseModel):
@@ -224,7 +244,10 @@ class ManualKnowledgeScriptCreate(BaseModel):
 
 
 class GenerateScriptStreamRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     prompt_id: int
     style_id: int
     topic: str = Field(..., min_length=1, max_length=2000)
+    model_library_id: int = Field(..., ge=1, description="模型库 ID（model_libraries 表主键）")
+    model_name: str = Field("", max_length=128, description="模型名称，为空时取模型库默认首个模型")
 

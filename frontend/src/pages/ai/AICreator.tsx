@@ -1,6 +1,7 @@
 import { Button, Card, Input, Select, Typography, message } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { authFetch } from "@/services/apiClient";
 import {
   createScriptApi,
   listModelsApi,
@@ -119,12 +120,10 @@ export default function AICreator() {
     setGenerating(true);
     setGeneratedText("");
     try {
-      const token = localStorage.getItem("access_token");
-      const resp = await fetch("/api/v1/scripts/generate", {
+      const resp = await authFetch("/api/v1/scripts/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token ?? ""}`,
         },
         body: JSON.stringify({
           model: selectedModel,
@@ -134,10 +133,6 @@ export default function AICreator() {
         }),
       });
       if (resp.status === 401) {
-        localStorage.removeItem("access_token");
-        if (!window.location.pathname.startsWith("/login")) {
-          window.location.href = "/login";
-        }
         return;
       }
       if (!resp.ok || !resp.body) {
@@ -205,18 +200,18 @@ export default function AICreator() {
     }
   };
 
-  const cardClass = "border border-slate-200 shadow-none bg-white rounded-lg [&_.ant-card-body]:bg-white";
+  const cardClass = "border border-yc-border shadow-none bg-yc-bg-card rounded-lg [&_.ant-card-body]:bg-yc-bg-card";
 
   return (
-    <div className="min-h-full bg-white p-4 md:p-8 text-slate-900">
+    <div className="min-h-full bg-yc-bg-card p-4 md:p-8 text-yc-text-primary">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className={`lg:col-span-1 ${cardClass}`}>
-          <Title level={4} className="!mb-4 !text-slate-900">
+          <Title level={4} className="!mb-4 !text-yc-text-primary">
             AI 脚本工坊
           </Title>
           <div className="space-y-4">
             <div>
-              <Text className="text-slate-600">选择模型</Text>
+              <Text className="text-yc-text-secondary">选择模型</Text>
               <Select
                 className="w-full mt-1"
                 value={selectedModel || undefined}
@@ -227,7 +222,7 @@ export default function AICreator() {
               />
             </div>
             <div>
-              <Text className="text-slate-600">选择提示词</Text>
+              <Text className="text-yc-text-secondary">选择提示词</Text>
               <Select
                 className="w-full mt-1"
                 value={selectedPrompt ?? undefined}
@@ -238,7 +233,7 @@ export default function AICreator() {
               />
             </div>
             <div>
-              <Text className="text-slate-600">选择风格</Text>
+              <Text className="text-yc-text-secondary">选择风格</Text>
               <Select
                 className="w-full mt-1"
                 value={selectedStyle ?? undefined}
@@ -249,7 +244,7 @@ export default function AICreator() {
               />
             </div>
             <div>
-              <Text className="text-slate-600">创作主题 / 素材核心点</Text>
+              <Text className="text-yc-text-secondary">创作主题 / 素材核心点</Text>
               <TextArea
                 rows={8}
                 value={coreIdea}

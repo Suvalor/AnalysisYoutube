@@ -1,4 +1,4 @@
-import apiClient from "./apiClient";
+import apiClient, { authFetch } from "./apiClient";
 
 export type SopScript = {
   id: number;
@@ -176,13 +176,11 @@ export async function streamSopAiSplitApi(
   signal?: AbortSignal
 ) {
   const baseURL = (apiClient.defaults.baseURL || "http://localhost:8000").replace(/\/$/, "");
-  const token = localStorage.getItem("access_token") || "";
-  const resp = await fetch(`${baseURL}/api/sop/segments/ai-split`, {
+  const resp = await authFetch(`${baseURL}/api/sop/segments/ai-split`, {
     method: "POST",
     signal,
     headers: {
       "Content-Type": "application/json",
-      Authorization: token ? `Bearer ${token}` : "",
     },
     body: JSON.stringify(payload),
   });

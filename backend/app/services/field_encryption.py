@@ -1,13 +1,23 @@
-"""用户敏感字段（如 AI API Key）的服务端对称加密，依赖 SECRET_KEY 或专用环境变量。"""
+"""用户敏感字段（如 AI API Key）的服务端对称加密，依赖 SECRET_KEY 或专用环境变量。
+
+安全说明：
+  - 使用 Fernet 对称加密，密钥由 SECRET_KEY 或 FIELD_ENCRYPTION_SECRET 派生。
+  - 生产环境务必设置独立的 FIELD_ENCRYPTION_SECRET（与 JWT 的 SECRET_KEY 分离），
+    以便独立轮换，降低密钥泄露影响面。
+  - 数据库泄露 + 密钥泄露 = 所有 API Key 明文暴露，因此密钥管理至关重要。
+"""
 
 from __future__ import annotations
 
 import base64
 import hashlib
+import logging
 
 from cryptography.fernet import Fernet, InvalidToken
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _fernet_key_material(secret: str) -> bytes:
@@ -17,10 +27,18 @@ def _fernet_key_material(secret: str) -> bytes:
 
 
 def _get_secret() -> str:
-    """优先使用专用加密盐，否则回退到 JWT 用的 SECRET_KEY。生产环境务必使用强随机值。"""
+    """优先使用专用加密盐，否则回退到 JWT 用的 SECRET_KEY。强制最小 32 字符。"""
     raw = (settings.field_encryption_secret or settings.secret_key or "").strip()
-    if not raw:
-        raise ValueError("请配置 SECRET_KEY 或 FIELD_ENCRYPTION_SECRET，否则无法加密存储 API Key")
+    if not raw or len(raw) < 32:
+        raise ValueError(
+            "SECRET_KEY 或 FIELD_ENCRYPTION_SECRET 必须至少 32 个字符，"
+            "否则无法安全加密存储 API Key"
+        )
+    if not settings.field_encryption_secret:
+        logger.warning(
+            "FIELD_ENCRYPTION_SECRET 未设置，回退使用 SECRET_KEY 加密字段。"
+            "生产环境建议设置独立的 FIELD_ENCRYPTION_SECRET 以支持密钥独立轮换。"
+        )
     return raw
 
 

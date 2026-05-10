@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <!-- Rounded square background -->
+  <rect width="180" height="180" rx="36" fill="#1a1a2e"/>
+  <!-- Outer circle -->
+  <circle cx="90" cy="90" r="78" fill="none" stroke="#0f3460" stroke-width="2" opacity="0.5"/>
+  <!-- Inner circle ring -->
+  <circle cx="90" cy="90" r="70" fill="none" stroke="#16213e" stroke-width="2" opacity="0.8"/>
+  <!-- Compass tick marks (N/E/S/W) -->
+  <line x1="90" y1="18" x2="90" y2="28" stroke="#e2e8f0" stroke-width="4" stroke-linecap="round"/>
+  <line x1="162" y1="90" x2="152" y2="90" stroke="#e2e8f0" stroke-width="4" stroke-linecap="round"/>
+  <line x1="90" y1="162" x2="90" y2="152" stroke="#e2e8f0" stroke-width="4" stroke-linecap="round"/>
+  <line x1="18" y1="90" x2="28" y2="90" stroke="#e2e8f0" stroke-width="4" stroke-linecap="round"/>
+  <!-- Minor tick marks -->
+  <line x1="141" y1="39" x2="134.5" y2="45.5" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="141" y1="141" x2="134.5" y2="134.5" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="39" y1="141" x2="45.5" y2="134.5" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="39" y1="39" x2="45.5" y2="45.5" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- North pointer (red/warm) -->
+  <polygon points="90,28 78,82 90,72 102,82" fill="#ef4444" opacity="0.95"/>
+  <!-- South pointer (blue/cool) -->
+  <polygon points="90,152 78,98 90,108 102,98" fill="#3b82f6" opacity="0.85"/>
+  <!-- East pointer -->
+  <polygon points="152,90 98,78 108,90 98,102" fill="#6366f1" opacity="0.7"/>
+  <!-- West pointer -->
+  <polygon points="28,90 82,78 72,90 82,102" fill="#6366f1" opacity="0.7"/>
+  <!-- Center dot -->
+  <circle cx="90" cy="90" r="7" fill="#f8fafc"/>
+  <circle cx="90" cy="90" r="3.5" fill="#1a1a2e"/>
+  <!-- N label -->
+  <text x="90" y="52" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" font-weight="bold" fill="#ef4444">N</text>
+</svg>

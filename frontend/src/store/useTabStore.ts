@@ -15,11 +15,18 @@ export type TabType =
   | "video-board"
   | "feishu-workspace"
   | "feishu-viewer"
-  | "ai-model-settings"
   | "config-center"
   | "sop-workflow"
   | "agent-edit"
-  | "inspiration-pool";
+  | "inspiration-pool"
+  | "blue-ocean-radar"
+  | "keyword-research"
+  | "seo-scoring"
+  | "trend-discovery"
+  | "navigation-guide"
+  | "personal-settings"
+  | "channel-growth"
+  | "download-list";
 
 export type TabItem = {
   id: string;
@@ -37,14 +44,34 @@ export type TabItem = {
 type TabState = {
   tabs: TabItem[];
   activeTabId: string | null;
+  /** 固定标签 ID 集合（来自 navDefs 的标签不可被批量关闭） */
+  pinnedTabIds: Set<string>;
+  /** 当 openTab 改变 activeTabId 时置 true，阻止 TabSync useEffect 回拉 URL */
+  _suppressNavigation: boolean;
   openTab: (tab: TabItem) => void;
   closeTab: (id: string) => void;
   setActiveTab: (id: string) => void;
+  /** 关闭目标标签左侧的所有非固定标签 */
+  closeLeftTabs: (id: string) => void;
+  /** 关闭目标标签右侧的所有非固定标签 */
+  closeRightTabs: (id: string) => void;
+  /** 关闭除目标标签外的所有非固定标签 */
+  closeOtherTabs: (id: string) => void;
+  /** 关闭所有非固定标签 */
+  closeAllTabs: () => void;
+  /** 注册固定标签 ID（由 TabbedShell 初始化时调用） */
+  registerPinnedIds: (ids: string[]) => void;
 };
 
 export const useTabStore = create<TabState>((set, get) => ({
   tabs: [],
   activeTabId: null,
+  pinnedTabIds: new Set<string>(),
+  _suppressNavigation: false,
+
+  registerPinnedIds: (ids) => {
+    set({ pinnedTabIds: new Set(ids) });
+  },
 
   openTab: (tab) => {
     const { tabs } = get();
@@ -74,17 +101,20 @@ export const useTabStore = create<TabState>((set, get) => ({
               }
             : t
         );
-        set({ tabs: nextTabs, activeTabId: mergedId });
+        // openTab 触发的 activeTabId 变化 → 设置 suppress 标志，阻止 TabSync 回拉 URL
+        set({ tabs: nextTabs, activeTabId: mergedId, _suppressNavigation: true });
         return;
       }
     }
 
     const idx = tabs.findIndex((t) => t.id === tab.id);
     if (idx >= 0) {
-      set({ activeTabId: tab.id });
+      // 标签已打开，仅激活；设置 suppress 防止 TabSync 回拉
+      set({ activeTabId: tab.id, _suppressNavigation: true });
       return;
     }
-    set({ tabs: [...tabs, tab], activeTabId: tab.id });
+    // 新标签 → 设置 suppress 防止 TabSync 回拉
+    set({ tabs: [...tabs, tab], activeTabId: tab.id, _suppressNavigation: true });
   },
 
   closeTab: (id) => {
@@ -99,5 +129,40 @@ export const useTabStore = create<TabState>((set, get) => ({
     set({ tabs: next, activeTabId: nextActive });
   },
 
-  setActiveTab: (id) => set({ activeTabId: id }),
+  setActiveTab: (id) => set({ activeTabId: id, _suppressNavigation: true }),
+
+  closeLeftTabs: (id) => {
+    const { tabs, activeTabId, pinnedTabIds } = get();
+    const idx = tabs.findIndex((t) => t.id === id);
+    if (idx <= 0) return;
+    // 保留目标及右侧所有标签，左侧仅保留固定标签
+    const next = tabs.filter((t, i) => i >= idx || pinnedTabIds.has(t.id));
+    const nextActive = next.some((t) => t.id === activeTabId) ? activeTabId : id;
+    set({ tabs: next, activeTabId: nextActive });
+  },
+
+  closeRightTabs: (id) => {
+    const { tabs, activeTabId, pinnedTabIds } = get();
+    const idx = tabs.findIndex((t) => t.id === id);
+    if (idx < 0 || idx === tabs.length - 1) return;
+    // 保留目标及左侧所有标签，右侧仅保留固定标签
+    const next = tabs.filter((t, i) => i <= idx || pinnedTabIds.has(t.id));
+    const nextActive = next.some((t) => t.id === activeTabId) ? activeTabId : id;
+    set({ tabs: next, activeTabId: nextActive });
+  },
+
+  closeOtherTabs: (id) => {
+    const { tabs, activeTabId, pinnedTabIds } = get();
+    // 保留目标标签 + 所有固定标签
+    const next = tabs.filter((t) => t.id === id || pinnedTabIds.has(t.id));
+    set({ tabs: next, activeTabId: id });
+  },
+
+  closeAllTabs: () => {
+    const { tabs, pinnedTabIds } = get();
+    // 仅保留固定标签
+    const next = tabs.filter((t) => pinnedTabIds.has(t.id));
+    const nextActive = next[0]?.id ?? null;
+    set({ tabs: next, activeTabId: nextActive });
+  },
 }));

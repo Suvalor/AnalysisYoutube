@@ -6,8 +6,8 @@ import re
 import httpx
 
 from app.models.user import User
-from app.services.config_manager import ResolvedIntegrationConfig, resolve_model_alias_for_volcengine
-from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig, normalize_openai_base_url
+from app.services.config_manager import ResolvedIntegrationConfig
+from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig, normalize_base_url
 from app.services.script_user_ai import parse_models_from_user_json, user_custom_openai_credentials
 
 
@@ -52,12 +52,12 @@ async def split_outline_markdown_with_ai_stream(
     else:
         if integration is None:
             raise ValueError("未配置自建 LLM 时，必须在请求内解析并传入用户集成配置 integration")
-        api_key = integration.volcengine_api_key
-        base_url_raw = integration.volcengine_base_url
-        explicit = resolve_model_alias_for_volcengine(model or "", integration)
-    base_url = normalize_openai_base_url(base_url_raw)
+        api_key = ""
+        base_url_raw = ""
+        explicit = (model or "").strip()
+    base_url = normalize_base_url(base_url_raw)
     factory = LLMClientFactory()
-    cfg = LLMClientConfig(api_key=api_key, base_url=base_url, model_name=explicit)
+    cfg = LLMClientConfig(api_key=api_key, base_url=base_url, model_name=explicit, protocol="openai")
     resolved_model = factory.resolve_model_name(cfg)
     if not api_key or not base_url or not resolved_model:
         raise ValueError("LLM 配置不完整，无法执行 AI 拆解")

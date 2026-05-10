@@ -1,4 +1,4 @@
-import { Button, Card, Checkbox, Empty, InputNumber, message, Spin, Typography } from "antd";
+import { Button, Card, Checkbox, Empty, InputNumber, message, Select, Space, Spin, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -11,8 +11,11 @@ import {
   YAxis,
 } from "recharts";
 import { compareCompetitorsApi, listYouTubeChannelsApi } from "@/services/authApi";
+import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
+import apiClient from "@/services/apiClient";
+import { useChartColors } from "@/hooks/useChartColors";
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 
 type PoolItem = {
   pool_id: number;
@@ -23,14 +26,41 @@ type PoolItem = {
   };
 };
 
-const lineColors = ["#60a5fa", "#34d399", "#f59e0b", "#f472b6"];
-
 export default function CompetitorAnalysis() {
+  const chartColors = useChartColors();
   const [pool, setPool] = useState<PoolItem[]>([]);
   const [selectedChannelIds, setSelectedChannelIds] = useState<number[]>([]);
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(false);
   const [chartData, setChartData] = useState<Array<Record<string, string | number>>>([]);
+  // AI 洞察
+  const [aiInsight, setAiInsight] = useState<Record<string, string> | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [modelOptions, setModelOptions] = useState<ModelItem[]>([]);
+  const [agentOptions, setAgentOptions] = useState<PromptItem[]>([]);
+  const [selectedModelLibId, setSelectedModelLibId] = useState<number | undefined>(undefined);
+  const [selectedLlmModelName, setSelectedLlmModelName] = useState<string>("");
+  const [selectedAgentId, setSelectedAgentId] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    const loadConfigs = async () => {
+      try {
+        const [models, prompts] = await Promise.all([listModelsApi(), listPromptsApi()]);
+        const chatModels = models.filter((m) => (m.library_kind ?? "chat") === "chat");
+        setModelOptions(chatModels);
+        setAgentOptions(prompts);
+        if (chatModels.length > 0) {
+          setSelectedModelLibId(chatModels[0].id);
+          const first = chatModels[0];
+          const name =
+            ((first.supported_models_json || "").match(/"value"\s*:\s*"([^"]+)"/)?.[1] ?? "").trim();
+          setSelectedLlmModelName(name);
+        }
+        if (prompts.length > 0) setSelectedAgentId(prompts[0].id);
+      } catch { /* 静默 */ }
+    };
+    void loadConfigs();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -68,14 +98,40 @@ export default function CompetitorAnalysis() {
     }
   };
 
+  const onAiInsight = async () => {
+    if (selectedChannelIds.length < 2) {
+      message.warning("请先选择至少 2 个频道");
+      return;
+    }
+    if (!selectedModelLibId || !selectedLlmModelName) {
+      message.warning("请先选择 AI 模型配置");
+      return;
+    }
+    setAiLoading(true);
+    setAiInsight(null);
+    try {
+      const res = await apiClient.post("/api/youtube/competitors/ai-insight", {
+        channel_ids: selectedChannelIds,
+        model_library_id: selectedModelLibId,
+        llm_model_name: selectedLlmModelName,
+        agent_id: selectedAgentId,
+      });
+      setAiInsight(res.data.insight);
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail ?? "AI 竞对分析失败");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#F8F9FA] p-6 md:p-10 text-slate-900">
+    <div className="min-h-screen bg-yc-bg-page p-6 md:p-10 text-yc-text-primary">
       <div className="max-w-7xl mx-auto space-y-6">
-        <Card className="!bg-white !border-slate-200 !shadow-sm">
-          <Title level={3} style={{ color: "#0f172a", marginBottom: 8 }}>
+        <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm">
+          <Title level={3} className="text-yc-text-primary" style={{ marginBottom: 8 }}>
             竞对洞察
           </Title>
-          <Text style={{ color: "#64748b" }}>
+          <Text className="text-yc-text-secondary">
             勾选 2-3 个监控频道，生成总播放量与订阅量增长趋势图。
           </Text>
           <div className="mt-4 flex flex-col gap-4">
@@ -86,18 +142,47 @@ export default function CompetitorAnalysis() {
             >
               {pool.map((item) => (
                 <Checkbox key={item.pool_id} value={item.channel.id}>
-                  <span className="text-slate-800">
+                  <span className="text-yc-text-primary">
                     {item.channel.title}
-                    <span className="text-slate-500 ml-1">({item.group_name})</span>
+                    <span className="text-yc-text-secondary ml-1">({item.group_name})</span>
                   </span>
                 </Checkbox>
               ))}
             </Checkbox.Group>
             <div className="flex items-center gap-3">
-              <span className="text-slate-700">回溯天数</span>
+              <span className="text-yc-text-secondary">回溯天数</span>
               <InputNumber min={7} max={180} value={days} onChange={(v) => setDays(Number(v ?? 30))} />
               <Button type="primary" onClick={onAnalyze} loading={loading}>
                 生成对比图
+              </Button>
+            </div>
+            {/* AI 模型选择 */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <Select
+                style={{ width: 200 }}
+                placeholder="AI 模型配置"
+                value={selectedModelLibId}
+                onChange={(v) => {
+                  setSelectedModelLibId(v);
+                  const target = modelOptions.find((m) => m.id === v);
+                  if (target) {
+                    const name = ((target.supported_models_json || "").match(/"value"\s*:\s*"([^"]+)"/)?.[1] ?? "").trim();
+                    setSelectedLlmModelName(name);
+                  }
+                }}
+                options={modelOptions.map((m) => ({ value: m.id, label: m.name }))}
+                allowClear
+              />
+              <Select
+                style={{ width: 200 }}
+                placeholder="AI 智能体"
+                value={selectedAgentId}
+                onChange={setSelectedAgentId}
+                options={agentOptions.map((p) => ({ value: p.id, label: p.title }))}
+                allowClear
+              />
+              <Button type="primary" ghost loading={aiLoading} onClick={onAiInsight}>
+                AI 竞争分析
               </Button>
             </div>
           </div>
@@ -105,29 +190,29 @@ export default function CompetitorAnalysis() {
 
         <Spin spinning={loading}>
           {chartData.length === 0 ? (
-            <Card className="!bg-white !border-slate-200 !shadow-sm">
+            <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm">
               <Empty description="暂无图表数据，请先选择频道并生成" />
             </Card>
           ) : (
             <>
               <Card
-                title={<span className="text-slate-900">播放量增长趋势（total_views）</span>}
-                className="!bg-white !border-slate-200 !shadow-sm"
+                title={<span className="text-yc-text-primary">播放量增长趋势（total_views）</span>}
+                className="!bg-yc-bg-card !border-yc-border !shadow-sm"
               >
                 <div className="h-[360px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="date" stroke="#64748b" />
-                      <YAxis stroke="#64748b" />
-                      <Tooltip />
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                      <XAxis dataKey="date" stroke={chartColors.axis} />
+                      <YAxis stroke={chartColors.axis} />
+                      <Tooltip contentStyle={{ backgroundColor: chartColors.tooltip.bg, border: `1px solid ${chartColors.tooltip.border}`, color: chartColors.tooltip.text }} />
                       <Legend />
                       {selectedChannels.map((item, idx) => (
                         <Line
                           key={`${item.channel.id}-views`}
                           type="monotone"
                           dataKey={`${item.channel.title}_views`}
-                          stroke={lineColors[idx % lineColors.length]}
+                          stroke={chartColors.series[idx % chartColors.series.length]}
                           strokeWidth={2}
                           dot={false}
                         />
@@ -138,23 +223,23 @@ export default function CompetitorAnalysis() {
               </Card>
 
               <Card
-                title={<span className="text-slate-900">订阅量增长趋势（subscriber_count）</span>}
-                className="!bg-white !border-slate-200 !shadow-sm"
+                title={<span className="text-yc-text-primary">订阅量增长趋势（subscriber_count）</span>}
+                className="!bg-yc-bg-card !border-yc-border !shadow-sm"
               >
                 <div className="h-[360px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="date" stroke="#64748b" />
-                      <YAxis stroke="#64748b" />
-                      <Tooltip />
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                      <XAxis dataKey="date" stroke={chartColors.axis} />
+                      <YAxis stroke={chartColors.axis} />
+                      <Tooltip contentStyle={{ backgroundColor: chartColors.tooltip.bg, border: `1px solid ${chartColors.tooltip.border}`, color: chartColors.tooltip.text }} />
                       <Legend />
                       {selectedChannels.map((item, idx) => (
                         <Line
                           key={`${item.channel.id}-subs`}
                           type="monotone"
                           dataKey={`${item.channel.title}_subscriber_count`}
-                          stroke={lineColors[idx % lineColors.length]}
+                          stroke={chartColors.series[idx % chartColors.series.length]}
                           strokeWidth={2}
                           dot={false}
                         />
@@ -166,6 +251,32 @@ export default function CompetitorAnalysis() {
             </>
           )}
         </Spin>
+
+        {/* AI 竞争分析结果 */}
+        {aiInsight && (
+          <Card title="AI 竞争格局分析" className="!bg-yc-bg-card !border-yc-border !shadow-sm">
+            <div className="space-y-4">
+              {aiInsight.positioning_diff && (
+                <div><Text strong>定位差异</Text><Paragraph className="!mb-0">{aiInsight.positioning_diff}</Paragraph></div>
+              )}
+              {aiInsight.content_strategy_diff && (
+                <div><Text strong>内容策略差异</Text><Paragraph className="!mb-0">{aiInsight.content_strategy_diff}</Paragraph></div>
+              )}
+              {aiInsight.audience_overlap && (
+                <div><Text strong>受众重叠度</Text><Paragraph className="!mb-0">{aiInsight.audience_overlap}</Paragraph></div>
+              )}
+              {aiInsight.competitive_summary && (
+                <div><Text strong>竞争格局总结</Text><Paragraph className="!mb-0">{aiInsight.competitive_summary}</Paragraph></div>
+              )}
+              {aiInsight.actionable_advice && (
+                <div><Text strong>可操作建议</Text><Paragraph className="!mb-0">{aiInsight.actionable_advice}</Paragraph></div>
+              )}
+            </div>
+          </Card>
+        )}
+        {aiLoading && (
+          <div className="flex justify-center py-8"><Spin size="large" tip="AI 正在分析竞争格局…" /></div>
+        )}
       </div>
     </div>
   );

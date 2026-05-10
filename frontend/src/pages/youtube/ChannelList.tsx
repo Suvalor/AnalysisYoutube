@@ -1,4 +1,4 @@
-import { Alert, Button, Drawer, Form, Input, InputNumber, Modal, Popover, Select, Spin, Table, Tag, Typography, message } from "antd";
+import { Alert, Button, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Popover, Select, Spin, Table, Tag, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -400,8 +400,8 @@ export default function ChannelList() {
       key: "ch",
       render: (_, r) => (
         <div className="flex items-center gap-2 min-w-0">
-          <img src={r.thumbnail_url || ""} alt="" className="w-9 h-9 rounded-full border border-slate-200 shrink-0" />
-          <Typography.Text ellipsis={{ tooltip: r.title }} className="font-medium text-slate-900">
+          <img src={r.thumbnail_url || ""} alt="" className="w-9 h-9 rounded-full border border-yc-border shrink-0" />
+          <Typography.Text ellipsis={{ tooltip: r.title }} className="font-medium text-yc-text-primary">
             {r.title}
           </Typography.Text>
         </div>
@@ -414,9 +414,9 @@ export default function ChannelList() {
       render: (v: number) => formatNumber(v),
     },
     {
-      title: "频道总播放",
-      dataIndex: "channel_total_views",
-      width: 120,
+      title: "总播放量",
+      dataIndex: "total_views",
+      width: 110,
       render: (v: number) => formatNumber(v),
     },
     {
@@ -432,14 +432,11 @@ export default function ChannelList() {
     {
       title: "爆款视频",
       key: "vurl",
-      width: 168,
+      width: 88,
       render: (_, r) => (
-        <div className="flex flex-col leading-tight">
-          <Typography.Link href={r.viral_video_url} target="_blank" rel="noreferrer">
-            打开视频
-          </Typography.Link>
-          <span className="text-xs text-slate-500">播放：{formatNumber(r.trigger_video_views)}</span>
-        </div>
+        <Typography.Link href={r.viral_video_url} target="_blank" rel="noreferrer">
+          打开
+        </Typography.Link>
       ),
     },
     {
@@ -499,14 +496,14 @@ export default function ChannelList() {
       key: "title",
       render: (_, r) => (
         <div className="flex items-center gap-2">
-          <img src={r.channel.thumbnail_url || ""} alt="" className="w-9 h-9 rounded-full border border-slate-200" />
+          <img src={r.channel.thumbnail_url || ""} alt="" className="w-9 h-9 rounded-full border border-yc-border" />
           <div className="min-w-0">
-            <div className="font-medium text-slate-900 truncate">{r.channel.title}</div>
+            <div className="font-medium text-yc-text-primary truncate">{r.channel.title}</div>
             {r.channel.description?.trim() ? (
               <Popover
                 title="频道简介"
                 content={
-                  <Typography.Paragraph className="!mb-0 max-w-sm whitespace-pre-wrap text-slate-700 text-xs">
+                  <Typography.Paragraph className="!mb-0 max-w-sm whitespace-pre-wrap text-yc-text-secondary text-xs">
                     {r.channel.description}
                   </Typography.Paragraph>
                 }
@@ -514,14 +511,14 @@ export default function ChannelList() {
               >
                 <button
                   type="button"
-                  className="text-xs text-blue-600 hover:text-blue-500 truncate max-w-[200px] block text-left"
+                  className="text-xs text-yc-info hover:text-yc-primary-hover truncate max-w-[200px] block text-left"
                   onClick={(e) => e.stopPropagation()}
                 >
                   简介预览
                 </button>
               </Popover>
             ) : (
-              <span className="text-xs text-slate-400">暂无简介</span>
+              <span className="text-xs text-yc-text-tertiary">暂无简介</span>
             )}
           </div>
         </div>
@@ -544,10 +541,10 @@ export default function ChannelList() {
                   </Tag>
                 ))
               ) : (
-                <span className="text-xs text-slate-400">待 AI 分析</span>
+                <span className="text-xs text-yc-text-tertiary">待 AI 分析</span>
               )}
             </div>
-            {exp ? <div className="text-xs text-slate-600 line-clamp-2 leading-snug">{exp}</div> : null}
+            {exp ? <div className="text-xs text-yc-text-secondary line-clamp-2 leading-snug">{exp}</div> : null}
           </div>
         );
       },
@@ -572,10 +569,10 @@ export default function ChannelList() {
       key: "updated_at",
       dataIndex: ["channel", "updated_at"],
       render: (v: string) => {
-        if (!v) return <span className="text-xs text-slate-400">-</span>;
+        if (!v) return <span className="text-xs text-yc-text-tertiary">-</span>;
         const dt = dayjs(v);
         return (
-          <span title={dt.format("YYYY-MM-DD HH:mm")} className="text-xs text-slate-700">
+          <span title={dt.format("YYYY-MM-DD HH:mm")} className="text-xs text-yc-text-secondary">
             {dt.fromNow()}
           </span>
         );
@@ -585,26 +582,29 @@ export default function ChannelList() {
       title: "操作",
       key: "op",
       render: (_, r) => (
-        <Button
-          size="small"
-          danger
-          onClick={async (e) => {
-            e.stopPropagation();
+        <Popconfirm
+          title="确认移除"
+          description="移除后需重新添加才能恢复，确认继续？"
+          onConfirm={async () => {
             await deleteYouTubeChannelApi(r.pool_id);
             message.success("已移除");
             await load();
           }}
+          okText="确认"
+          cancelText="取消"
         >
-          移除
-        </Button>
+          <Button size="small" danger onClick={(e) => e.stopPropagation()}>
+            移除
+          </Button>
+        </Popconfirm>
       ),
     },
   ];
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm space-y-2">
-        <div className="text-sm text-slate-600">批量录入（分号或换行分隔多个链接）</div>
+      <div className="bg-yc-bg-card border border-yc-border rounded-lg p-4 shadow-sm space-y-2">
+        <div className="text-sm text-yc-text-secondary">批量录入（分号或换行分隔多个链接）</div>
         <div className="flex flex-col md:flex-row gap-2 md:items-start">
           <Input.TextArea
             rows={3}
@@ -634,7 +634,7 @@ export default function ChannelList() {
       </div>
 
       <Spin spinning={loading}>
-        <div className="bg-white border border-slate-200 rounded-lg p-2 shadow-sm space-y-2">
+        <div className="bg-yc-bg-card border border-yc-border rounded-lg p-2 shadow-sm space-y-2">
           <div className="flex flex-wrap justify-between gap-2 px-2 pt-1">
             <Input
               allowClear
@@ -644,7 +644,7 @@ export default function ChannelList() {
               onChange={(e) => setKeyword(e.target.value)}
             />
             <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-600 self-center">排序</span>
+              <span className="text-sm text-yc-text-secondary self-center">排序</span>
               <Select
                 style={{ width: 220 }}
                 value={sortBy}
@@ -669,10 +669,10 @@ export default function ChannelList() {
             pagination={false}
             onRow={(record) => ({
               onClick: () => onRowClick(record),
-              className: "cursor-pointer hover:bg-slate-50",
+              className: "cursor-pointer hover:bg-yc-bg-inset",
             })}
           />
-          <div ref={loadMoreRef} className="py-3 text-center text-sm text-slate-500">
+          <div ref={loadMoreRef} className="py-3 text-center text-sm text-yc-text-tertiary">
             {loadingMore ? "加载中..." : hasMore ? "向下滚动加载更多" : "没有更多数据了"}
           </div>
         </div>
@@ -745,7 +745,7 @@ export default function ChannelList() {
             />
           ) : null}
 
-          <div className="text-sm text-slate-600 mb-2">挖掘结果（未写入数据库，点击「添加关注」后才会入库）</div>
+          <div className="text-sm text-yc-text-secondary mb-2">挖掘结果（未写入数据库，点击「添加关注」后才会入库）</div>
           <Table<DiscoverChannelItem>
             rowKey="yt_channel_id"
             size="small"

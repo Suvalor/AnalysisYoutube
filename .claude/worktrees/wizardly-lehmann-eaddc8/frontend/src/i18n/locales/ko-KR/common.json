@@ -1,0 +1,81 @@
+{
+  "app": {
+    "name": "YouTube Compass",
+    "subtitle": "YouTube 해외 의사결정 도구"
+  },
+  "action": {
+    "save": "저장",
+    "cancel": "취소",
+    "confirm": "확인",
+    "delete": "삭제",
+    "edit": "편집",
+    "close": "닫기",
+    "loading": "로딩 중...",
+    "search": "검색",
+    "reset": "초기화",
+    "add": "추가",
+    "create": "생성",
+    "update": "업데이트",
+    "submit": "제출",
+    "back": "뒤로",
+    "refresh": "새로고침",
+    "export": "내보내기",
+    "import": "가져오기",
+    "download": "다운로드",
+    "upload": "업로드",
+    "test": "테스트",
+    "clear": "지우기",
+    "logout": "로그아웃",
+    "login": "로그인",
+    "register": "회원가입",
+    "next": "다음",
+    "prev": "이전",
+    "more": "더보기",
+    "expand": "펼치기",
+    "collapse": "접기",
+    "selectAll": "전체선택",
+    "deselectAll": "전체해제"
+  },
+  "status": {
+    "success": "성공",
+    "error": "오류",
+    "warning": "경고",
+    "noData": "데이터 없음",
+    "loading": "로딩 중",
+    "saving": "저장 중",
+    "deleting": "삭제 중",
+    "enabled": "활성화",
+    "disabled": "비활성화",
+    "active": "활성",
+    "inactive": "비활성",
+    "verified": "인증됨",
+    "unverified": "미인증"
+  },
+  "validation": {
+    "required": "필수 항목입니다",
+    "requiredField": "필수 항목을 입력해 주세요",
+    "email": "유효한 이메일 주소를 입력해 주세요",
+    "phone": "유효한 전화번호를 입력해 주세요",
+    "password": "비밀번호는 6자 이상이어야 합니다",
+    "passwordConfirm": "비밀번호가 일치하지 않습니다",
+    "maxLength": "내용이 너무 깁니다",
+    "minLength": "내용이 너무 짧습니다",
+    "invalidFormat": "형식이 올바르지 않습니다",
+    "invalidJson": "유효한 JSON이어야 합니다"
+  },
+  "message": {
+    "saveSuccess": "저장되었습니다",
+    "deleteSuccess": "삭제되었습니다",
+    "updateSuccess": "업데이트되었습니다",
+    "createSuccess": "생성되었습니다",
+    "deleteConfirm": "삭제하시겠습니까?",
+    "unsavedChanges": "저장되지 않은 변경사항이 있습니다",
+    "networkError": "네트워크 오류, 나중에 다시 시도해 주세요",
+    "serverError": "서버 오류, 나중에 다시 시도해 주세요",
+    "sessionExpired": "세션이 만료되었습니다, 다시 로그인해 주세요"
+  },
+  "pagination": {
+    "total": "총 {{total}}건",
+    "page": "{{current}} / {{total}} 페이지"
+  }
+}

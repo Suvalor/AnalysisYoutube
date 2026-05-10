@@ -6,6 +6,8 @@ export type UserSettings = {
   ai_models_json: string | null;
   ai_prompt_config_json: string | null;
   has_ai_api_key: boolean;
+  theme: string | null;
+  locale: string | null;
 };
 
 /** 更新设置；不要传 ai_api_key 字段表示不修改已存密钥 */
@@ -38,9 +40,6 @@ export type IntegrationSettingsRead = {
   tencent_cos_region: string;
   tencent_cos_bucket: string;
   tencent_custom_domain: string;
-  volcengine_endpoint_id: string;
-  volcengine_base_url: string;
-  volcengine_model_gemini: string;
   volc_cv_access_key_id: string;
   volc_cv_region: string;
   volc_cv_host: string;
@@ -50,12 +49,10 @@ export type IntegrationSettingsRead = {
   has_youtube_api_key: boolean;
   has_aliyun_access_key_secret: boolean;
   has_tencent_cos_secret_key: boolean;
-  has_volcengine_api_key: boolean;
   has_volc_cv_secret_access_key: boolean;
   youtube_api_key_display: string | null;
   aliyun_access_key_secret_display: string | null;
   tencent_cos_secret_key_display: string | null;
-  volcengine_api_key_display: string | null;
   volc_cv_secret_access_key_display: string | null;
 };
 
@@ -76,10 +73,6 @@ export type IntegrationSettingsUpdatePayload = Partial<{
   tencent_cos_region: string | null;
   tencent_cos_bucket: string | null;
   tencent_custom_domain: string | null;
-  volcengine_api_key: string | null;
-  volcengine_endpoint_id: string | null;
-  volcengine_base_url: string | null;
-  volcengine_model_gemini: string | null;
   volc_cv_access_key_id: string | null;
   volc_cv_secret_access_key: string | null;
   volc_cv_region: string | null;

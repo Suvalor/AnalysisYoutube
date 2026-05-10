@@ -1,7 +1,7 @@
 from functools import lru_cache
 import json
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic import computed_field
 from pydantic_settings import BaseSettings
 
@@ -10,24 +10,19 @@ class Settings(BaseSettings):
     """全局配置，优先从环境变量读取。"""
 
     mysql_user: str = Field("root", alias="MYSQL_USER")
-    mysql_password: str = Field("password", alias="MYSQL_PASSWORD")
+    mysql_password: str = Field("", alias="MYSQL_PASSWORD")
     mysql_host: str = Field("127.0.0.1", alias="MYSQL_HOST")
     mysql_port: int = Field(3306, alias="MYSQL_PORT")
     mysql_db: str = Field("creator_saas", alias="MYSQL_DB")
 
     database_url: str | None = Field(None, alias="DATABASE_URL")
 
-    secret_key: str = Field("change_me", alias="SECRET_KEY")
+    secret_key: str = Field("", alias="SECRET_KEY")
     # 可选：与 JWT 分离的字段加密盐；未设置时回退使用 secret_key
     field_encryption_secret: str = Field("", alias="FIELD_ENCRYPTION_SECRET")
     algorithm: str = Field("HS256", alias="ALGORITHM")
     access_token_expire_minutes: int = Field(1440, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
-    youtube_api_key: str = Field("", alias="YOUTUBE_API_KEY")
-    volcengine_api_key: str = Field("", alias="VOLCENGINE_API_KEY")
-    volcengine_endpoint_id: str = Field("", alias="VOLCENGINE_ENDPOINT_ID")
-    volcengine_base_url: str = Field("", alias="VOLCENGINE_BASE_URL")
-    volcengine_model_gemini: str = Field("", alias="VOLCENGINE_MODEL_GEMINI")
-    # 智能视觉 CV（图像修补 Inpaint）：与方舟 LLM API Key 不同，一般为 AccessKey + SecretKey
+    # 智能视觉 CV（图像修补 Inpaint）：AccessKey + SecretKey
     volc_cv_access_key_id: str = Field("", alias="VOLC_CV_ACCESS_KEY_ID")
     volc_cv_secret_access_key: str = Field("", alias="VOLC_CV_SECRET_ACCESS_KEY")
     volc_cv_region: str = Field("cn-north-1", alias="VOLC_CV_REGION")
@@ -48,18 +43,27 @@ class Settings(BaseSettings):
     tencent_cos_region: str = Field("", alias="TENCENT_COS_REGION")
     tencent_cos_bucket: str = Field("", alias="TENCENT_COS_BUCKET")
     tencent_custom_domain: str = Field("", alias="TENCENT_CUSTOM_DOMAIN")
-    jimeng_api_base_url: str = Field("", alias="JIMENG_API_BASE_URL")
-    jimeng_api_key: str = Field("", alias="JIMENG_API_KEY")
-    jimeng_auth_token: str = Field("", alias="JIMENG_AUTH_TOKEN")
-    jimeng_submit_path: str = Field("/v1/tasks", alias="JIMENG_SUBMIT_PATH")
-    jimeng_status_path_template: str = Field("/v1/tasks/{task_id}", alias="JIMENG_STATUS_PATH_TEMPLATE")
     google_oauth_client_id: str = Field("", alias="GOOGLE_OAUTH_CLIENT_ID")
     google_oauth_client_secret: str = Field("", alias="GOOGLE_OAUTH_CLIENT_SECRET")
     google_oauth_redirect_uri: str = Field("", alias="GOOGLE_OAUTH_REDIRECT_URI")
 
+    # SMTP 邮件服务配置
+    smtp_host: str = Field("", alias="SMTP_HOST")
+    smtp_port: int = Field(465, alias="SMTP_PORT")
+    smtp_user: str = Field("", alias="SMTP_USER")
+    smtp_password: str = Field("", alias="SMTP_PASSWORD")
+    smtp_from_email: str = Field("", alias="SMTP_FROM_EMAIL")
+    smtp_use_ssl: bool = Field(True, alias="SMTP_USE_SSL")
+
+    # 前端站点地址（用于生成密码重置等链接）
+    frontend_base_url: str = Field("http://localhost:5173", alias="FRONTEND_BASE_URL")
+
+    # yt-dlp 下载代理（可选，如 http://127.0.0.1:7890）
+    download_proxy: str = Field("", alias="DOWNLOAD_PROXY")
+
     # 支持单个 URL、逗号分隔字符串，或 JSON 数组字符串
     backend_cors_origins: str = Field(
-        "http://localhost:5173",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174",
         alias="BACKEND_CORS_ORIGINS",
     )
 
@@ -96,6 +100,16 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         extra = "ignore"
+
+    @model_validator(mode="after")
+    def _validate_secret_key(self) -> "Settings":
+        """启动时强制校验 SECRET_KEY，防止空值或弱密钥导致 JWT 伪造和加密失效。"""
+        if not self.secret_key or len(self.secret_key) < 32:
+            raise ValueError(
+                "SECRET_KEY 必须设置且至少 32 个字符。"
+                "请在 .env 或环境变量中配置强随机密钥，例如: python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+            )
+        return self
 
 
 @lru_cache
