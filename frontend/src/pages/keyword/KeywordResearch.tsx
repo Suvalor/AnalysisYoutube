@@ -201,9 +201,9 @@ export default function KeywordResearch() {
   };
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: "0 auto" }}>
+    <div className="p-6 max-w-[1200px] mx-auto">
       <Title level={3} style={{ marginBottom: 24 }}>
-        <SearchOutlined style={{ marginRight: 8, color: "#1890ff" }} />
+        <SearchOutlined style={{ marginRight: 8, color: "var(--color-primary)" }} />
         关键词研究
       </Title>
 
@@ -270,7 +270,7 @@ export default function KeywordResearch() {
             {history.map((item) => (
               <Tag
                 key={item.id}
-                color="blue"
+                color="processing"
                 style={{ fontSize: 13, padding: "4px 10px", cursor: "pointer" }}
                 onClick={() => handleHistoryClick(item)}
               >
@@ -333,7 +333,7 @@ export default function KeywordResearch() {
                 {result.related_keywords.map((kw: any, i: number) => (
                   <Tag
                     key={i}
-                    color={kw.search_volume >= 10000 ? "red" : kw.search_volume >= 1000 ? "blue" : "default"}
+                    color={kw.search_volume >= 10000 ? "error" : kw.search_volume >= 1000 ? "processing" : "default"}
                     style={{ fontSize: 13, padding: "4px 10px", cursor: "pointer" }}
                     onClick={() => {
                       setKeyword(kw.keyword || kw);
@@ -359,10 +359,10 @@ export default function KeywordResearch() {
                     gridTemplateColumns: "48px 1fr 100px 90px 90px 100px",
                     gap: 8,
                     padding: "8px 0",
-                    borderBottom: "1px solid #f0f0f0",
+                    borderBottom: "1px solid var(--color-border)",
                     fontWeight: 600,
                     fontSize: 13,
-                    color: "#666",
+                    color: "var(--color-text-secondary)",
                   }}
                 >
                   <div>#</div>
@@ -381,14 +381,14 @@ export default function KeywordResearch() {
                       gridTemplateColumns: "48px 1fr 100px 90px 90px 100px",
                       gap: 8,
                       padding: "8px 0",
-                      borderBottom: "1px solid #f0f0f0",
+                      borderBottom: "1px solid var(--color-border)",
                       fontSize: 13,
                       cursor: "pointer",
                       alignItems: "center",
                     }}
                     onClick={() => { const u = buildYouTubeWatchUrl(record.video_id); if (u) window.open(u, "_blank"); }}
                   >
-                    <div style={{ color: "#999" }}>{idx + 1}</div>
+                    <div style={{ color: "var(--color-text-tertiary)" }}>{idx + 1}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                       {record.thumbnail_url && (
                         <Image
@@ -415,7 +415,7 @@ export default function KeywordResearch() {
                     <div><Space size={4}><LikeOutlined />{formatNumber(record.like_count)}</Space></div>
                     <div><Space size={4}><MessageOutlined />{formatNumber(record.comment_count)}</Space></div>
                     <div>
-                      <Tag color={record.engagement_rate >= 5 ? "#52c41a" : record.engagement_rate >= 2 ? "#1890ff" : "#faad14"}>
+                      <Tag color={record.engagement_rate >= 5 ? "success" : record.engagement_rate >= 2 ? "processing" : "warning"}>
                         {record.engagement_rate?.toFixed(2) || "0.00"}%
                       </Tag>
                     </div>
@@ -430,7 +430,7 @@ export default function KeywordResearch() {
                 )}
 
                 {displayCount >= result.popular_videos.length && result.popular_videos.length > 0 && (
-                  <div style={{ textAlign: "center", padding: "16px 0", color: "#999" }}>
+                  <div style={{ textAlign: "center", padding: "16px 0", color: "var(--color-text-tertiary)" }}>
                     共 {result.popular_videos.length} 条，已全部加载
                   </div>
                 )}

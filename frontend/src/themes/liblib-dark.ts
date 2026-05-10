@@ -9,6 +9,7 @@ export const liblibDarkTokens: TokenMap = {
   "--color-primary-border": "rgba(167,139,250,0.3)",
 
   "--color-bg-base": "#0f0f1a",
+  "--color-bg-secondary": "rgba(25,25,50,0.6)",
   "--color-bg-layout": "#0a0a14",
   "--color-bg-sidebar": "rgba(15,15,30,0.85)",
   "--color-bg-header": "rgba(15,15,30,0.9)",

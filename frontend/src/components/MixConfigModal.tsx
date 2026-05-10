@@ -119,12 +119,12 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
       <div className="space-y-4">
         {/* Selected assets summary */}
         <div>
-          <h4 className="text-sm font-medium text-slate-700 mb-2">已选素材 ({selectedAssets.length})</h4>
+          <h4 className="text-sm font-medium text-yc-text-primary mb-2">已选素材 ({selectedAssets.length})</h4>
           <div className="max-h-40 overflow-y-auto space-y-1">
             {selectedAssets.map((asset) => (
               <div
                 key={asset.id}
-                className="flex items-center gap-2 text-sm text-slate-600 bg-slate-50 rounded px-2 py-1"
+                className="flex items-center gap-2 text-sm text-yc-text-secondary bg-yc-bg-secondary rounded px-2 py-1"
               >
                 <span className="shrink-0">
                   {asset.file_type === 'video' ? '🎬' : asset.file_type === 'audio' ? '🔊' : '🖼️'}
@@ -138,7 +138,7 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
         <Form form={form} layout="vertical" initialValues={{ aspect_ratio: '9:16' }}>
           {/* Audio mode toggle */}
           <div>
-            <h4 className="text-sm font-medium text-slate-700 mb-2">配音来源</h4>
+            <h4 className="text-sm font-medium text-yc-text-primary mb-2">配音来源</h4>
             <Radio.Group
               value={audioMode}
               onChange={(e) => setAudioMode(e.target.value as AudioMode)}
@@ -187,7 +187,7 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
                 <Button icon={<UploadOutlined />}>选择配音文件</Button>
               </Upload>
               {!audioFile && (
-                <p className="text-xs text-slate-400 mt-1">支持 MP3、WAV 等音频格式</p>
+                <p className="text-xs text-yc-text-tertiary mt-1">支持 MP3、WAV 等音频格式</p>
               )}
             </div>
           )}
@@ -211,11 +211,11 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
           {/* Highlights toggle */}
           <div className="flex items-center gap-2">
             <Switch checked={useHighlights} onChange={setUseHighlights} />
-            <span className="text-sm text-slate-600">精彩片段优先</span>
+            <span className="text-sm text-yc-text-secondary">精彩片段优先</span>
           </div>
         </Form>
 
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-yc-text-tertiary">
           混编为后台任务，提交后可在任务中心查看进度与结果。
         </p>
       </div>
