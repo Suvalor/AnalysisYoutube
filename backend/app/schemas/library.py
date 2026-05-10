@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.ssrf_guard import validate_url_against_ssrf
 
@@ -244,6 +244,7 @@ class ManualKnowledgeScriptCreate(BaseModel):
 
 
 class GenerateScriptStreamRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     prompt_id: int
     style_id: int
     topic: str = Field(..., min_length=1, max_length=2000)
