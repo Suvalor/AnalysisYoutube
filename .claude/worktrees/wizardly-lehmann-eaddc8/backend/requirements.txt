@@ -1,0 +1,33 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+SQLAlchemy[asyncio]==2.0.36
+asyncmy==0.2.9
+alembic==1.14.0
+aiosmtplib>=3.0.2
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+pydantic==2.9.2
+pydantic-settings==2.6.1
+python-dotenv==1.0.1
+PyMySQL==1.1.1
+email-validator==2.2.0
+httpx==0.28.1
+# 火山引擎 OpenAPI（智能视觉 CV：Img2ImgInpainting 等），用于去水印云端修复
+volcengine-python-sdk>=5.0.22,<6
+APScheduler==3.10.4
+openai==1.52.2
+anthropic>=0.40.0
+alibabacloud_sts20150401==1.2.0
+alibabacloud_tea_openapi==0.4.1
+oss2==2.19.1
+cos-python-sdk-v5>=1.9.0,<2
+# 去水印重构为纯 AI 路径（不再依赖本地 OCR/OpenCV/ffmpeg 算法）
+numpy==1.26.4
+Pillow>=10.0.0,<12.0.0
+python-multipart
+slowapi==0.1.9
+Markdown==3.7
+nh3==0.2.18
+yt-dlp>=2025.3.31
+ffmpeg-python>=0.2.0
