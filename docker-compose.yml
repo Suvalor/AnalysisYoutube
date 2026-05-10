@@ -1,20 +1,23 @@
-# MySQL 使用与后端相同思路的 Hub 同步源，避免首次 pull 时访问 docker.io 超时
+# Docker Compose 配置
+# 所有敏感值均通过环境变量注入，默认值仅供本地开发使用，不可用于生产。
+# 复制 .env.example 为 .env 并填入实际值后启动：cp .env.example .env
+
 services:
   mysql:
     image: docker.m.daocloud.io/library/mysql:8.0
     container_name: creator_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: creator_saas
-      MYSQL_USER: creator
-      MYSQL_PASSWORD: literal:REDACTED_MYSQL_PASSWORD
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      MYSQL_DATABASE: ${MYSQL_DB:-creator_saas}
+      MYSQL_USER: ${MYSQL_USER:-creator}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${MYSQL_USER:-creator}", "-p${MYSQL_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -32,29 +35,34 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    env_file: .env
     environment:
-      MYSQL_USER: creator
-      MYSQL_PASSWORD: literal:REDACTED_MYSQL_PASSWORD
+      MYSQL_USER: ${MYSQL_USER:-creator}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
-      MYSQL_DB: creator_saas
-      DATABASE_URL: mysql+asyncmy://creator:literal:REDACTED_MYSQL_PASSWORD@mysql:3306/creator_saas
-      SECRET_KEY: change_this_to_a_strong_random_string
-      ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+      MYSQL_DB: ${MYSQL_DB:-creator_saas}
+      DATABASE_URL: mysql+asyncmy://${MYSQL_USER:-creator}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DB:-creator_saas}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
       # 兼容本地开发：不同机器/配置可能导致前端 Origin 在 localhost/127.0.0.1、5173/5174 之间切换
-      BACKEND_CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174
-      YOUTUBE_API_KEY: literal:REDACTED_YOUTUBE_API_KEY
-      VOLCENGINE_API_KEY: literal:REDACTED_VOLCENGINE_API_KEY
-      VOLCENGINE_ENDPOINT_ID: doubao-seed-2.0-pro
-      VOLCENGINE_BASE_URL: https://ark.cn-beijing.volces.com/api/coding/v3
-      VOLCENGINE_MODEL_GEMINI: gemini-1.5-pro
-      ALIYUN_ACCESS_KEY_ID: literal:REDACTED_ALIYUN_ACCESS_KEY_ID
-      ALIYUN_ACCESS_KEY_SECRET: literal:REDACTED_ALIYUN_ACCESS_KEY_SECRET
-      ALIYUN_ROLE_ARN: literal:REDACTED_ALIYUN_ROLE_ARN
-      ALIYUN_REGION_ID: cn-guangzhou
-      ALIYUN_OSS_BUCKET_NAME: literal:REDACTED_ALIYUN_OSS_BUCKET_NAME
-      ALIYUN_OSS_ENDPOINT: oss-cn-guangzhou.aliyuncs.com
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174}
+      ALIYUN_ACCESS_KEY_ID: ${ALIYUN_ACCESS_KEY_ID:-}
+      ALIYUN_ACCESS_KEY_SECRET: ${ALIYUN_ACCESS_KEY_SECRET:-}
+      ALIYUN_ROLE_ARN: ${ALIYUN_ROLE_ARN:-}
+      ALIYUN_REGION_ID: ${ALIYUN_REGION_ID:-cn-guangzhou}
+      ALIYUN_OSS_BUCKET_NAME: ${ALIYUN_OSS_BUCKET_NAME:-}
+      ALIYUN_OSS_ENDPOINT: ${ALIYUN_OSS_ENDPOINT:-oss-cn-guangzhou.aliyuncs.com}
+      # SMTP 邮件服务（注册验证码 / 密码重置），不配置则邮件功能不可用
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-true}
+      # 前端站点地址（用于生成密码重置链接）
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}
     ports:
       - "8000:8000"
     # 挂载本地 backend：容器内 Alembic/应用代码与仓库一致；宿主 entrypoint.sh 须可执行（chmod +x）
@@ -64,4 +72,3 @@ services:
 
 volumes:
   mysql_data:
-

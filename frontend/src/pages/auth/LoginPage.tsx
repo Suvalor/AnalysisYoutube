@@ -1,13 +1,15 @@
-import { Alert, Button, Checkbox, Form, Input } from "antd";
-import { useEffect, useState } from "react";
+import { Alert, Button, Checkbox, Form, Input, Space } from "antd";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "@/components/Layout/AuthLayout";
-import { loginApi } from "@/services/authApi";
+import { getCaptchaApi, loginApi } from "@/services/authApi";
 import { useAuth } from "@/store/authStore";
 
 type FormValues = {
   email: string;
   password: string;
+  captcha_code: string;
 };
 
 export default function LoginPage() {
@@ -15,44 +17,67 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rememberMe, setRememberMe] = useState(true);
+  const [captchaId, setCaptchaId] = useState("");
+  const [captchaImage, setCaptchaImage] = useState("");
+  const [captchaLoading, setCaptchaLoading] = useState(false);
   const navigate = useNavigate();
   const { setToken } = useAuth();
+  const { t } = useTranslation("auth");
+  const fetchedRef = useRef(false);
+
+  const fetchCaptcha = useCallback(async () => {
+    setCaptchaLoading(true);
+    try {
+      const data = await getCaptchaApi();
+      setCaptchaId(data.captcha_id);
+      setCaptchaImage(data.captcha_image);
+      form.setFieldValue("captcha_code", "");
+    } catch {
+      setError(t("common:message.networkError"));
+    } finally {
+      setCaptchaLoading(false);
+    }
+  }, [form, t]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    // 用 ref 防止 StrictMode 双重调用
+    if (!fetchedRef.current) {
+      fetchedRef.current = true;
+      fetchCaptcha();
+    }
     const storedEmail = localStorage.getItem("rememberedEmail") || "";
-    const storedPassword = localStorage.getItem("rememberedPassword") || "";
-    if (storedEmail || storedPassword) {
-      form.setFieldsValue({
-        email: storedEmail,
-        password: storedPassword
-      });
+    if (storedEmail) {
+      form.setFieldValue("email", storedEmail);
       setRememberMe(true);
     }
-  }, [form]);
+  }, [form, fetchCaptcha]);
 
   const onFinish = async (values: FormValues) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await loginApi(values);
+      const res = await loginApi({
+        email: values.email,
+        password: values.password,
+        captcha_id: captchaId,
+        captcha_code: values.captcha_code,
+      });
       setToken(res.access_token);
       if (typeof window !== "undefined") {
         if (rememberMe) {
           localStorage.setItem("rememberedEmail", values.email);
-          localStorage.setItem("rememberedPassword", values.password);
         } else {
           localStorage.removeItem("rememberedEmail");
-          localStorage.removeItem("rememberedPassword");
         }
       }
-      navigate("/dashboard");
+      navigate("/blue-ocean-radar");
     } catch (e: any) {
-      const message =
+      const msg =
         e?.response?.data?.detail ??
         e?.message ??
-        "登录失败，请稍后重试";
-      setError(String(message));
+        t("common:message.networkError");
+      setError(String(msg));
+      fetchCaptcha();
     } finally {
       setLoading(false);
     }
@@ -60,8 +85,8 @@ export default function LoginPage() {
 
   return (
     <AuthLayout
-      title="登录 Creator SaaS"
-      subtitle="为 YouTube 创作者打造的一站式效率工具"
+      title={`${t("login.title")} YouTube Compass`}
+      subtitle={t("common:app.subtitle")}
     >
       <Form
         layout="vertical"
@@ -71,33 +96,71 @@ export default function LoginPage() {
       >
         {error && (
           <div className="mb-4">
-            <Alert type="error" message={error} showIcon />
+            <Alert type="error" message={error} showIcon closable onClose={() => setError(null)} />
           </div>
         )}
         <Form.Item
-          label="邮箱"
+          label={t("login.email")}
           name="email"
           rules={[
-            { required: true, message: "请输入邮箱" },
-            { type: "email", message: "邮箱格式不正确" }
+            { required: true, message: t("common:validation.email") },
+            { type: "email", message: t("common:validation.email") }
           ]}
         >
           <Input placeholder="you@example.com" size="large" />
         </Form.Item>
         <Form.Item
-          label="密码"
+          label={t("login.password")}
           name="password"
-          rules={[{ required: true, message: "请输入密码" }]}
+          rules={[{ required: true, message: t("common:validation.required") }]}
         >
-          <Input.Password placeholder="至少 8 位安全密码" size="large" />
+          <Input.Password placeholder="••••••••" size="large" />
+        </Form.Item>
+        <Form.Item
+          label={t("login.captcha")}
+          name="captcha_code"
+          rules={[
+            { required: true, message: t("common:validation.required") },
+            { len: 4  , message: t("common:validation.captchaLength") }
+          ]}
+        >
+          <Space>
+            <Input
+              placeholder={t("login.captcha")}
+              size="large"
+              maxLength={4}
+              style={{ width: 120 }}
+            />
+            {captchaImage && (
+              <img
+                src={`data:image/png;base64,${captchaImage}`}
+                alt={t("login.captcha")}
+                className="h-10 cursor-pointer rounded border border-slate-600"
+                onClick={fetchCaptcha}
+                title={t("login.captchaRefresh")}
+              />
+            )}
+            <Button
+              size="large"
+              onClick={fetchCaptcha}
+              loading={captchaLoading}
+            >
+              {t("common:action.refresh")}
+            </Button>
+          </Space>
         </Form.Item>
         <Form.Item>
-          <Checkbox
-            checked={rememberMe}
-            onChange={(e) => setRememberMe(e.target.checked)}
-          >
-            记住账号和密码
-          </Checkbox>
+          <div className="flex items-center justify-between">
+            <Checkbox className="text-slate-400 text-sm"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+            >
+              {t("login.rememberMe")}
+            </Checkbox>
+            <Link to="/forgot-password" className="text-indigo-400 hover:text-indigo-300 text-sm">
+              {t("login.forgotPassword")}
+            </Link>
+          </div>
         </Form.Item>
         <Form.Item className="mt-6 mb-2">
           <Button
@@ -107,17 +170,16 @@ export default function LoginPage() {
             className="w-full"
             loading={loading}
           >
-            登录
+            {t("login.submit")}
           </Button>
         </Form.Item>
         <div className="text-sm text-slate-300 flex justify-between">
-          <span>还没有账号？</span>
+          <span>{t("login.noAccount")}</span>
           <Link to="/register" className="text-indigo-400 hover:text-indigo-300">
-            立即注册
+            {t("login.goRegister")}
           </Link>
         </div>
       </Form>
     </AuthLayout>
   );
 }
-

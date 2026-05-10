@@ -81,7 +81,7 @@ def _require_api_key(youtube_api_key: str) -> None:
     if not (youtube_api_key or "").strip():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="未配置 YouTube Data API Key（请在设置中心填写或配置环境变量 YOUTUBE_API_KEY）",
+            detail="未配置 YouTube Data API Key，请在设置中心填写",
         )
 
 
@@ -129,7 +129,6 @@ class DiscoverChannelsByKeywordResult:
     warnings: list[str]
     search_calls: int
     channels_list_calls: int
-    videos_list_calls: int
 
 
 async def discover_channels_by_keyword(
@@ -157,10 +156,9 @@ async def discover_channels_by_keyword(
 
     search_calls = 0
     channels_list_calls = 0
-    videos_list_calls = 0
 
     try:
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
             resp = await client.get(
                 f"{YOUTUBE_API_BASE}/search",
                 params={
@@ -192,44 +190,12 @@ async def discover_channels_by_keyword(
                 warnings=warnings,
                 search_calls=search_calls,
                 channels_list_calls=0,
-                videos_list_calls=0,
             )
 
         ordered_cids = list(channel_first_video.keys())
         channel_rows: dict[str, dict] = {}
-        trigger_video_views_map: dict[str, int] = {}
 
-        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
-            ordered_video_ids: list[str] = []
-            seen_video_ids: set[str] = set()
-            for cid in ordered_cids:
-                vid = channel_first_video[cid]
-                if vid not in seen_video_ids:
-                    seen_video_ids.add(vid)
-                    ordered_video_ids.append(vid)
-
-            for group in chunked(ordered_video_ids, MAX_IDS_PER_REQUEST):
-                videos_list_calls += 1
-                resp = await client.get(
-                    f"{YOUTUBE_API_BASE}/videos",
-                    params={
-                        "part": "statistics",
-                        "id": ",".join(group),
-                        "key": youtube_api_key,
-                    },
-                )
-                _raise_for_youtube_response(resp)
-                payload = resp.json()
-                for video in payload.get("items", []):
-                    vid = video.get("id")
-                    if not isinstance(vid, str) or not vid:
-                        continue
-                    try:
-                        trigger_views = int((video.get("statistics") or {}).get("viewCount", 0))
-                    except (TypeError, ValueError):
-                        trigger_views = 0
-                    trigger_video_views_map[vid] = trigger_views
-
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
             for group in chunked(ordered_cids, MAX_IDS_PER_REQUEST):
                 channels_list_calls += 1
                 resp = await client.get(
@@ -283,8 +249,7 @@ async def discover_channels_by_keyword(
                     "title": title,
                     "thumbnail_url": thumbnail_url,
                     "subscriber_count": sub,
-                    "channel_total_views": total_views,
-                    "trigger_video_views": trigger_video_views_map.get(video_id, 0),
+                    "total_views": total_views,
                     "channel_url": f"https://www.youtube.com/channel/{cid}",
                     "viral_video_url": f"https://www.youtube.com/watch?v={video_id}",
                 }
@@ -295,7 +260,6 @@ async def discover_channels_by_keyword(
             warnings=warnings,
             search_calls=search_calls,
             channels_list_calls=channels_list_calls,
-            videos_list_calls=videos_list_calls,
         )
     except HTTPException:
         raise
@@ -308,6 +272,219 @@ async def discover_channels_by_keyword(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"挖掘过程发生异常：{e}",
+        ) from e
+
+
+@dataclass
+class BlueOceanRadarScanResult:
+    """蓝海雷达扫描：仅内存数据，供路由层序列化；不落库。"""
+
+    items: list[dict]
+    warnings: list[str]
+    search_calls: int
+    videos_list_calls: int
+    channels_list_calls: int
+
+
+async def blue_ocean_radar_scan(
+    *,
+    keyword: str,
+    published_after_days: int,
+    max_subscribers: int,
+    outlier_multiplier: float,
+    youtube_api_key: str,
+    video_duration: str | None = None,
+) -> BlueOceanRadarScanResult:
+    """
+    蓝海雷达：search.list（播放量序）→ videos.list 精确播放量 → channels.list →
+    粉丝上限与爆款系数过滤 → 按 outlier_score 降序。
+    search 单次 maxResults=50；videos / channels 按批计费。
+    """
+    _require_api_key(youtube_api_key)
+    kw = (keyword or "").strip()
+    if not kw:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="keyword 不能为空")
+
+    days = max(1, int(published_after_days))
+    warnings: list[str] = []
+    now_utc = datetime.now(timezone.utc)
+    published_after_dt = now_utc - timedelta(days=days)
+    published_after_iso = published_after_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    search_calls = 0
+    videos_list_calls = 0
+    channels_list_calls = 0
+
+    try:
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
+            search_params: dict[str, str | int] = {
+                "part": "snippet",
+                "type": "video",
+                "q": kw,
+                "order": "viewCount",
+                "publishedAfter": published_after_iso,
+                "maxResults": 50,
+                "key": youtube_api_key,
+            }
+            if video_duration in ("short", "medium", "long"):
+                search_params["videoDuration"] = video_duration
+
+            resp = await client.get(f"{YOUTUBE_API_BASE}/search", params=search_params)
+            search_calls = 1
+            _raise_for_youtube_response(resp)
+            search_data = resp.json()
+
+        pairs: list[tuple[str, str]] = []
+        for item in search_data.get("items", []):
+            vid = (item.get("id") or {}).get("videoId")
+            cid = (item.get("snippet") or {}).get("channelId")
+            if isinstance(vid, str) and vid.strip() and isinstance(cid, str) and cid.strip():
+                pairs.append((vid.strip(), cid.strip()))
+
+        if not pairs:
+            return BlueOceanRadarScanResult(
+                items=[],
+                warnings=warnings,
+                search_calls=search_calls,
+                videos_list_calls=0,
+                channels_list_calls=0,
+            )
+
+        video_ids = [p[0] for p in pairs]
+        view_by_vid: dict[str, int] = {}
+
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
+            for group in chunked(video_ids, MAX_IDS_PER_REQUEST):
+                videos_list_calls += 1
+                data = await _videos_get(client, video_ids=group, youtube_api_key=youtube_api_key)
+                for v in data.get("items", []):
+                    vid = v.get("id")
+                    stats = v.get("statistics") or {}
+                    raw_vc = stats.get("viewCount")
+                    if not isinstance(vid, str) or not vid.strip():
+                        continue
+                    vid = vid.strip()
+                    if raw_vc is None:
+                        warnings.append(f"视频 {vid}：无播放量字段，已跳过")
+                        continue
+                    try:
+                        view_by_vid[vid] = int(raw_vc)
+                    except (TypeError, ValueError):
+                        warnings.append(f"视频 {vid}：播放量字段异常，已跳过")
+
+            best_by_channel: dict[str, tuple[str, int]] = {}
+            for vid, cid in pairs:
+                views = view_by_vid.get(vid)
+                if views is None:
+                    continue
+                prev = best_by_channel.get(cid)
+                if prev is None or views > prev[1]:
+                    best_by_channel[cid] = (vid, views)
+
+            if not best_by_channel:
+                return BlueOceanRadarScanResult(
+                    items=[],
+                    warnings=warnings,
+                    search_calls=search_calls,
+                    videos_list_calls=videos_list_calls,
+                    channels_list_calls=0,
+                )
+
+            ordered_cids: list[str] = []
+            seen_c: set[str] = set()
+            for _vid, cid in pairs:
+                if cid in best_by_channel and cid not in seen_c:
+                    seen_c.add(cid)
+                    ordered_cids.append(cid)
+
+            channel_rows: dict[str, dict] = {}
+            for group in chunked(ordered_cids, MAX_IDS_PER_REQUEST):
+                channels_list_calls += 1
+                resp_ch = await client.get(
+                    f"{YOUTUBE_API_BASE}/channels",
+                    params={
+                        "part": "snippet,statistics",
+                        "id": ",".join(group),
+                        "key": youtube_api_key,
+                    },
+                )
+                _raise_for_youtube_response(resp_ch)
+                payload = resp_ch.json()
+                for ch in payload.get("items", []):
+                    cid = ch.get("id")
+                    if isinstance(cid, str) and cid:
+                        channel_rows[cid] = ch
+
+        items: list[dict] = []
+        for cid in ordered_cids:
+            pair = best_by_channel.get(cid)
+            if not pair:
+                continue
+            viral_vid, viral_views = pair
+            ch = channel_rows.get(cid)
+            if not ch:
+                warnings.append(f"频道 {cid}：channels.list 未返回详情，已跳过")
+                continue
+            stats = ch.get("statistics") or {}
+            sub_raw = stats.get("subscriberCount")
+            if sub_raw is None:
+                warnings.append(f"频道 {cid}：订阅数未公开，已跳过")
+                continue
+            try:
+                sub = int(sub_raw)
+            except (TypeError, ValueError):
+                warnings.append(f"频道 {cid}：订阅数字段异常，已跳过")
+                continue
+            if sub >= max_subscribers:
+                continue
+            outlier_score = viral_views / max(sub, 1)
+            if outlier_score < outlier_multiplier:
+                continue
+            try:
+                total_views = int(stats.get("viewCount", 0))
+            except (TypeError, ValueError):
+                total_views = 0
+            snippet = ch.get("snippet") or {}
+            title = snippet.get("title") or ""
+            thumbs = snippet.get("thumbnails") or {}
+            high = thumbs.get("high") or {}
+            default = thumbs.get("default") or {}
+            thumbnail_url = high.get("url") or default.get("url")
+
+            items.append(
+                {
+                    "yt_channel_id": cid,
+                    "title": title,
+                    "thumbnail_url": thumbnail_url,
+                    "subscriber_count": sub,
+                    "total_views": total_views,
+                    "channel_url": f"https://www.youtube.com/channel/{cid}",
+                    "viral_video_url": f"https://www.youtube.com/watch?v={viral_vid}",
+                    "viral_view_count": viral_views,
+                    "outlier_score": round(outlier_score, 4),
+                }
+            )
+
+        items.sort(key=lambda x: float(x["outlier_score"]), reverse=True)
+
+        return BlueOceanRadarScanResult(
+            items=items,
+            warnings=warnings,
+            search_calls=search_calls,
+            videos_list_calls=videos_list_calls,
+            channels_list_calls=channels_list_calls,
+        )
+    except HTTPException:
+        raise
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"访问 YouTube API 网络异常：{e}",
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"蓝海雷达扫描发生异常：{e}",
         ) from e
 
 
@@ -541,7 +718,7 @@ async def fetch_channel_info(identifier: dict[str, str], *, youtube_api_key: str
     else:
         params["forHandle"] = identifier["handle"].lstrip("@")
 
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
         response = await client.get(f"{YOUTUBE_API_BASE}/channels", params=params)
 
     if response.status_code != 200:
@@ -601,8 +778,7 @@ async def _videos_get(
             "key": youtube_api_key,
         },
     )
-    if resp.status_code != 200:
-        raise _http_error(f"YouTube videos API 调用失败：{resp.text}")
+    _raise_for_youtube_response(resp)
     return resp.json()
 
 
@@ -630,7 +806,7 @@ async def fetch_recent_videos(
     limit = max(1, min(limit, 50))
     quota = FetchRecentVideosQuota()
 
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
         data = await _channels_get(
             client,
             params={
@@ -700,7 +876,7 @@ async def fetch_channels_by_ids(
         return [] if not return_call_count else ([], 0)
 
     _require_api_key(youtube_api_key)
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
         all_items: list[dict] = []
         call_count = 0
         for group in chunked(channel_ids, MAX_IDS_PER_REQUEST):
@@ -897,7 +1073,7 @@ async def run_bulk_analyze_pipeline(urls: str, *, youtube_api_key: str) -> BulkA
         result.errors.append("未解析到任何有效的频道链接（需要 youtube.com/channel/UC… 或 youtube.com/@handle）")
         return result
 
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
         if handles:
             mapping, herr = await resolve_handles_to_channel_ids(
                 client, list(handles), youtube_api_key=youtube_api_key
@@ -937,7 +1113,7 @@ async def run_refresh_pipeline_for_youtube_channel_ids(
     if not unique:
         return result
 
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
         inner = await _pipeline_fetch_channels_and_videos(client, unique, youtube_api_key=youtube_api_key)
         result.channel_items = inner.channel_items
         result.video_items = inner.video_items
@@ -1029,7 +1205,7 @@ async def fetch_comment_threads_with_search(
     page_token: str | None = None
     api_calls = 0
 
-    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
         while len(collected) < max_total:
             batch = min(100, max_total - len(collected))
             params: dict = {
@@ -1061,3 +1237,403 @@ async def fetch_comment_threads_with_search(
                 break
 
     return collected[:max_total], api_calls
+
+
+# ──────────────────────────────────────────────
+# 品类机会报告
+# ──────────────────────────────────────────────
+
+# YouTube 视频时长分类阈值（秒）
+_DURATION_SHORT_MAX = 60       # ≤60s = short
+_DURATION_MEDIUM_MAX = 600     # ≤600s = medium, >600s = long
+
+
+def _classify_duration(seconds: int | None) -> str:
+    """将视频时长（秒）分类为 short / medium / long。"""
+    if seconds is None:
+        return "medium"
+    if seconds <= _DURATION_SHORT_MAX:
+        return "short"
+    if seconds <= _DURATION_MEDIUM_MAX:
+        return "medium"
+    return "long"
+
+
+async def category_opportunity_scan(
+    *,
+    keyword: str,
+    region: str,
+    lookback_months: int,
+    youtube_api_key: str,
+) -> dict:
+    """
+    品类机会报告：分析指定品类关键词的市场机会。
+    返回头部频道增速、内容缺口、新入局者统计。
+    """
+    _require_api_key(youtube_api_key)
+    kw = (keyword or "").strip()
+    if not kw:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="keyword 不能为空")
+
+    now_utc = datetime.now(timezone.utc)
+    published_after_dt = now_utc - timedelta(days=lookback_months * 30)
+    published_after_iso = published_after_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    # 新入局者判定：频道创建时间在 lookback_months 内
+    newcomer_cutoff = now_utc - timedelta(days=lookback_months * 30)
+
+    videos_list_calls = 0
+    channels_list_calls = 0
+
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
+        # Step 1: search.list 获取该品类热门视频
+        search_params = {
+            "part": "snippet",
+            "type": "video",
+            "q": kw,
+            "order": "viewCount",
+            "publishedAfter": published_after_iso,
+            "maxResults": 50,
+            "regionCode": region,
+            "key": youtube_api_key,
+        }
+        resp = await client.get(f"{YOUTUBE_API_BASE}/search", params=search_params)
+        _raise_for_youtube_response(resp)
+        search_data = resp.json()
+
+        # 提取 videoId + channelId 对
+        pairs: list[tuple[str, str]] = []
+        for item in search_data.get("items", []):
+            vid = (item.get("id") or {}).get("videoId")
+            cid = (item.get("snippet") or {}).get("channelId")
+            if isinstance(vid, str) and vid.strip() and isinstance(cid, str) and cid.strip():
+                pairs.append((vid.strip(), cid.strip()))
+
+        if not pairs:
+            return {
+                "top_channels_growth": [],
+                "content_gaps": [],
+                "newcomer_stats": {"total_new_channels": 0, "successful_channels": 0, "success_rate": 0.0},
+                "videos_list_calls": 0,
+                "channels_list_calls": 0,
+            }
+
+        # Step 2: videos.list 获取播放量 + 时长
+        video_ids = [p[0] for p in pairs]
+        unique_cids = list(dict.fromkeys(cid for _, cid in pairs))
+
+        vid_stats: dict[str, dict] = {}  # vid -> {views, duration_seconds}
+        for group in chunked(video_ids, MAX_IDS_PER_REQUEST):
+            videos_list_calls += 1
+            resp_v = await client.get(
+                f"{YOUTUBE_API_BASE}/videos",
+                params={
+                    "part": "statistics,contentDetails",
+                    "id": ",".join(group),
+                    "key": youtube_api_key,
+                },
+            )
+            _raise_for_youtube_response(resp_v)
+            for v in resp_v.json().get("items", []):
+                vid = v.get("id", "")
+                stats = v.get("statistics") or {}
+                cd = v.get("contentDetails") or {}
+                try:
+                    views = int(stats.get("viewCount", 0))
+                except (TypeError, ValueError):
+                    views = 0
+                # 解析 ISO 8601 时长（PT#H#M#S）
+                dur_str = cd.get("duration", "")
+                dur_secs = _parse_iso_duration(dur_str)
+                vid_stats[vid] = {"views": views, "duration_seconds": dur_secs}
+
+        # Step 3: channels.list 获取频道详情（订阅数、创建时间、总播放量）
+        ch_details: dict[str, dict] = {}
+        for group in chunked(unique_cids, MAX_IDS_PER_REQUEST):
+            channels_list_calls += 1
+            resp_ch = await client.get(
+                f"{YOUTUBE_API_BASE}/channels",
+                params={
+                    "part": "snippet,statistics",
+                    "id": ",".join(group),
+                    "key": youtube_api_key,
+                },
+            )
+            _raise_for_youtube_response(resp_ch)
+            for ch in resp_ch.json().get("items", []):
+                cid = ch.get("id", "")
+                snippet = ch.get("snippet") or {}
+                stats = ch.get("statistics") or {}
+                try:
+                    subs = int(stats.get("subscriberCount", 0))
+                except (TypeError, ValueError):
+                    subs = 0
+                try:
+                    total_views = int(stats.get("viewCount", 0))
+                except (TypeError, ValueError):
+                    total_views = 0
+                try:
+                    video_count = int(stats.get("videoCount", 0))
+                except (TypeError, ValueError):
+                    video_count = 0
+                published_at = snippet.get("publishedAt", "")
+                ch_details[cid] = {
+                    "title": snippet.get("title", ""),
+                    "subscriber_count": subs,
+                    "total_views": total_views,
+                    "video_count": video_count,
+                    "published_at": published_at,
+                }
+
+    # ── 分析：头部频道增速 ──
+    growth_items: list[dict] = []
+    for cid in unique_cids[:20]:  # 取 Top 20 频道
+        detail = ch_details.get(cid)
+        if not detail or detail["subscriber_count"] == 0:
+            continue
+        # 增速估算：月均播放 / 粉丝数
+        monthly_views = detail["total_views"] / max(lookback_months, 1)
+        growth_rate = (monthly_views / max(detail["subscriber_count"], 1)) * 100
+        if growth_rate > 50:
+            trend = "rising"
+        elif growth_rate > 10:
+            trend = "stable"
+        else:
+            trend = "declining"
+        growth_items.append({
+            "channel_id": cid,
+            "title": detail["title"],
+            "subscriber_count": detail["subscriber_count"],
+            "monthly_growth_rate": round(growth_rate, 2),
+            "trend": trend,
+        })
+
+    # ── 分析：内容缺口 ──
+    duration_buckets: dict[str, list[int]] = {"short": [], "medium": [], "long": []}
+    for vid in video_ids:
+        vs = vid_stats.get(vid)
+        if not vs:
+            continue
+        bucket = _classify_duration(vs["duration_seconds"])
+        duration_buckets[bucket].append(vs["views"])
+
+    total_videos_with_stats = sum(len(v) for v in duration_buckets.values())
+    content_gaps: list[dict] = []
+    if total_videos_with_stats > 0:
+        for bucket_name, views_list in duration_buckets.items():
+            supply_ratio = len(views_list) / total_videos_with_stats
+            avg_views = int(sum(views_list) / max(len(views_list), 1))
+            # 机会分数：供给占比越低 + 平均播放越高 → 机会越大
+            opportunity_score = round((1 - supply_ratio) * (avg_views / max(total_videos_with_stats, 1)) * 100, 2)
+            content_gaps.append({
+                "duration_bucket": bucket_name,
+                "supply_ratio": round(supply_ratio, 4),
+                "avg_views": avg_views,
+                "opportunity_score": opportunity_score,
+            })
+
+    # ── 分析：新入局者统计 ──
+    newcomer_channels = 0
+    successful_newcomers = 0
+    for cid, detail in ch_details.items():
+        pub_at = detail.get("published_at", "")
+        if not pub_at:
+            continue
+        try:
+            created = datetime.fromisoformat(pub_at.replace("Z", "+00:00"))
+            if created >= newcomer_cutoff:
+                newcomer_channels += 1
+                if detail["subscriber_count"] > 1000:
+                    successful_newcomers += 1
+        except (ValueError, TypeError):
+            continue
+
+    newcomer_stats = {
+        "total_new_channels": newcomer_channels,
+        "successful_channels": successful_newcomers,
+        "success_rate": round(successful_newcomers / max(newcomer_channels, 1), 4),
+    }
+
+    return {
+        "top_channels_growth": growth_items,
+        "content_gaps": content_gaps,
+        "newcomer_stats": newcomer_stats,
+        "videos_list_calls": videos_list_calls,
+        "channels_list_calls": channels_list_calls,
+    }
+
+
+def _parse_iso_duration(dur: str) -> int | None:
+    """解析 ISO 8601 时长（PT1H2M3S）为秒数。"""
+    if not dur:
+        return None
+    import re as _re
+    m = _re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", dur)
+    if not m:
+        return None
+    h = int(m.group(1) or 0)
+    mins = int(m.group(2) or 0)
+    s = int(m.group(3) or 0)
+    return h * 3600 + mins * 60 + s
+
+
+# ──────────────────────────────────────────────
+# 跨地区对比
+# ──────────────────────────────────────────────
+
+# 地区代码 → 名称映射
+_REGION_NAMES: dict[str, str] = {
+    "US": "美国", "GB": "英国", "CA": "加拿大", "AU": "澳大利亚",
+    "SG": "新加坡", "MY": "马来西亚", "PH": "菲律宾", "ID": "印尼",
+    "TH": "泰国", "VN": "越南", "IN": "印度", "JP": "日本", "KR": "韩国",
+    "AE": "阿联酋", "SA": "沙特", "EG": "埃及", "NG": "尼日利亚",
+    "BR": "巴西", "MX": "墨西哥", "DE": "德国", "FR": "法国",
+    "TW": "台湾", "HK": "香港",
+}
+
+
+async def cross_region_compare(
+    *,
+    keyword: str,
+    regions: list[str],
+    published_after_days: int,
+    youtube_api_key: str,
+) -> list[dict]:
+    """
+    跨地区对比：同一关键词在不同地区的市场快照。
+    对每个地区分别调用 search.list + channels.list。
+    """
+    _require_api_key(youtube_api_key)
+    kw = (keyword or "").strip()
+    if not kw:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="keyword 不能为空")
+
+    now_utc = datetime.now(timezone.utc)
+    published_after_iso = (now_utc - timedelta(days=published_after_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    snapshots: list[dict] = []
+    channels_calls = 0
+
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT, trust_env=False) as client:
+        for region_code in regions:
+            try:
+                # search.list
+                resp = await client.get(
+                    f"{YOUTUBE_API_BASE}/search",
+                    params={
+                        "part": "snippet",
+                        "type": "video",
+                        "q": kw,
+                        "order": "viewCount",
+                        "publishedAfter": published_after_iso,
+                        "maxResults": 25,
+                        "regionCode": region_code,
+                        "key": youtube_api_key,
+                    },
+                )
+                _raise_for_youtube_response(resp)
+                search_data = resp.json()
+
+                # 提取频道 ID
+                cids_seen: list[str] = []
+                cids_set: set[str] = set()
+                for item in search_data.get("items", []):
+                    cid = (item.get("snippet") or {}).get("channelId", "")
+                    if cid and cid not in cids_set:
+                        cids_set.add(cid)
+                        cids_seen.append(cid)
+
+                if not cids_seen:
+                    snapshots.append({
+                        "region_code": region_code,
+                        "region_name": _REGION_NAMES.get(region_code, region_code),
+                        "channel_count": 0,
+                        "avg_views": 0,
+                        "median_outlier_score": 0.0,
+                        "top_channel_title": "",
+                        "top_channel_subscribers": 0,
+                    })
+                    continue
+
+                # channels.list 获取订阅数和播放量
+                ch_data: dict[str, dict] = {}
+                for group in chunked(cids_seen, MAX_IDS_PER_REQUEST):
+                    channels_calls += 1
+                    resp_ch = await client.get(
+                        f"{YOUTUBE_API_BASE}/channels",
+                        params={
+                            "part": "snippet,statistics",
+                            "id": ",".join(group),
+                            "key": youtube_api_key,
+                        },
+                    )
+                    _raise_for_youtube_response(resp_ch)
+                    for ch in resp_ch.json().get("items", []):
+                        cid = ch.get("id", "")
+                        snippet = ch.get("snippet") or {}
+                        stats = ch.get("statistics") or {}
+                        try:
+                            subs = int(stats.get("subscriberCount", 0))
+                        except (TypeError, ValueError):
+                            subs = 0
+                        try:
+                            views = int(stats.get("viewCount", 0))
+                        except (TypeError, ValueError):
+                            views = 0
+                        ch_data[cid] = {
+                            "title": snippet.get("title", ""),
+                            "subscriber_count": subs,
+                            "total_views": views,
+                        }
+
+                # 计算统计量
+                channel_count = len(ch_data)
+                total_views = sum(d["total_views"] for d in ch_data.values())
+                avg_views = total_views // max(channel_count, 1)
+
+                # 爆款系数中位数
+                outlier_scores = []
+                for d in ch_data.values():
+                    subs = d["subscriber_count"]
+                    views = d["total_views"]
+                    if subs > 0:
+                        outlier_scores.append(views / subs)
+                outlier_scores.sort()
+                if outlier_scores:
+                    mid = len(outlier_scores) // 2
+                    median_outlier = outlier_scores[mid]
+                else:
+                    median_outlier = 0.0
+
+                # Top 频道（按订阅数）
+                top_ch = max(ch_data.values(), key=lambda x: x["subscriber_count"], default=None)
+
+                snapshots.append({
+                    "region_code": region_code,
+                    "region_name": _REGION_NAMES.get(region_code, region_code),
+                    "channel_count": channel_count,
+                    "avg_views": avg_views,
+                    "median_outlier_score": round(median_outlier, 4),
+                    "top_channel_title": top_ch["title"] if top_ch else "",
+                    "top_channel_subscribers": top_ch["subscriber_count"] if top_ch else 0,
+                })
+            except Exception as _cross_region_err:
+                # 单地区失败不影响其他地区
+                import logging as _logging
+                _logging.getLogger(__name__).warning(
+                    "跨地区对比单地区扫描失败: region=%s err=%s",
+                    region_code, _cross_region_err,
+                )
+                snapshots.append({
+                    "region_code": region_code,
+                    "region_name": _REGION_NAMES.get(region_code, region_code),
+                    "channel_count": 0,
+                    "avg_views": 0,
+                    "median_outlier_score": 0.0,
+                    "top_channel_title": "",
+                    "top_channel_subscribers": 0,
+                })
+
+    return {
+        "snapshots": snapshots,
+        "channels_calls": channels_calls,
+    }

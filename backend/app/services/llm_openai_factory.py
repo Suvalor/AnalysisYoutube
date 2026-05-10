@@ -1,94 +1,27 @@
 """
-OpenAI 兼容 LLM 的协议感知与客户端构建。
+LLM 客户端工厂：根据 protocol 字段选择 Anthropic SDK 或 OpenAI SDK。
 
-根据配置中的 Base URL 动态选择行为，避免在业务代码中散落 if-else。
+protocol=anthropic（默认）→ Anthropic Messages API
+protocol=openai          → OpenAI chat.completions API（兼容网关）
 """
 
 from __future__ import annotations
 
-from enum import Enum
+import logging
+
 from dataclasses import dataclass
 from typing import AsyncIterator, Any
 
 import httpx
 from openai import AsyncOpenAI
+from anthropic import AsyncAnthropic
 
-from app.services.config_manager import ResolvedIntegrationConfig
+logger = logging.getLogger(__name__)
 
 
-def normalize_openai_base_url(url: str | None) -> str:
-    """去掉首尾空白与末尾斜杠，便于与规范地址比较。"""
+def normalize_base_url(url: str | None) -> str:
+    """去掉首尾空白与末尾斜杠。"""
     return (url or "").strip().rstrip("/")
-
-
-# 火山引擎 Coding Plan（OpenAI 兼容）规范 Base URL，须与控制台文档一致
-VOLCENGINE_CODING_OPENAI_BASE_URL_CANONICAL = "https://ark.cn-beijing.volces.com/api/coding/v3"
-
-# Coding Plan 下未指定模型时使用的默认 model 参数（可被集成配置中的 Endpoint 覆盖）
-VOLCENGINE_CODING_DEFAULT_MODEL_ID = "ark-code-latest"
-
-
-class LlmOpenAiProtocolKind(str, Enum):
-    """当前请求所采用的 OpenAI 兼容协议变体。"""
-
-    STANDARD = "standard"
-    """标准 OpenAI Compatible：不修改 model 与 Header，仅透传 SDK 默认行为。"""
-
-    VOLCENGINE_CODING_V3 = "volcengine_coding_v3"
-    """火山引擎 Coding Plan：/api/coding/v3，未指定 model 时使用 ark-code-latest 或集成 Endpoint。"""
-
-
-def detect_openai_protocol_kind(base_url: str | None) -> LlmOpenAiProtocolKind:
-    """仅依据 Base URL 判断协议类型（不读环境变量硬编码开关）。"""
-    u = normalize_openai_base_url(base_url)
-    if u == VOLCENGINE_CODING_OPENAI_BASE_URL_CANONICAL:
-        return LlmOpenAiProtocolKind.VOLCENGINE_CODING_V3
-    return LlmOpenAiProtocolKind.STANDARD
-
-
-def is_volcengine_coding_plan_openai_api(base_url: str | None) -> bool:
-    return detect_openai_protocol_kind(base_url) == LlmOpenAiProtocolKind.VOLCENGINE_CODING_V3
-
-
-def resolve_openai_chat_model_parameter(
-    base_url: str,
-    explicit_model: str,
-    integration: ResolvedIntegrationConfig | None,
-) -> str:
-    """
-    解析 chat.completions 的 model 参数。
-
-    - Coding Plan URL：显式非空则用显式值；否则优先集成中的 volcengine_endpoint_id，再回退 ark-code-latest。
-    - 火山方舟常规 OpenAI 路径（非 Coding）：保留 ep- 接入点回退逻辑。
-    - 其他 URL：标准模式，显式优先，否则回退集成 endpoint_id。
-    """
-    # 按最新要求：
-    # - 仅当 base_url 为 Coding Plan 时才做非标准适配：model_name 为空则默认 ark-code-latest
-    # - 其它 URL 维持“原汁原味”：不对 model_name 做任何默认填充/重写
-    _ = integration  # 当前解析逻辑不使用 integration，仅保留参数兼容
-    u = normalize_openai_base_url(base_url)
-    ex = (explicit_model or "").strip()
-    if is_volcengine_coding_plan_openai_api(u):
-        return ex if ex else VOLCENGINE_CODING_DEFAULT_MODEL_ID
-    return ex
-
-
-def create_async_openai_client(
-    *,
-    api_key: str,
-    base_url: str,
-    timeout: float | None = 120.0,
-    limits: httpx.Limits | None = None,
-) -> tuple[AsyncOpenAI, httpx.AsyncClient]:
-    """
-    构建 AsyncOpenAI 与底层 httpx 客户端。
-
-    调用方必须在用毕后执行 ``await http_client.aclose()``（标准 OpenAI 兼容模式同样适用）。
-    """
-    normalized = normalize_openai_base_url(base_url)
-    http_client = httpx.AsyncClient(timeout=timeout, limits=limits, trust_env=False)
-    client = AsyncOpenAI(api_key=api_key, base_url=normalized, http_client=http_client)
-    return client, http_client
 
 
 @dataclass(frozen=True)
@@ -96,107 +29,142 @@ class LLMClientConfig:
     api_key: str
     base_url: str
     model_name: str | None = None
+    protocol: str = "anthropic"  # anthropic / openai
 
 
 class LLMClientFactory:
     """
-    OpenAI 兼容 LLM 客户端工厂（协议感知 + async streaming 支持）。
+    LLM 客户端工厂（协议感知 + async streaming 支持）。
 
-    核心原则：
-    - 仅依据 base_url 是否为 Coding Plan 才触发非标准逻辑
-    - Coding Plan：model_name 为空 => 默认 ark-code-latest
-    - 其它：严格尊重 model_name，不做任何默认填充或重写
+    根据 cfg.protocol 选择 SDK：
+    - anthropic：使用 Anthropic SDK 调用 Messages API
+    - openai：使用 OpenAI SDK 调用 chat.completions API
     """
 
     def __init__(
         self,
         *,
-        standard_timeout_seconds: float = 120.0,
-        coding_plan_timeout_seconds: float | None = None,
+        default_timeout_seconds: float = 120.0,
         max_connections: int = 30,
         max_keepalive_connections: int = 10,
     ) -> None:
-        self._standard_timeout = standard_timeout_seconds
-        self._coding_plan_timeout = coding_plan_timeout_seconds
+        self._timeout = default_timeout_seconds
         self._limits = httpx.Limits(max_connections=max_connections, max_keepalive_connections=max_keepalive_connections)
 
     def resolve_model_name(self, cfg: LLMClientConfig) -> str:
-        base = normalize_openai_base_url(cfg.base_url)
-        model = (cfg.model_name or "").strip()
-        # 复用现有 resolve_openai_chat_model_parameter 的规则：Coding Plan 才注入默认
-        return resolve_openai_chat_model_parameter(base, model, integration=None)
+        return (cfg.model_name or "").strip()
 
-    def detect_is_coding_plan(self, cfg: LLMClientConfig) -> bool:
-        return is_volcengine_coding_plan_openai_api(cfg.base_url)
+    # ── Anthropic 通道 ──
 
-    def _extract_delta_text(self, chunk: Any, *, is_coding_plan: bool) -> str:
-        """
-        流式数据清洗器：尽可能从 chunk 里抽取增量文本。
-        目标：把潜在字段差异（content/text/message/content 等）归一到字符串。
-        """
-        try:
-            choices = getattr(chunk, "choices", None)
-            if not choices:
-                return ""
-            first = choices[0]
-            delta = getattr(first, "delta", None)
-            if delta is None:
-                return ""
-
-            # 标准：delta.content
-            content = getattr(delta, "content", None)
-            if isinstance(content, str) and content:
-                return content
-
-            # 兼容：delta.text
-            text = getattr(delta, "text", None)
-            if isinstance(text, str) and text:
-                return text
-
-            # 兼容：delta.message.content
-            message = getattr(delta, "message", None)
-            msg_content = getattr(message, "content", None) if message is not None else None
-            if isinstance(msg_content, str) and msg_content:
-                return msg_content
-
-            # Coding Plan：delta 可能是 dict 或嵌套对象
-            if is_coding_plan and isinstance(delta, dict):
-                v = delta.get("content") or delta.get("text")
-                if isinstance(v, str) and v:
-                    return v
-                message_obj = delta.get("message")
-                if isinstance(message_obj, dict):
-                    v2 = message_obj.get("content") or message_obj.get("text")
-                    if isinstance(v2, str) and v2:
-                        return v2
-
-            # 其它情况：返回空（不影响 SSE 协议，只是不产出 delta）
-            return ""
-        except Exception:
-            return ""
-
-    async def stream_chat_completions_deltas(
+    async def _anthropic_chat(
         self,
         *,
         cfg: LLMClientConfig,
         messages: list[dict[str, str]],
         temperature: float = 0.7,
-        # 允许未来扩展：例如 max_tokens
-        **create_kwargs: Any,
-    ) -> AsyncIterator[str]:
-        """
-        流式调用：返回 async iterator，逐 chunk 产出增量文本。
-        注意：函数内部负责正确关闭 http_client，保证并发与资源释放。
-        """
-        base = normalize_openai_base_url(cfg.base_url)
-        is_coding_plan = self.detect_is_coding_plan(cfg)
-        timeout = self._coding_plan_timeout if is_coding_plan else self._standard_timeout
-
+        **kwargs: Any,
+    ) -> str:
+        """Anthropic Messages API 非流式调用。"""
+        base = normalize_base_url(cfg.base_url)
         model_name = self.resolve_model_name(cfg)
         if not model_name:
-            raise ValueError("model_name 不能为空（Coding Plan 可留空以使用默认 ark-code-latest）")
+            raise ValueError("Anthropic 协议要求 model_name 不能为空")
 
-        http_client = httpx.AsyncClient(timeout=timeout, limits=self._limits, trust_env=False)
+        http_client = httpx.AsyncClient(timeout=self._timeout, limits=self._limits, trust_env=False)
+        client = AsyncAnthropic(api_key=cfg.api_key, base_url=base or None, http_client=http_client)
+        try:
+            system_prompt, filtered = _split_system_prompt(messages)
+            resp = await client.messages.create(
+                model=model_name,
+                max_tokens=kwargs.pop("max_tokens", 4096),
+                temperature=temperature,
+                system=system_prompt or None,
+                messages=filtered,
+            )
+            return resp.content[0].text if resp.content else ""
+        finally:
+            await http_client.aclose()
+
+    async def _anthropic_stream(
+        self,
+        *,
+        cfg: LLMClientConfig,
+        messages: list[dict[str, str]],
+        temperature: float = 0.7,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """Anthropic Messages API 流式调用。"""
+        base = normalize_base_url(cfg.base_url)
+        model_name = self.resolve_model_name(cfg)
+        if not model_name:
+            raise ValueError("Anthropic 协议要求 model_name 不能为空")
+
+        http_client = httpx.AsyncClient(timeout=self._timeout, limits=self._limits, trust_env=False)
+        client = AsyncAnthropic(api_key=cfg.api_key, base_url=base or None, http_client=http_client)
+        try:
+            system_prompt, filtered = _split_system_prompt(messages)
+            stream = await client.messages.create(
+                model=model_name,
+                max_tokens=kwargs.pop("max_tokens", 4096),
+                temperature=temperature,
+                system=system_prompt or None,
+                messages=filtered,
+                stream=True,
+            )
+            async for event in stream:
+                if event.type == "content_block_delta" and hasattr(event, "delta"):
+                    text = getattr(event.delta, "text", None)
+                    if text:
+                        yield text
+        finally:
+            await http_client.aclose()
+
+    # ── OpenAI 通道 ──
+
+    async def _openai_chat(
+        self,
+        *,
+        cfg: LLMClientConfig,
+        messages: list[dict[str, str]],
+        temperature: float = 0.7,
+        **kwargs: Any,
+    ) -> str:
+        """OpenAI chat.completions 非流式调用。"""
+        base = normalize_base_url(cfg.base_url)
+        model_name = self.resolve_model_name(cfg)
+        if not model_name:
+            raise ValueError("OpenAI 协议要求 model_name 不能为空")
+
+        http_client = httpx.AsyncClient(timeout=self._timeout, limits=self._limits, trust_env=False)
+        client = AsyncOpenAI(api_key=cfg.api_key, base_url=base, http_client=http_client)
+        try:
+            resp = await client.chat.completions.create(
+                model=model_name,
+                stream=False,
+                messages=messages,
+                temperature=temperature,
+                **kwargs,
+            )
+            choice = resp.choices[0] if resp.choices else None
+            return (choice.message.content if choice and choice.message else "") or ""
+        finally:
+            await http_client.aclose()
+
+    async def _openai_stream(
+        self,
+        *,
+        cfg: LLMClientConfig,
+        messages: list[dict[str, str]],
+        temperature: float = 0.7,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """OpenAI chat.completions 流式调用。"""
+        base = normalize_base_url(cfg.base_url)
+        model_name = self.resolve_model_name(cfg)
+        if not model_name:
+            raise ValueError("OpenAI 协议要求 model_name 不能为空")
+
+        http_client = httpx.AsyncClient(timeout=self._timeout, limits=self._limits, trust_env=False)
         client = AsyncOpenAI(api_key=cfg.api_key, base_url=base, http_client=http_client)
         try:
             stream = await client.chat.completions.create(
@@ -204,14 +172,16 @@ class LLMClientFactory:
                 stream=True,
                 messages=messages,
                 temperature=temperature,
-                **create_kwargs,
+                **kwargs,
             )
             async for chunk in stream:
-                delta_text = self._extract_delta_text(chunk, is_coding_plan=is_coding_plan)
+                delta_text = _extract_openai_delta(chunk)
                 if delta_text:
                     yield delta_text
         finally:
             await http_client.aclose()
+
+    # ── 统一入口 ──
 
     async def chat_completions_content(
         self,
@@ -219,24 +189,62 @@ class LLMClientFactory:
         cfg: LLMClientConfig,
         messages: list[dict[str, str]],
         temperature: float = 0.7,
-        **create_kwargs: Any,
+        **kwargs: Any,
     ) -> str:
-        """非流式调用：返回 choices[0].message.content 的文本。"""
-        base = normalize_openai_base_url(cfg.base_url)
-        is_coding_plan = self.detect_is_coding_plan(cfg)
-        timeout = self._coding_plan_timeout if is_coding_plan else self._standard_timeout
-        http_client = httpx.AsyncClient(timeout=timeout, limits=self._limits, trust_env=False)
-        client = AsyncOpenAI(api_key=cfg.api_key, base_url=base, http_client=http_client)
-        try:
-            resp = await client.chat.completions.create(
-                model=self.resolve_model_name(cfg),
-                stream=False,
-                messages=messages,
-                temperature=temperature,
-                **create_kwargs,
-            )
-            choice = resp.choices[0] if resp.choices else None
-            raw_content = (choice.message.content if choice and choice.message else "") or ""
-            return raw_content
-        finally:
-            await http_client.aclose()
+        """非流式调用：根据 protocol 选择 SDK。"""
+        if cfg.protocol == "anthropic":
+            return await self._anthropic_chat(cfg=cfg, messages=messages, temperature=temperature, **kwargs)
+        return await self._openai_chat(cfg=cfg, messages=messages, temperature=temperature, **kwargs)
+
+    async def stream_chat_completions_deltas(
+        self,
+        *,
+        cfg: LLMClientConfig,
+        messages: list[dict[str, str]],
+        temperature: float = 0.7,
+        **kwargs: Any,
+    ) -> AsyncIterator[str]:
+        """流式调用：根据 protocol 选择 SDK。"""
+        if cfg.protocol == "anthropic":
+            async for delta in self._anthropic_stream(cfg=cfg, messages=messages, temperature=temperature, **kwargs):
+                yield delta
+        else:
+            async for delta in self._openai_stream(cfg=cfg, messages=messages, temperature=temperature, **kwargs):
+                yield delta
+
+
+def _split_system_prompt(messages: list[dict[str, str]]) -> tuple[str, list[dict[str, str]]]:
+    """将 system 消息从 messages 中分离（Anthropic SDK 要求 system 为独立参数）。"""
+    system_parts: list[str] = []
+    filtered: list[dict[str, str]] = []
+    for msg in messages:
+        if msg.get("role") == "system":
+            system_parts.append(msg.get("content", ""))
+        else:
+            filtered.append(msg)
+    return "\n\n".join(system_parts), filtered
+
+
+def _extract_openai_delta(chunk: Any) -> str:
+    """从 OpenAI streaming chunk 中提取增量文本。"""
+    try:
+        choices = getattr(chunk, "choices", None)
+        if not choices:
+            return ""
+        first = choices[0]
+        delta = getattr(first, "delta", None)
+        if delta is None:
+            return ""
+        content = getattr(delta, "content", None)
+        if isinstance(content, str) and content:
+            return content
+        text = getattr(delta, "text", None)
+        if isinstance(text, str) and text:
+            return text
+        message = getattr(delta, "message", None)
+        msg_content = getattr(message, "content", None) if message is not None else None
+        if isinstance(msg_content, str) and msg_content:
+            return msg_content
+        return ""
+    except Exception:
+        return ""

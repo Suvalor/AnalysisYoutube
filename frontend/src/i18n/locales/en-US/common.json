@@ -1,0 +1,81 @@
+{
+  "app": {
+    "name": "YouTube Compass",
+    "subtitle": "YouTube Overseas Decision Tool"
+  },
+  "action": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "loading": "Loading...",
+    "search": "Search",
+    "reset": "Reset",
+    "add": "Add",
+    "create": "Create",
+    "update": "Update",
+    "submit": "Submit",
+    "back": "Back",
+    "refresh": "Refresh",
+    "export": "Export",
+    "import": "Import",
+    "download": "Download",
+    "upload": "Upload",
+    "test": "Test",
+    "clear": "Clear",
+    "logout": "Logout",
+    "login": "Login",
+    "register": "Register",
+    "next": "Next",
+    "prev": "Previous",
+    "more": "More",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All"
+  },
+  "status": {
+    "success": "Success",
+    "error": "Error",
+    "warning": "Warning",
+    "noData": "No Data",
+    "loading": "Loading",
+    "saving": "Saving",
+    "deleting": "Deleting",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "active": "Active",
+    "inactive": "Inactive",
+    "verified": "Verified",
+    "unverified": "Unverified"
+  },
+  "validation": {
+    "required": "This field is required",
+    "requiredField": "Please fill in required fields before continuing",
+    "email": "Please enter a valid email address",
+    "phone": "Please enter a valid phone number",
+    "password": "Password must be at least 6 characters",
+    "passwordConfirm": "Passwords do not match",
+    "maxLength": "Content is too long",
+    "minLength": "Content is too short",
+    "invalidFormat": "Invalid format",
+    "invalidJson": "Must be valid JSON"
+  },
+  "message": {
+    "saveSuccess": "Saved successfully",
+    "deleteSuccess": "Deleted successfully",
+    "updateSuccess": "Updated successfully",
+    "createSuccess": "Created successfully",
+    "deleteConfirm": "Confirm delete?",
+    "unsavedChanges": "You have unsaved changes",
+    "networkError": "Network error, please try again later",
+    "serverError": "Server error, please try again later",
+    "sessionExpired": "Session expired, please login again"
+  },
+  "pagination": {
+    "total": "Total {{total}} items",
+    "page": "Page {{current}} / {{total}}"
+  }
+}

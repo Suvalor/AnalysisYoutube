@@ -8,10 +8,12 @@ import {
   Input,
   Modal,
   Pagination,
+  Popconfirm,
   Row,
   Select,
   Space,
   Spin,
+  Tag,
   Typography,
   Upload,
   message,
@@ -20,12 +22,13 @@ import {
   DownloadOutlined,
   EyeOutlined,
   FileImageOutlined,
+  MergeOutlined,
   SoundOutlined,
   VideoCameraOutlined,
 } from "@ant-design/icons";
 import { type Dayjs } from "dayjs";
 import dayjs from "dayjs";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   deleteAssetApi,
   listModelsApi,
@@ -35,6 +38,13 @@ import {
   type ModelItem,
 } from "@/services/libraryApi";
 import useModelPreference from "@/hooks/useModelPreference";
+import MixConfigModal from "@/components/MixConfigModal";
+import {
+  listMixTasks,
+  downloadMixResult,
+  type MixTask,
+  type MixTaskStatus,
+} from "@/services/downloadApi";
 
 const { Text } = Typography;
 
@@ -102,6 +112,46 @@ export default function AssetLibraryPage() {
   const [sortPreset, setSortPreset] = useState<SortPreset>("time_desc");
   const [previewAsset, setPreviewAsset] = useState<AssetItem | null>(null);
   const [thumbErrorIds, setThumbErrorIds] = useState<Record<number, boolean>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [mixModalOpen, setMixModalOpen] = useState(false);
+  const [mixTasks, setMixTasks] = useState<MixTask[]>([]);
+  const [mixTasksLoading, setMixTasksLoading] = useState(false);
+  const [downloadingTaskId, setDownloadingTaskId] = useState<number | null>(null);
+
+  const loadMixTasks = useCallback(async () => {
+    setMixTasksLoading(true);
+    try {
+      const resp = await listMixTasks({ limit: 20 });
+      setMixTasks(resp.items ?? []);
+    } catch {
+      message.error("加载混剪任务列表失败");
+    } finally {
+      setMixTasksLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMixTasks();
+  }, [loadMixTasks]);
+
+  const handleDownloadMixResult = useCallback(async (taskId: number) => {
+    setDownloadingTaskId(taskId);
+    try {
+      await downloadMixResult(taskId);
+      message.success("下载已开始");
+    } catch {
+      message.error("下载混剪结果失败");
+    } finally {
+      setDownloadingTaskId(null);
+    }
+  }, []);
+
+  const MIX_TASK_STATUS_MAP: Record<MixTaskStatus, { color: string; label: string }> = {
+    PENDING: { color: "default", label: "等待中" },
+    PROCESSING: { color: "processing", label: "处理中" },
+    COMPLETED: { color: "success", label: "已完成" },
+    FAILED: { color: "error", label: "失败" },
+  };
 
   const sortApi = useMemo(() => sortPresetToApi(sortPreset), [sortPreset]);
   const { value: watermarkPrefModelId, setValue: setWatermarkPrefModelId } =
@@ -191,6 +241,7 @@ export default function AssetLibraryPage() {
 
   useEffect(() => {
     setPage(1);
+    setSelectedIds(new Set());
   }, [typeFilter, dateRange, searchText, sortPreset]);
 
   const onConfirmUpload = async () => {
@@ -272,6 +323,25 @@ export default function AssetLibraryPage() {
     setThumbErrorIds((prev) => ({ ...prev, [id]: true }));
   };
 
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === items.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(items.map((a) => a.id)));
+    }
+  };
+
+  const selectedAssets = useMemo(() => items.filter((a) => selectedIds.has(a.id)), [items, selectedIds]);
+
   return (
     <div className="p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-5">
@@ -333,6 +403,26 @@ export default function AssetLibraryPage() {
           </Row>
         </Card>
 
+        {/* Batch action bar */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 shadow-sm">
+            <span className="text-sm text-blue-700 font-medium">
+              已选 {selectedIds.size} 项
+            </span>
+            <Button
+              size="small"
+              type="primary"
+              icon={<MergeOutlined />}
+              onClick={() => setMixModalOpen(true)}
+            >
+              一键 AI 混编
+            </Button>
+            <Button size="small" onClick={() => setSelectedIds(new Set())}>
+              清除选择
+            </Button>
+          </div>
+        )}
+
         <Spin spinning={listLoading}>
           {items.length === 0 && !listLoading ? (
             <Card className="!bg-slate-900/60 !border-slate-800">
@@ -340,6 +430,18 @@ export default function AssetLibraryPage() {
             </Card>
           ) : (
             <Row gutter={[16, 16]}>
+              {/* Select all row */}
+              {items.length > 0 && (
+                <Col span={24}>
+                  <Checkbox
+                    checked={selectedIds.size === items.length && items.length > 0}
+                    indeterminate={selectedIds.size > 0 && selectedIds.size < items.length}
+                    onChange={toggleSelectAll}
+                  >
+                    全选本页 ({items.length})
+                  </Checkbox>
+                </Col>
+              )}
               {items.map((asset) => {
                 const src = mediaSrc(asset);
                 const broken = thumbErrorIds[asset.id];
@@ -351,6 +453,12 @@ export default function AssetLibraryPage() {
                       styles={{ body: { padding: 12 } }}
                     >
                       <div className="mb-3 relative group rounded-lg overflow-hidden bg-slate-950/80 min-h-[160px]">
+                        <Checkbox
+                          checked={selectedIds.has(asset.id)}
+                          onChange={() => toggleSelect(asset.id)}
+                          className="absolute top-2 left-2 z-10"
+                          style={{ accentColor: 'var(--color-primary)' }}
+                        />
                         {ft === "image" && (
                           <>
                             {!broken && src ? (
@@ -363,7 +471,7 @@ export default function AssetLibraryPage() {
                                 onError={() => markThumbError(asset.id)}
                               />
                             ) : (
-                              <div className="w-full h-52 flex items-center justify-center text-slate-500 text-xs px-3 text-center">
+                              <div className="w-full h-52 flex items-center justify-center text-yc-text-secondary text-xs px-3 text-center">
                                 图片无法加载。请确认 access_url 有效，或在 OSS/COS/CDN 配置 CORS 允许当前站点。
                               </div>
                             )}
@@ -380,7 +488,7 @@ export default function AssetLibraryPage() {
                                 playsInline
                               />
                             ) : (
-                              <div className="w-full h-52 flex items-center justify-center text-slate-500 text-xs px-3 text-center">
+                              <div className="w-full h-52 flex items-center justify-center text-yc-text-secondary text-xs px-3 text-center">
                                 暂无视频地址
                               </div>
                             )}
@@ -391,12 +499,12 @@ export default function AssetLibraryPage() {
                             {src ? (
                               <audio src={src} controls className="w-full" preload="metadata" />
                             ) : (
-                              <div className="text-slate-500 text-xs text-center px-2">暂无音频地址</div>
+                              <div className="text-yc-text-secondary text-xs text-center px-2">暂无音频地址</div>
                             )}
                           </div>
                         )}
                         {ft === "unknown" && (
-                          <div className="w-full h-52 flex items-center justify-center text-slate-500 text-xs px-3 text-center">
+                          <div className="w-full h-52 flex items-center justify-center text-yc-text-secondary text-xs px-3 text-center">
                             无法识别的素材类型，请刷新列表或联系管理员。
                           </div>
                         )}
@@ -415,7 +523,7 @@ export default function AssetLibraryPage() {
                         <h3 className="font-medium text-slate-100 text-sm line-clamp-2 min-h-[2.5rem]" title={asset.title}>
                           {asset.title}
                         </h3>
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-400">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-yc-text-tertiary">
                           {ft === "image" ? (
                             <FileImageOutlined className="text-cyan-400" aria-hidden />
                           ) : ft === "video" ? (
@@ -423,7 +531,7 @@ export default function AssetLibraryPage() {
                           ) : ft === "audio" ? (
                             <SoundOutlined className="text-amber-400" aria-hidden />
                           ) : (
-                            <FileImageOutlined className="text-slate-500" aria-hidden />
+                            <FileImageOutlined className="text-yc-text-secondary" aria-hidden />
                           )}
                           <span>
                             {ft === "image" ? "图片" : ft === "video" ? "视频" : ft === "audio" ? "音频" : "未知类型"}
@@ -434,9 +542,15 @@ export default function AssetLibraryPage() {
                           <span>{formatBytes(asset.file_size)}</span>
                         </div>
                         <div className="flex justify-end pt-2">
-                          <Button danger size="small" onClick={() => void onDelete(asset.id)}>
-                            删除
-                          </Button>
+                          <Popconfirm
+                            title="确认删除"
+                            description="删除后无法恢复，确认继续？"
+                            onConfirm={() => void onDelete(asset.id)}
+                            okText="确认"
+                            cancelText="取消"
+                          >
+                            <Button danger size="small">删除</Button>
+                          </Popconfirm>
                         </div>
                       </div>
                     </Card>
@@ -459,11 +573,71 @@ export default function AssetLibraryPage() {
               onChange={(p, ps) => {
                 setPage(p);
                 setPageSize(ps);
+                setSelectedIds(new Set());
               }}
             />
           </div>
         ) : null}
       </div>
+
+      {/* 混剪任务列表 */}
+      <Card
+        title="混剪任务"
+        size="small"
+        style={{ marginTop: 16, maxWidth: 1280, marginLeft: "auto", marginRight: "auto" }}
+        extra={
+          <Button size="small" onClick={loadMixTasks} loading={mixTasksLoading}>
+            刷新
+          </Button>
+        }
+      >
+        {mixTasks.length === 0 ? (
+          <Empty description="暂无混剪任务" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {mixTasks.map((task) => {
+              const statusInfo = MIX_TASK_STATUS_MAP[task.status];
+              return (
+                <div
+                  key={task.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "8px 12px",
+                    borderRadius: 6,
+                    border: "1px solid var(--color-border)",
+                  }}
+                >
+                  <Space>
+                    <span style={{ color: "var(--color-text-secondary)" }}>#{task.id}</span>
+                    <Tag color={statusInfo.color}>{statusInfo.label}</Tag>
+                    <span style={{ color: "var(--color-text-tertiary)", fontSize: 12 }}>
+                      {new Date(task.created_at).toLocaleString()}
+                    </span>
+                  </Space>
+                  {task.status === "COMPLETED" && (
+                    <Button
+                      type="link"
+                      size="small"
+                      loading={downloadingTaskId === task.id}
+                      onClick={() => handleDownloadMixResult(task.id)}
+                    >
+                      下载混剪结果
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      <MixConfigModal
+        open={mixModalOpen}
+        onClose={() => setMixModalOpen(false)}
+        selectedAssets={selectedAssets}
+      />
 
       <Modal
         title="上传素材"
@@ -522,7 +696,7 @@ export default function AssetLibraryPage() {
               notFoundContent={loadingWatermarkModels ? "加载中..." : "暂无可用图像去水印模型"}
             />
           ) : null}
-          {uploading ? <Text style={{ color: "#94a3b8" }}>上传处理中，请稍候...</Text> : null}
+          {uploading ? <Text style={{ color: "var(--color-text-tertiary)" }}>上传处理中，请稍候...</Text> : null}
         </div>
       </Modal>
 
@@ -552,7 +726,7 @@ export default function AssetLibraryPage() {
             </div>
           )}
           {previewAsset && normalizeAssetFileType(previewAsset.file_type) === "unknown" && (
-            <p className="text-slate-400 text-sm px-4">该素材类型不支持预览。</p>
+            <p className="text-yc-text-tertiary text-sm px-4">该素材类型不支持预览。</p>
           )}
         </div>
       </Modal>

@@ -1,21 +1,28 @@
+import os
 from datetime import datetime, time
+from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy import or_, select
 
 from app.api.deps import CurrentUserDep, DBSessionDep
+from app.services.mix_task_service import MIX_OUTPUT_DIR
 from app.constants.asset_source import (
     ALLOWED_ASSET_SOURCES,
     ASSET_SOURCE_INSPIRATION,
     ASSET_SOURCE_SOP,
 )
+from app.crud.mix_task import create_mix_task, get_mix_task, list_mix_tasks
 from app.models.library import AssetLibrary
+from app.models.mix_task import MixTask, MixTaskStatus
 from app.schemas.materials import (
     MaterialAccessUrlResponse,
     MaterialRead,
     MaterialTypeEnum,
     MaterialUploadResponse,
 )
+from app.schemas.mix_task import MixRequest, MixTaskRead, MixTaskListResponse
 from app.services.material_service import (
     infer_file_type,
     process_watermark_removal_best_effort,
@@ -25,6 +32,7 @@ from app.services.material_service import (
 from app.services.watermark_inpaint_config import resolve_inpaint_runtime_config
 from app.services.asset_access_service import library_row_access_url
 from app.services.config_manager import resolve_integration_config
+from app.services.mix_task_service import run_mix_task
 from app.services.object_storage import get_write_backend, material_access_url
 
 
@@ -183,3 +191,105 @@ async def upload_material(
         )
     finally:
         remove_temp_dir(tmp_dir)
+
+
+# --- Mix (混剪) routes ---
+
+@router.post("/mix", response_model=dict)
+async def create_mix_task_endpoint(
+    payload: MixRequest,
+    background_tasks: BackgroundTasks,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> dict:
+    """Submit a video mix task. Returns immediately; processing runs in background."""
+    audio_type = "tts" if payload.narration_text else ("file" if payload.audio_file_id else "none")
+
+    row = await create_mix_task(
+        db,
+        user_id=current_user.id,
+        source_video_ids=payload.video_ids,
+        audio_source_type=audio_type,
+        audio_source_ref=payload.narration_text or payload.audio_file_id or "",
+        aspect_ratio=payload.aspect_ratio,
+        use_highlights=payload.use_highlights,
+    )
+
+    background_tasks.add_task(run_mix_task, row.id, current_user.id)
+
+    return {"message": "混剪任务已提交", "task_id": row.id}
+
+
+def _mix_task_to_read(row: MixTask) -> MixTaskRead:
+    """Convert MixTask ORM row to MixTaskRead, hiding server-local output_path."""
+    return MixTaskRead.model_validate(row).model_copy(
+        update={"has_output": bool(row.output_path)},
+    )
+
+
+@router.get("/mix-tasks", response_model=MixTaskListResponse)
+async def list_mix_tasks_endpoint(
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+) -> MixTaskListResponse:
+    rows, total = await list_mix_tasks(db, current_user.id, offset, limit)
+    return MixTaskListResponse(items=[_mix_task_to_read(r) for r in rows], total=total)
+
+
+@router.get("/mix-tasks/{task_id}", response_model=MixTaskRead)
+async def get_mix_task_endpoint(
+    task_id: int,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> MixTaskRead:
+    row = await get_mix_task(db, current_user.id, task_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="混剪任务不存在")
+    return _mix_task_to_read(row)
+
+
+@router.get("/mix-tasks/{task_id}/download")
+async def download_mix_result(
+    task_id: int,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> FileResponse:
+    """Download the output file of a completed mix task.
+
+    Validates task ownership (user_id isolation), status (COMPLETED),
+    and file existence on disk. Prevents path traversal by resolving
+    the path and ensuring it does not escape the output directory.
+    """
+    row = await get_mix_task(db, current_user.id, task_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="混剪任务不存在")
+    if row.status != MixTaskStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="混剪任务未完成，无法下载")
+    if not row.output_path:
+        raise HTTPException(status_code=400, detail="混剪结果文件不存在")
+
+    file_path = Path(row.output_path).resolve()
+
+    # Prevent path traversal: ensure the resolved path still points to a real file
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="混剪结果文件不存在")
+
+    # Prevent path traversal: ensure the resolved path stays inside the allowed output directory
+    allowed_base = MIX_OUTPUT_DIR.resolve()
+    if not str(file_path).startswith(str(allowed_base) + os.sep) and file_path != allowed_base:
+        raise HTTPException(status_code=403, detail="Access denied: invalid file path")
+
+    # Determine media type from extension
+    media_type = "video/mp4"
+    if file_path.suffix.lower() in (".webm",):
+        media_type = "video/webm"
+
+    filename = f"mix_{task_id}{file_path.suffix.lower()}"
+
+    return FileResponse(
+        path=str(file_path),
+        media_type=media_type,
+        filename=filename,
+    )

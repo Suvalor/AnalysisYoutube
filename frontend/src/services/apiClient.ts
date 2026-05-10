@@ -37,7 +37,7 @@ apiClient.interceptors.response.use(
     const status = error?.response?.status;
     const url = String(error?.config?.url ?? "");
     if (status === 401 && typeof window !== "undefined") {
-      const isAuthRoute = url.includes("/api/auth/login") || url.includes("/api/auth/register");
+      const isAuthRoute = url.includes("/api/auth/login") || url.includes("/api/auth/register") || url.includes("/api/auth/forgot-password") || url.includes("/api/auth/reset-password") || url.includes("/api/auth/send-email-code") || url.includes("/api/auth/captcha");
       if (!isAuthRoute) {
         localStorage.removeItem("access_token");
         if (!window.location.pathname.startsWith("/login")) {
@@ -50,4 +50,22 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
+
+/**
+ * 统一认证 fetch：用于 SSE/流式等需要原生 fetch 的场景，
+ * 自动注入 Authorization header 并处理 401。
+ */
+export async function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  const headers = new Headers(init.headers);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const resp = await fetch(url, { ...init, headers });
+  if (resp.status === 401 && typeof window !== "undefined") {
+    localStorage.removeItem("access_token");
+    if (!window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login";
+    }
+  }
+  return resp;
+}
 

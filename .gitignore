@@ -1,32 +1,103 @@
-# macOS
-.DS_Store
-
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-backend/.venv/
-backend/.pytest_cache/
-backend/.mypy_cache/
-backend/.ruff_cache/
-
-# Node / Frontend
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-
-# Env files
+# ==========================================
+# 环境与密钥（最高优先级）
+# ==========================================
 .env
 .env.*
-backend/.env
-frontend/.env
-frontend/.env.*
+!.env.example
+!.env.example.*
+docs/
 
-# Logs
+# ==========================================
+# Python
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+*.whl
+.venv/
+venv/
+ENV/
+env/
+backend/app/data
+
+# ==========================================
+# Node.js / 前端
+# ==========================================
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+*.tsbuildinfo
+youtube-compass-design-system/
+
+# ==========================================
+# IDE / 编辑器
+# ==========================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.classpath
+.settings/
+
+# ==========================================
+# 数据库 / 存储
+# ==========================================
+*.sqlite3
+*.db
+mysql_data/
+
+# ==========================================
+# 日志 / 临时文件
+# ==========================================
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+logs/
+tmp/
+temp/
+*.tmp
+*.bak
 
+# ==========================================
+# Docker / 部署
+# ==========================================
+docker-compose.override.yml
+docker-compose.*.yml
+!docker-compose.yml
+
+# ==========================================
+# 操作系统
+# ==========================================
+Thumbs.db
+Desktop.ini
+
+# ==========================================
+# 安全与敏感文件
+# ==========================================
+*_rsa
+*_ed25519
+*.pem
+*.key
+*.p12
+*.jks
+credentials.json
+service-account*.json
+.secrets/
+
+# ==========================================
+# 测试 / 覆盖率
+# ==========================================
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.pytest_cache/
