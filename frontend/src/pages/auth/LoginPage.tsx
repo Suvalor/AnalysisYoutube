@@ -72,11 +72,13 @@ export default function LoginPage() {
       }
       navigate("/blue-ocean-radar");
     } catch (e: any) {
-      const msg =
-        e?.response?.data?.detail ??
-        e?.message ??
-        t("common:message.networkError");
-      setError(String(msg));
+      const raw = e?.response?.data?.detail;
+      const msg = typeof raw === "string"
+        ? raw
+        : Array.isArray(raw)
+          ? raw.map((err: any) => err?.msg ?? String(err)).join("; ")
+          : e?.message ?? t("common:message.networkError");
+      setError(msg);
       fetchCaptcha();
     } finally {
       setLoading(false);

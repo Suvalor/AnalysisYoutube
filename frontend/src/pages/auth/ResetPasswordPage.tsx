@@ -58,11 +58,13 @@ export default function ResetPasswordPage() {
                 await resetPasswordApi(token, values.new_password);
                 setResetSuccess(true);
               } catch (e: any) {
-                const message =
-                  e?.response?.data?.detail ??
-                  e?.message ??
-                  "重置失败，请重试";
-                setResetError(String(message));
+                const raw = e?.response?.data?.detail;
+                const message = typeof raw === "string"
+                  ? raw
+                  : Array.isArray(raw)
+                    ? raw.map((err: any) => err?.msg ?? String(err)).join("; ")
+                    : e?.message ?? "重置失败，请重试";
+                setResetError(message);
               } finally {
                 setResetLoading(false);
               }
@@ -102,11 +104,13 @@ export default function ResetPasswordPage() {
                 await forgotPasswordApi(values.email);
                 setForgotSuccess(true);
               } catch (e: any) {
-                const message =
-                  e?.response?.data?.detail ??
-                  e?.message ??
-                  "发送失败，请重试";
-                setForgotError(String(message));
+                const raw = e?.response?.data?.detail;
+                const message = typeof raw === "string"
+                  ? raw
+                  : Array.isArray(raw)
+                    ? raw.map((err: any) => err?.msg ?? String(err)).join("; ")
+                    : e?.message ?? "发送失败，请重试";
+                setForgotError(message);
               } finally {
                 setForgotLoading(false);
               }

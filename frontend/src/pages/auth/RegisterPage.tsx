@@ -51,11 +51,13 @@ export default function RegisterPage() {
         });
       }, 1000);
     } catch (e: any) {
-      const message =
-        e?.response?.data?.detail ??
-        e?.message ??
-        "验证码发送失败，请确认邮箱地址正确或稍后重试";
-      setError(String(message));
+      const raw = e?.response?.data?.detail;
+      const message = typeof raw === "string"
+        ? raw
+        : Array.isArray(raw)
+          ? raw.map((err: any) => err?.msg ?? String(err)).join("; ")
+          : e?.message ?? "验证码发送失败，请确认邮箱地址正确或稍后重试";
+      setError(message);
     } finally {
       setCodeSending(false);
     }
@@ -78,11 +80,13 @@ export default function RegisterPage() {
       // 注册成功后跳转登录页
       navigate("/login");
     } catch (e: any) {
-      const message =
-        e?.response?.data?.detail ??
-        e?.message ??
-        "注册失败，请稍后重试";
-      setError(String(message));
+      const raw = e?.response?.data?.detail;
+      const message = typeof raw === "string"
+        ? raw
+        : Array.isArray(raw)
+          ? raw.map((err: any) => err?.msg ?? String(err)).join("; ")
+          : e?.message ?? "注册失败，请稍后重试";
+      setError(message);
     } finally {
       setLoading(false);
     }
