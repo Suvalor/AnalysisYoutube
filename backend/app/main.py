@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -10,6 +11,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.api.v1 import api_router_v1, integration_settings, users
 from app.core.config import settings
+from app.core.log_filter import SensitiveDataFilter
 from app.core.rate_limit import limiter
 from app.services.scheduler_service import shutdown_scheduler, start_scheduler
 
@@ -19,6 +21,7 @@ _SENSITIVE_FIELDS = frozenset({"password", "new_password", "confirm_password"})
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    logging.getLogger().addFilter(SensitiveDataFilter())
     start_scheduler()
     try:
         yield
@@ -112,6 +115,56 @@ def create_app() -> FastAPI:
             await self.app(scope, receive, _send)
 
     app.add_middleware(SecurityHeadersMiddleware)
+
+    class HTTPSRedirectMiddleware:
+        """纯 ASGI 中间件：非 HTTPS 请求重定向到 HTTPS。
+
+        豁免条件：
+        - host 为 localhost / 127.0.0.1（开发环境）
+        - 路径为 /health（健康检查）
+        - X-Forwarded-Proto 头已设置为 https（反向代理终止 SSL）
+        """
+
+        EXEMPT_HOSTS: frozenset[str] = frozenset({"localhost", "127.0.0.1"})
+        EXEMPT_PATHS: frozenset[str] = frozenset({"/health"})
+
+        def __init__(self, app: ASGIApp) -> None:
+            self.app = app
+
+        async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+            if scope["type"] in ("http", "websocket"):
+                headers = dict(
+                    (k.decode("latin-1").lower(), v.decode("latin-1"))
+                    for k, v in scope.get("headers", [])
+                )
+                scheme = headers.get("x-forwarded-proto", scope.get("scheme", "http"))
+                host = headers.get("host", "").split(":")[0]
+                path = scope.get("path", "")
+
+                if (
+                    scheme == "http"
+                    and host not in self.EXEMPT_HOSTS
+                    and path not in self.EXEMPT_PATHS
+                ):
+                    query = scope.get("query_string", b"").decode("latin-1")
+                    url = f"https://{headers.get('host', '')}{path}"
+                    if query:
+                        url += f"?{query}"
+                    response_headers = [
+                        (b"location", url.encode("latin-1")),
+                        (b"content-length", b"0"),
+                    ]
+                    await send({
+                        "type": "http.response.start",
+                        "status": 301,
+                        "headers": response_headers,
+                    })
+                    await send({"type": "http.response.body", "body": b""})
+                    return
+
+            await self.app(scope, receive, send)
+
+    app.add_middleware(HTTPSRedirectMiddleware)
 
     app.include_router(api_router_v1, prefix="/api")
     # 部分网关会把 /api 前缀剥掉再转发到后端，补挂 /users/... 以免集成配置与域名校验 404

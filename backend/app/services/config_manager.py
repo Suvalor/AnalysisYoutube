@@ -49,6 +49,14 @@ SECRET_PAYLOAD_KEYS: frozenset[str] = frozenset(
     }
 )
 
+SEMI_SECRET_PAYLOAD_KEYS: frozenset[str] = frozenset(
+    {
+        "aliyun_access_key_id",
+        "tencent_cos_secret_id",
+        "volc_cv_access_key_id",
+    }
+)
+
 # 前端或误操作传入的脱敏占位，禁止写入数据库
 SECRET_PLACEHOLDER_VALUES: frozenset[str] = frozenset(
     {

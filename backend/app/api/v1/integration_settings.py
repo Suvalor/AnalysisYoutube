@@ -18,6 +18,7 @@ from app.schemas.integration_settings import (
 from app.services.config_manager import (
     INTEGRATION_PAYLOAD_KEYS,
     SECRET_PAYLOAD_KEYS,
+    SEMI_SECRET_PAYLOAD_KEYS,
     is_secret_placeholder,
     merge_integration_config,
     resolve_integration_config,
@@ -34,37 +35,58 @@ router = APIRouter()
 _MASK = "********"
 
 
-def _secret_display(merged_has: bool) -> str | None:
-    return _MASK if merged_has else None
+def _secret_display(merged_has: bool) -> str:
+    return _MASK if merged_has else ""
+
+
+def _semi_secret_display(value: str | None) -> str:
+    """对半敏感字段脱敏：保留后4位，前面用 **** 替代。"""
+    if not value:
+        return ""
+    if len(value) <= 4:
+        return "****"
+    return "****" + value[-4:]
 
 
 async def _to_read(session, org_id: int, stored: dict[str, str]) -> IntegrationSettingsRead:
     merged = merge_integration_config(stored)
     org = await session.get(Organization, org_id)
     org_name = org.name if org else ""
-    return IntegrationSettingsRead(
-        youtube_api_key=merged.youtube_api_key,
-        active_storage_provider=merged.active_storage_provider,
-        aliyun_access_key_id=merged.aliyun_access_key_id,
-        aliyun_access_key_secret=merged.aliyun_access_key_secret,
-        aliyun_role_arn=merged.aliyun_role_arn,
-        aliyun_region_id=merged.aliyun_region_id,
-        aliyun_oss_bucket_name=merged.aliyun_oss_bucket_name,
-        aliyun_oss_endpoint=merged.aliyun_oss_endpoint,
-        aliyun_custom_domain=merged.aliyun_custom_domain,
-        tencent_cos_secret_id=merged.tencent_cos_secret_id,
-        tencent_cos_secret_key=merged.tencent_cos_secret_key,
-        tencent_cos_region=merged.tencent_cos_region,
-        tencent_cos_bucket=merged.tencent_cos_bucket,
-        tencent_custom_domain=merged.tencent_custom_domain,
-        volc_cv_access_key_id=merged.volc_cv_access_key_id,
-        volc_cv_secret_access_key=merged.volc_cv_secret_access_key,
-        volc_cv_region=merged.volc_cv_region,
-        volc_cv_host=merged.volc_cv_host,
-        volc_cv_inpaint_req_key=merged.volc_cv_inpaint_req_key,
-        watermark_video_ai_max_frames=merged.watermark_video_ai_max_frames,
-        watermark_inpaint_prompt=merged.watermark_inpaint_prompt,
-    )
+
+    # 构建字段值映射，对敏感字段脱敏
+    raw: dict[str, str | int] = {
+        "youtube_api_key": merged.youtube_api_key,
+        "active_storage_provider": merged.active_storage_provider,
+        "aliyun_access_key_id": merged.aliyun_access_key_id,
+        "aliyun_access_key_secret": merged.aliyun_access_key_secret,
+        "aliyun_role_arn": merged.aliyun_role_arn,
+        "aliyun_region_id": merged.aliyun_region_id,
+        "aliyun_oss_bucket_name": merged.aliyun_oss_bucket_name,
+        "aliyun_oss_endpoint": merged.aliyun_oss_endpoint,
+        "aliyun_custom_domain": merged.aliyun_custom_domain,
+        "tencent_cos_secret_id": merged.tencent_cos_secret_id,
+        "tencent_cos_secret_key": merged.tencent_cos_secret_key,
+        "tencent_cos_region": merged.tencent_cos_region,
+        "tencent_cos_bucket": merged.tencent_cos_bucket,
+        "tencent_custom_domain": merged.tencent_custom_domain,
+        "volc_cv_access_key_id": merged.volc_cv_access_key_id,
+        "volc_cv_secret_access_key": merged.volc_cv_secret_access_key,
+        "volc_cv_region": merged.volc_cv_region,
+        "volc_cv_host": merged.volc_cv_host,
+        "volc_cv_inpaint_req_key": merged.volc_cv_inpaint_req_key,
+        "watermark_video_ai_max_frames": merged.watermark_video_ai_max_frames,
+        "watermark_inpaint_prompt": merged.watermark_inpaint_prompt,
+    }
+
+    for key in SECRET_PAYLOAD_KEYS:
+        if key in raw:
+            raw[key] = _secret_display(bool(raw[key]))
+
+    for key in SEMI_SECRET_PAYLOAD_KEYS:
+        if key in raw:
+            raw[key] = _semi_secret_display(str(raw[key]))
+
+    return IntegrationSettingsRead(**raw)
 
 
 def _require_org_id(current_user) -> int:

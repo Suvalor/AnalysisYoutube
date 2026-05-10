@@ -125,7 +125,7 @@ export default function ResetPasswordPage() {
                 { type: "email", message: "邮箱格式不正确" }
               ]}
             >
-              <Input placeholder="you@example.com" size="large" />
+              <Input placeholder="you@example.com" size="large" autoComplete="email" />
             </Form.Item>
             <Form.Item className="mt-6 mb-2">
               <Button
@@ -188,14 +188,14 @@ function ResetForm({
             { pattern: /[0-9]/, message: "密码必须包含数字" },
           ]}
         >
-          <Input.Password placeholder="至少 12 位，含字母和数字" size="large" />
+          <Input.Password placeholder="至少 12 位，含字母和数字" size="large" autoComplete="new-password" />
         </Form.Item>
         <Form.Item
           label="确认新密码"
           name="confirm_password"
           rules={[{ required: true, message: "请再次输入密码" }]}
         >
-          <Input.Password placeholder="再次输入新密码" size="large" />
+          <Input.Password placeholder="再次输入新密码" size="large" autoComplete="new-password" />
         </Form.Item>
         <Form.Item className="mt-6 mb-2">
           <Button

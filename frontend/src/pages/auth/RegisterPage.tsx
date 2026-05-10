@@ -116,7 +116,7 @@ export default function RegisterPage() {
             { pattern: /^1\d{10}$/, message: "请输入有效的11位手机号" }
           ]}
         >
-          <Input placeholder="11位手机号" size="large" maxLength={11} />
+          <Input placeholder="11位手机号" size="large" maxLength={11} autoComplete="tel" />
         </Form.Item>
         <Form.Item
           label="邮箱"
@@ -126,7 +126,7 @@ export default function RegisterPage() {
             { type: "email", message: "邮箱格式不正确" }
           ]}
         >
-          <Input placeholder="you@example.com" size="large" />
+          <Input placeholder="you@example.com" size="large" autoComplete="email" />
         </Form.Item>
         <Form.Item
           label="邮箱验证码"
@@ -142,6 +142,7 @@ export default function RegisterPage() {
               size="large"
               maxLength={6}
               style={{ width: 140 }}
+              autoComplete="one-time-code"
             />
             <Button
               size="large"
@@ -163,14 +164,14 @@ export default function RegisterPage() {
             { pattern: /[0-9]/, message: "密码必须包含数字" },
           ]}
         >
-          <Input.Password placeholder="至少 12 位，含字母和数字" size="large" />
+          <Input.Password placeholder="至少 12 位，含字母和数字" size="large" autoComplete="new-password" />
         </Form.Item>
         <Form.Item
           label="确认密码"
           name="confirmPassword"
           rules={[{ required: true, message: "请再次输入密码" }]}
         >
-          <Input.Password placeholder="再次输入密码" size="large" />
+          <Input.Password placeholder="再次输入密码" size="large" autoComplete="new-password" />
         </Form.Item>
         <Form.Item className="mt-6 mb-2">
           <Button

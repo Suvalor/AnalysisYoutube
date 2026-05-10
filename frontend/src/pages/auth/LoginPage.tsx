@@ -109,14 +109,14 @@ export default function LoginPage() {
             { type: "email", message: t("common:validation.email") }
           ]}
         >
-          <Input placeholder="you@example.com" size="large" />
+          <Input placeholder="you@example.com" size="large" autoComplete="email" />
         </Form.Item>
         <Form.Item
           label={t("login.password")}
           name="password"
           rules={[{ required: true, message: t("common:validation.required") }]}
         >
-          <Input.Password placeholder="••••••••" size="large" />
+          <Input.Password placeholder="••••••••" size="large" autoComplete="current-password" />
         </Form.Item>
         <Form.Item
           label={t("login.captcha")}
@@ -132,6 +132,7 @@ export default function LoginPage() {
               size="large"
               maxLength={4}
               style={{ width: 120 }}
+              autoComplete="off"
             />
             {captchaImage && (
               <img
