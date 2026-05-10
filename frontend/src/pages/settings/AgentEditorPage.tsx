@@ -102,11 +102,11 @@ export default function AgentEditorPage({ promptId: promptIdFromTab }: AgentEdit
 
   return (
     <div className="p-4 md:p-6">
-      <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
+      <div className="bg-yc-bg-card border border-yc-border rounded-lg p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold text-slate-900">智能体编辑</h2>
-            <p className="text-slate-500 mt-1">可在此编辑复杂系统提示词规则，保存后立即生效。</p>
+            <h2 className="text-xl font-semibold text-yc-text-primary">智能体编辑</h2>
+            <p className="text-yc-text-secondary mt-1">可在此编辑复杂系统提示词规则，保存后立即生效。</p>
           </div>
           <div className="flex items-center gap-2">
             <Popconfirm
@@ -126,7 +126,7 @@ export default function AgentEditorPage({ promptId: promptIdFromTab }: AgentEdit
 
         {invalidId ? (
           <div className="py-10 text-center">
-            <p className="text-slate-600 mb-4">当前智能体 ID 无效，请返回智能体列表重新选择。</p>
+            <p className="text-yc-text-secondary mb-4">当前智能体 ID 无效，请返回智能体列表重新选择。</p>
             <Button type="primary" onClick={goBack}>
               返回智能体管理
             </Button>

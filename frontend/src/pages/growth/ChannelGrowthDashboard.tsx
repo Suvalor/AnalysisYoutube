@@ -114,10 +114,10 @@ function TrendTag({ trend }: { trend: string }) {
 
 /** 互动得分颜色 */
 function scoreColor(score: number): string {
-  if (score >= 70) return "#52c41a";
-  if (score >= 50) return "#1890ff";
-  if (score >= 30) return "#faad14";
-  return "#ff4d4f";
+  if (score >= 70) return "var(--color-success)";
+  if (score >= 50) return "var(--color-primary)";
+  if (score >= 30) return "var(--color-warning)";
+  return "var(--color-danger)";
 }
 
 export default function ChannelGrowthDashboard() {
@@ -180,7 +180,7 @@ export default function ChannelGrowthDashboard() {
       sorter: (a: ChannelMetrics, b: ChannelMetrics) =>
         a.subscriber_growth_rate - b.subscriber_growth_rate,
       render: (v: number) => (
-        <span style={{ color: v >= 0 ? "#52c41a" : "#ff4d4f" }}>
+        <span style={{ color: v >= 0 ? "var(--color-stat-positive)" : "var(--color-stat-negative)" }}>
           {v >= 0 ? "+" : ""}
           {v.toFixed(1)}%
         </span>
@@ -193,7 +193,7 @@ export default function ChannelGrowthDashboard() {
       sorter: (a: ChannelMetrics, b: ChannelMetrics) =>
         a.view_growth_rate - b.view_growth_rate,
       render: (v: number) => (
-        <span style={{ color: v >= 0 ? "#52c41a" : "#ff4d4f" }}>
+        <span style={{ color: v >= 0 ? "var(--color-stat-positive)" : "var(--color-stat-negative)" }}>
           {v >= 0 ? "+" : ""}
           {v.toFixed(1)}%
         </span>
@@ -235,7 +235,7 @@ export default function ChannelGrowthDashboard() {
   ];
 
   return (
-    <div style={{ padding: 24 }}>
+    <div className="p-6">
       <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
         <Col>
           <Title level={4} style={{ margin: 0 }}>
@@ -309,8 +309,8 @@ export default function ChannelGrowthDashboard() {
                   valueStyle={{
                     color:
                       data.summary.avg_subscriber_growth_rate >= 0
-                        ? "#52c41a"
-                        : "#ff4d4f",
+                        ? "var(--color-stat-positive)"
+                        : "var(--color-stat-negative)",
                   }}
                   prefix={
                     data.summary.avg_subscriber_growth_rate >= 0 ? (
@@ -329,12 +329,12 @@ export default function ChannelGrowthDashboard() {
                   value={data.summary.fastest_growing_rate}
                   suffix="%"
                   prefix={<TrophyOutlined />}
-                  valueStyle={{ color: "#faad14" }}
+                  valueStyle={{ color: "var(--color-warning)" }}
                 />
                 <div
                   style={{
                     fontSize: 12,
-                    color: "#999",
+                    color: "var(--color-text-tertiary)",
                     marginTop: 4,
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -380,7 +380,7 @@ export default function ChannelGrowthDashboard() {
                     yAxisId="subs"
                     type="monotone"
                     dataKey="subscribers"
-                    stroke="#1890ff"
+                    stroke="var(--color-chart-1)"
                     strokeWidth={2}
                     dot={false}
                     name="Subscribers"
@@ -389,7 +389,7 @@ export default function ChannelGrowthDashboard() {
                     yAxisId="views"
                     type="monotone"
                     dataKey="views"
-                    stroke="#52c41a"
+                    stroke="var(--color-chart-2)"
                     strokeWidth={2}
                     dot={false}
                     name="Views"

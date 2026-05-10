@@ -33,7 +33,7 @@ YouTube Compass 帮助你在创作前发现未被充分开发的 YouTube 市场�
 git clone https://github.com/<owner>/youtube-compass.git
 cd youtube-compass
 
-# 2. 复制并编辑环境变量（必须填入 SECRET_KEY、DATABASE_URL、YOUTUBE_API_KEY）
+# 2. 复制并编辑环境变量（必须填入 SECRET_KEY、DATABASE_URL）
 cp .env.example .env
 
 # 3. 启动服务
@@ -97,7 +97,6 @@ cp .env.example .env
 |------|------|
 | `SECRET_KEY` | JWT 签名密钥，生产环境务必使用强随机字符串（>= 32 字符） |
 | `DATABASE_URL` | MySQL 连接串，格式：`mysql+asyncmy://user:pass@host:3306/db` |
-| `YOUTUBE_API_KEY` | YouTube Data API v3 密钥 |
 
 ### 完整配置
 
@@ -117,8 +116,6 @@ cp .env.example .env
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token 过期时间（分钟） | 1440 |
 | **CORS** | | |
 | `BACKEND_CORS_ORIGINS` | 允许的前端地址，逗号分隔 | http://localhost:5173 |
-| **YouTube** | | |
-| `YOUTUBE_API_KEY` | YouTube Data API v3 密钥 | - |
 | **对象存储** | | |
 | `ACTIVE_STORAGE_PROVIDER` | 存储提供商：ALIYUN / TENCENT | TENCENT |
 | `ALIYUN_ACCESS_KEY_ID` | 阿里云 AccessKey ID | - |

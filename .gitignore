@@ -34,6 +34,7 @@ frontend/node_modules/
 frontend/dist/
 frontend/build/
 *.tsbuildinfo
+youtube-compass-design-system/
 
 # ==========================================
 # IDE / 编辑器

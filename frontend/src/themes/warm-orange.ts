@@ -9,6 +9,7 @@ export const warmOrangeTokens: TokenMap = {
   "--color-primary-border": "#fed7aa",
 
   "--color-bg-base": "#fffbf7",
+  "--color-bg-secondary": "#fff7ed",
   "--color-bg-layout": "#fef7f0",
   "--color-bg-sidebar": "#fffbf7",
   "--color-bg-header": "#fffbf7",

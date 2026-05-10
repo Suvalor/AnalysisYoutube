@@ -102,7 +102,7 @@ export default function KnowledgeBase() {
               className={`p-1 rounded-md border border-transparent transition-colors shrink-0 ${
                 row.is_pinned
                   ? "text-amber-600 bg-amber-100/80 border-amber-200 hover:bg-amber-100"
-                  : "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                  : "text-yc-text-tertiary hover:text-amber-600 hover:bg-amber-50"
               }`}
             >
               <Pin size={18} className={row.is_pinned ? "fill-amber-500" : ""} strokeWidth={row.is_pinned ? 2.5 : 2} />
@@ -237,9 +237,9 @@ export default function KnowledgeBase() {
 
   return (
     <div className="p-6 md:p-10">
-      <div className="max-w-6xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-semibold mb-2 text-slate-900">知识库管理</h2>
-        <p className="text-slate-600 mb-4">在此查看已保存剧本，并从任意剧本继续进入 SOP 下一步。</p>
+      <div className="max-w-6xl rounded-2xl border border-yc-border bg-yc-bg-card p-6 shadow-sm">
+        <h2 className="text-xl font-semibold mb-2 text-yc-text-primary">知识库管理</h2>
+        <p className="text-yc-text-secondary mb-4">在此查看已保存剧本，并从任意剧本继续进入 SOP 下一步。</p>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Segmented
             value={viewMode}
@@ -312,7 +312,7 @@ export default function KnowledgeBase() {
         >
           <div className="space-y-4 pt-2">
             <div>
-              <div className="text-xs text-slate-600 mb-1">标题 / 项目名</div>
+              <div className="text-xs text-yc-text-secondary mb-1">标题 / 项目名</div>
               <Input
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
@@ -322,14 +322,14 @@ export default function KnowledgeBase() {
               />
             </div>
             <div>
-              <div className="text-xs text-slate-600 mb-1">核心内容 / 剧情（Markdown，与 AI 脚本工坊落库格式一致）</div>
+              <div className="text-xs text-yc-text-secondary mb-1">核心内容 / 剧情（Markdown，与 AI 脚本工坊落库格式一致）</div>
               <MarkdownEditorToggle
                 value={formPlot}
                 onChange={setFormPlot}
                 minRows={12}
                 placeholder="支持 ### 标题、**加粗**、表格、围栏代码块等；可切换「预览」或「分栏」查看渲染效果"
               />
-              <div className="text-right text-xs text-slate-400 mt-1">{formPlot.length} / 500000</div>
+              <div className="text-right text-xs text-yc-text-tertiary mt-1">{formPlot.length} / 500000</div>
             </div>
           </div>
         </Modal>

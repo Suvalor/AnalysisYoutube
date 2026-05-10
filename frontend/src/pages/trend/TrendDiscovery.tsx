@@ -107,8 +107,8 @@ function SortHeader({
     >
       {label}
       <span style={{ fontSize: 10, display: "inline-flex", flexDirection: "column", lineHeight: 1 }}>
-        <CaretUpOutlined style={{ color: active && order === "asc" ? "#1890ff" : "#bbb", fontSize: 9 }} />
-        <CaretDownOutlined style={{ color: active && order === "desc" ? "#1890ff" : "#bbb", fontSize: 9, marginTop: -3 }} />
+        <CaretUpOutlined style={{ color: active && order === "asc" ? "var(--color-primary)" : "var(--color-text-tertiary)", fontSize: 9 }} />
+        <CaretDownOutlined style={{ color: active && order === "desc" ? "var(--color-primary)" : "var(--color-text-tertiary)", fontSize: 9, marginTop: -3 }} />
       </span>
     </div>
   );
@@ -186,7 +186,7 @@ export default function TrendDiscovery() {
       content: `频道ID: ${record.channel_id}，订阅数: ${formatNumber(record.channel_subscribers)}`,
       okText: "确认入库",
       cancelText: "取消",
-      okButtonProps: { style: { background: "#ff4d4f", borderColor: "#ff4d4f" } },
+      okButtonProps: { style: { background: "var(--color-danger)", borderColor: "var(--color-danger)" } },
       onOk: async () => {
         try {
           const res = await addChannelByIdApi({
@@ -261,9 +261,9 @@ export default function TrendDiscovery() {
   };
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: "0 auto" }}>
+    <div className="p-6 max-w-[1200px] mx-auto">
       <Title level={3} style={{ marginBottom: 24 }}>
-        <FireOutlined style={{ marginRight: 8, color: "#ff4d4f" }} />
+        <FireOutlined style={{ marginRight: 8, color: "var(--color-danger)" }} />
         热门趋势
       </Title>
 
@@ -320,7 +320,7 @@ export default function TrendDiscovery() {
             {history.map((item) => (
               <Tag
                 key={item.id}
-                color="blue"
+                color="processing"
                 style={{ fontSize: 13, padding: "4px 10px", cursor: "pointer" }}
                 onClick={() => handleHistoryClick(item)}
               >
@@ -391,9 +391,9 @@ export default function TrendDiscovery() {
                     key={cat.category_id}
                     color={
                       cat.percentage >= 20
-                        ? "red"
+                        ? "error"
                         : cat.percentage >= 10
-                        ? "blue"
+                        ? "processing"
                         : "default"
                     }
                     style={{ fontSize: 13, padding: "4px 10px" }}
@@ -415,10 +415,10 @@ export default function TrendDiscovery() {
                   gridTemplateColumns: "48px 1fr 100px 90px 90px 100px 110px 80px",
                   gap: 8,
                   padding: "8px 0",
-                  borderBottom: "1px solid #f0f0f0",
+                  borderBottom: "1px solid var(--color-border)",
                   fontWeight: 600,
                   fontSize: 13,
-                  color: "#666",
+                  color: "var(--color-text-secondary)",
                 }}
               >
                 <div>#</div>
@@ -440,14 +440,14 @@ export default function TrendDiscovery() {
                     gridTemplateColumns: "48px 1fr 100px 90px 90px 100px 110px 80px",
                     gap: 8,
                     padding: "8px 0",
-                    borderBottom: "1px solid #f0f0f0",
+                    borderBottom: "1px solid var(--color-border)",
                     fontSize: 13,
                     cursor: "pointer",
                     alignItems: "center",
                   }}
                   onClick={() => { const u = buildYouTubeWatchUrl(record.video_id); if (u) window.open(u, "_blank"); }}
                 >
-                  <div style={{ color: "#999" }}>{idx + 1}</div>
+                  <div style={{ color: "var(--color-text-tertiary)" }}>{idx + 1}</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                     {record.thumbnail_url && (
                       <Image
@@ -474,7 +474,7 @@ export default function TrendDiscovery() {
                   <div><Space size={4}><LikeOutlined />{formatNumber(record.like_count)}</Space></div>
                   <div><Space size={4}><MessageOutlined />{formatNumber(record.comment_count)}</Space></div>
                   <div>
-                    <Tag color={record.engagement_rate >= 5 ? "#52c41a" : record.engagement_rate >= 2 ? "#1890ff" : "#faad14"}>
+                    <Tag color={record.engagement_rate >= 5 ? "success" : record.engagement_rate >= 2 ? "processing" : "warning"}>
                       {record.engagement_rate.toFixed(2)}%
                     </Tag>
                   </div>
@@ -488,7 +488,7 @@ export default function TrendDiscovery() {
                         e.stopPropagation();
                         handleAddChannel(record);
                       }}
-                      style={{ background: "#ff4d4f", borderColor: "#ff4d4f" }}
+                      style={{ background: "var(--color-danger)", borderColor: "var(--color-danger)" }}
                     >
                       入库
                     </Button>
@@ -505,7 +505,7 @@ export default function TrendDiscovery() {
               )}
 
               {displayCount >= sortedVideos.length && sortedVideos.length > 0 && (
-                <div style={{ textAlign: "center", padding: "16px 0", color: "#999" }}>
+                <div style={{ textAlign: "center", padding: "16px 0", color: "var(--color-text-tertiary)" }}>
                   共 {sortedVideos.length} 条，已全部加载
                 </div>
               )}

@@ -4,9 +4,9 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.api.v1 import api_router_v1, integration_settings, users
 from app.core.config import settings
@@ -73,15 +73,43 @@ def create_app() -> FastAPI:
         "form-action 'self'"
     )
 
-    class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-        async def dispatch(self, request: Request, call_next):
-            response = await call_next(request)
-            response.headers["Content-Security-Policy"] = CSP_HEADER
-            response.headers["X-Content-Type-Options"] = "nosniff"
-            response.headers["X-Frame-Options"] = "DENY"
-            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-            response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-            return response
+    _SECURITY_HEADERS: dict[str, str] = {
+        "Content-Security-Policy": CSP_HEADER,
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    }
+
+    class SecurityHeadersMiddleware:
+        """纯 ASGI 中间件：注入安全响应头。
+
+        不使用 BaseHTTPMiddleware，避免其在异常路径下创建新 Response 对象
+        导致 CORSMiddleware 已添加的 Access-Control-* 头被丢弃的问题。
+        """
+
+        def __init__(self, app: ASGIApp) -> None:
+            self.app = app
+
+        async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+            if scope["type"] not in ("http", "websocket"):
+                await self.app(scope, receive, send)
+                return
+
+            inner_send = send
+            header_injected = False
+
+            async def _send(message: dict) -> None:
+                nonlocal header_injected
+                if message["type"] == "http.response.start" and not header_injected:
+                    headers = list(message.get("headers", []))
+                    for name, value in _SECURITY_HEADERS.items():
+                        headers.append((name.encode("latin-1"), value.encode("latin-1")))
+                    message["headers"] = headers
+                    header_injected = True
+                await inner_send(message)
+
+            await self.app(scope, receive, _send)
 
     app.add_middleware(SecurityHeadersMiddleware)
 

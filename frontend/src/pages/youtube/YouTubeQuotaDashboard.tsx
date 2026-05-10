@@ -16,23 +16,23 @@ export default function YouTubeQuotaDashboard() {
   }, []);
 
   return (
-    <div className="p-6 md:p-8 bg-[#F8F9FA] min-h-screen">
+    <div className="p-6 md:p-8 bg-yc-bg-secondary min-h-screen">
       <div className="max-w-7xl mx-auto space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="!border !border-slate-200 !shadow-sm">
-            <div className="text-slate-500 text-sm">今日免费总额度</div>
-            <div className="text-3xl font-semibold text-slate-900 mt-1">10,000</div>
+          <Card className="!border !border-yc-border !shadow-sm">
+            <div className="text-yc-text-secondary text-sm">今日免费总额度</div>
+            <div className="text-3xl font-semibold text-yc-text-primary mt-1">10,000</div>
           </Card>
-          <Card className="!border !border-slate-200 !shadow-sm">
-            <div className="text-slate-500 text-sm">今日已消耗额度</div>
+          <Card className="!border !border-yc-border !shadow-sm">
+            <div className="text-yc-text-secondary text-sm">今日已消耗额度</div>
             <div className="text-3xl font-semibold text-rose-600 mt-1">{data?.today_used ?? 0}</div>
           </Card>
-          <Card className="!border !border-slate-200 !shadow-sm">
-            <div className="text-slate-500 text-sm">今日剩余额度</div>
+          <Card className="!border !border-yc-border !shadow-sm">
+            <div className="text-yc-text-secondary text-sm">今日剩余额度</div>
             <div className="text-3xl font-semibold text-emerald-600 mt-1">{data?.today_remaining ?? 10000}</div>
           </Card>
         </div>
-        <Card className="!border !border-slate-200 !shadow-sm" title="近 7 天 API 消耗量">
+        <Card className="!border !border-yc-border !shadow-sm" title="近 7 天 API 消耗量">
           <div className="h-[320px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data?.history ?? []}>
@@ -40,7 +40,7 @@ export default function YouTubeQuotaDashboard() {
                 <XAxis dataKey="date" />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="points_used" fill="#2563eb" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="points_used" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

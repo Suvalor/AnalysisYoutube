@@ -126,7 +126,7 @@ def merge_integration_config(db_payload: dict[str, str] | None, s: Settings | No
     d = db_payload or {}
     base = s or get_settings()
     return ResolvedIntegrationConfig(
-        youtube_api_key=_pick_str(d, "youtube_api_key", base.youtube_api_key),
+        youtube_api_key=_pick_str(d, "youtube_api_key", ""),
         active_storage_provider=_pick_str(d, "active_storage_provider", base.active_storage_provider),
         aliyun_access_key_id=_pick_str(d, "aliyun_access_key_id", base.aliyun_access_key_id),
         aliyun_access_key_secret=_pick_str(d, "aliyun_access_key_secret", base.aliyun_access_key_secret),

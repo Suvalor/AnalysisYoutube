@@ -81,7 +81,7 @@ def _require_api_key(youtube_api_key: str) -> None:
     if not (youtube_api_key or "").strip():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="未配置 YouTube Data API Key（请在设置中心填写或配置环境变量 YOUTUBE_API_KEY）",
+            detail="未配置 YouTube Data API Key，请在设置中心填写",
         )
 
 

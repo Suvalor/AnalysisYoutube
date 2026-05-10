@@ -113,7 +113,7 @@ export default function FeishuDocViewer({ docId: docIdFromTab }: FeishuDocViewer
 
   return (
     <div className="h-full flex flex-col">
-      <div className="px-4 py-2 border-b border-slate-200 bg-white text-sm text-slate-700 flex flex-wrap items-center gap-3 min-h-[44px]">
+      <div className="px-4 py-2 border-b border-yc-border bg-yc-bg-card text-sm text-yc-text-primary flex flex-wrap items-center gap-3 min-h-[44px]">
         <span className="truncate flex-1 min-w-0">{title || "飞书云文档"}</span>
         {showArchiveToggle ? (
           <Segmented<PreviewSource>
@@ -127,7 +127,7 @@ export default function FeishuDocViewer({ docId: docIdFromTab }: FeishuDocViewer
           />
         ) : null}
       </div>
-      <div className="flex-1 bg-slate-50">
+      <div className="flex-1 bg-yc-bg-secondary">
         <iframe
           title={showArchiveToggle && previewSource === "archive" ? "离线归档预览" : "飞书原链预览"}
           src={iframeSrc}
