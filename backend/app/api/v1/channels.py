@@ -11,10 +11,19 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, DBSessionDep
 from app.models.youtube import YouTubeChannel, UserCompetitorPool
-from app.schemas.discovery import ChannelDiscoverRequest, ChannelDiscoverResponse, DiscoverChannelItem, QuickTrackRequest, QuickTrackResponse
+from app.schemas.discovery import (
+    BlueOceanChannelItem,
+    BlueOceanRadarRequest,
+    BlueOceanRadarResponse,
+    ChannelDiscoverRequest,
+    ChannelDiscoverResponse,
+    DiscoverChannelItem,
+    QuickTrackRequest,
+    QuickTrackResponse,
+)
 from app.services.config_manager import resolve_integration_config
 from app.services.quota_service import record_api_quota_usage
-from app.services.youtube_service import discover_channels_by_keyword, fetch_channel_info
+from app.services.youtube_service import blue_ocean_radar_scan, discover_channels_by_keyword, fetch_channel_info
 from app.crud.youtube import ensure_competitor_pool, upsert_channel
 
 router = APIRouter()
@@ -181,6 +190,9 @@ async def blue_ocean_radar(
 
     items = [BlueOceanChannelItem.model_validate(x) for x in result.items]
     return BlueOceanRadarResponse(items=items, warnings=result.warnings)
+
+
+@router.post(
     "/quick-track",
     response_model=QuickTrackResponse,
     summary="快速追踪博主（从视频列表一键入库）",

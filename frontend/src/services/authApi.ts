@@ -119,7 +119,8 @@ export type DiscoverChannelItem = {
   title: string;
   thumbnail_url: string | null;
   subscriber_count: number;
-  total_views: number;
+  channel_total_views: number;
+  trigger_video_views: number;
   channel_url: string;
   viral_video_url: string;
 };
@@ -152,11 +153,6 @@ export type BlueOceanChannelItem = {
   outlier_score: number;
   channel_url: string;
   viral_video_url: string;
-  total_views: number;
-  channel_url: string;
-  viral_video_url: string;
-  viral_view_count: number;
-  outlier_score: number;
 };
 
 export type BlueOceanRadarResponse = {
