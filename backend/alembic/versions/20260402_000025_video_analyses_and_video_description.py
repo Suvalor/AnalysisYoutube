@@ -81,8 +81,36 @@ def upgrade() -> None:
             sa.ForeignKeyConstraint(["video_id"], ["youtube_videos.id"], ondelete="CASCADE"),
             sa.UniqueConstraint("org_id", "video_id", name="uq_video_analyses_org_video"),
         )
-        op.create_index("ix_video_analyses_video_id", "video_analyses", ["video_id"])
-        op.create_index("ix_video_analyses_org_id", "video_analyses", ["org_id"])
+        # create_table 中 index=True 已自动创建索引，此处仅补建缺失索引
+        idx_exists = conn.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.statistics
+                WHERE table_schema = :db
+                  AND table_name = 'video_analyses'
+                  AND index_name = :idx
+                """
+            ),
+            {"db": db_name, "idx": "ix_video_analyses_video_id"},
+        ).scalar()
+        if not idx_exists:
+            op.create_index("ix_video_analyses_video_id", "video_analyses", ["video_id"])
+
+        idx2_exists = conn.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.statistics
+                WHERE table_schema = :db
+                  AND table_name = 'video_analyses'
+                  AND index_name = :idx
+                """
+            ),
+            {"db": db_name, "idx": "ix_video_analyses_org_id"},
+        ).scalar()
+        if not idx2_exists:
+            op.create_index("ix_video_analyses_org_id", "video_analyses", ["org_id"])
 
 
 def downgrade() -> None:

@@ -13,7 +13,7 @@ services:
         APT_USE_MIRROR: "1"
     container_name: creator_backend
     restart: unless-stopped
-    env_file: .env
+    env_file: backend/.env
     environment:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
       ALGORITHM: ${ALGORITHM:-HS256}

@@ -24,32 +24,36 @@ YouTube Compass 帮助你在创作前发现未被充分开发的 YouTube 市场�
 <!-- TODO: 替换为真实截图 -->
 > 截图占位：蓝海雷达主界面 / 竞对洞察对比页 / 视频看板
 
-## 快速开始（Docker 一键部署）
+## 快速开始（Docker 部署）
 
-**前置条件**：Docker & Docker Compose
+**前置条件**：Docker & Docker Compose，远程 MySQL 8.0 实例
 
 ```shell
 # 1. 克隆仓库
 git clone https://github.com/<owner>/youtube-compass.git
 cd youtube-compass
 
-# 2. 复制并编辑环境变量（必须填入 SECRET_KEY、DATABASE_URL）
-cp .env.example .env
+# 2. 配置后端环境变量
+cp backend/.env.example backend/.env
+# 编辑 backend/.env，填入远程数据库连接信息和 SECRET_KEY
 
-# 3. 启动服务
+# 3. 配置根目录环境变量（仅 docker-compose 插值所需）
+cp .env.example .env
+# 编辑 .env，填入 SECRET_KEY（与 backend/.env 一致）
+
+# 4. 启动后端服务
 docker compose up -d
 
-# 4. 执行数据库迁移
+# 5. 执行数据库迁移（初始化表结构）
 docker compose exec backend alembic upgrade head
 
-# 5. 访问
-#    前端：http://localhost:5173（需单独启动，见下方手动安装）
+# 6. 访问
 #    后端 API 文档：http://localhost:8000/docs
 ```
 
 > 将 `<owner>` 替换为实际的 GitHub 用户名或组织名。
 
-> Docker Compose 当前仅包含 MySQL + Backend。前端需手动启动或自行添加前端服务。
+> Docker Compose 仅包含 Backend 服务，数据库使用远程 MySQL。前端需手动启动或自行添加前端服务。
 
 ## 手动安装
 
@@ -64,6 +68,13 @@ python -m venv .venv && source .venv/bin/activate
 # 安装依赖
 pip install -r requirements.txt
 
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env，填入远程数据库连接信息和 SECRET_KEY
+
+# 执行数据库迁移（初始化远程数据库表结构）
+alembic upgrade head
+
 # 启动开发服务器
 uvicorn app.main:app --reload --port 8000
 ```
@@ -76,7 +87,11 @@ cd frontend
 # 安装依赖
 npm install
 
-# 启动开发服务器（:5173，自动代理 /api -> localhost:8000）
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env，设置 VITE_API_BASE_URL 指向后端地址
+
+# 启动开发服务器（默认 :5175，自动代理 /api -> localhost:8000）
 npm run dev
 
 # 生产构建
@@ -85,37 +100,46 @@ npm run build
 
 ## 环境变量配置
 
-复制 `.env.example` 为 `.env` 并填入实际值：
+### 配置文件说明
 
-```shell
-cp .env.example .env
-```
+| 文件 | 用途 | 说明 |
+|------|------|------|
+| `backend/.env` | **主配置文件** | 后端所有配置（数据库、认证、存储、邮件等），Docker 部署也读取此文件 |
+| `.env` | docker-compose 插值 | 仅包含 `SECRET_KEY`，供 `docker-compose.yml` 的 `${VAR:?}` 语法使用 |
+| `frontend/.env` | 前端配置 | API 地址和功能开关 |
 
-### 最小配置（必须设置）
+> 所有 `.env` 文件均已在 `.gitignore` 中排除，不会提交到仓库。请从对应的 `.env.example` 复制并填入实际值。
+
+### 后端最小配置（必须设置）
 
 | 变量 | 说明 |
 |------|------|
 | `SECRET_KEY` | JWT 签名密钥，生产环境务必使用强随机字符串（>= 32 字符） |
-| `DATABASE_URL` | MySQL 连接串，格式：`mysql+asyncmy://user:pass@host:3306/db` |
+| `MYSQL_HOST` | 远程 MySQL 主机地址 |
+| `MYSQL_PASSWORD` | MySQL 密码 |
+| `MYSQL_DB` | 数据库名 |
 
-### 完整配置
+> 后端自动从 `MYSQL_*` 变量拼接 `DATABASE_URL`，无需手动配置。如需覆盖，可直接设置 `DATABASE_URL`。
+
+### 后端完整配置
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | **数据库** | | |
-| `MYSQL_USER` | MySQL 用户名 | - |
-| `MYSQL_PASSWORD` | MySQL 密码 | - |
-| `MYSQL_HOST` | MySQL 主机 | localhost |
+| `MYSQL_USER` | MySQL 用户名 | root |
+| `MYSQL_ROOT_PASSWORD` | MySQL root 密码 | - |
+| `MYSQL_PASSWORD` | MySQL 密码（后端连接使用） | - |
+| `MYSQL_HOST` | MySQL 主机（远程地址） | 127.0.0.1 |
 | `MYSQL_PORT` | MySQL 端口 | 3306 |
-| `MYSQL_DB` | 数据库名 | creator_saas |
-| `DATABASE_URL` | 完整连接串（优先于上面的单独字段） | - |
+| `MYSQL_DB` | 数据库名 | analysisYoutube |
+| `DATABASE_URL` | 完整连接串（设置后优先于 MYSQL_* 拼接） | 自动拼接 |
 | **认证** | | |
 | `SECRET_KEY` | JWT 签名密钥（必填） | - |
 | `FIELD_ENCRYPTION_SECRET` | 字段加密盐（可选，未设置回退 SECRET_KEY） | - |
 | `ALGORITHM` | JWT 算法 | HS256 |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token 过期时间（分钟） | 1440 |
 | **CORS** | | |
-| `BACKEND_CORS_ORIGINS` | 允许的前端地址，逗号分隔 | http://localhost:5173 |
+| `BACKEND_CORS_ORIGINS` | 允许的前端地址，逗号分隔 | http://localhost:5173,... |
 | **对象存储** | | |
 | `ACTIVE_STORAGE_PROVIDER` | 存储提供商：ALIYUN / TENCENT | TENCENT |
 | `ALIYUN_ACCESS_KEY_ID` | 阿里云 AccessKey ID | - |
@@ -134,14 +158,15 @@ cp .env.example .env
 | `SMTP_USER` | SMTP 用户名 | - |
 | `SMTP_PASSWORD` | SMTP 密码 | - |
 | `SMTP_FROM_EMAIL` | 发件人地址 | - |
-| `FRONTEND_BASE_URL` | 前端地址（用于生成重置链接） | http://localhost:5173 |
+| `SMTP_USE_SSL` | 是否使用 SSL | true |
+| `FRONTEND_BASE_URL` | 前端地址（用于生成重置链接） | http://localhost:5175 |
 | **其他（可选）** | | |
 | `DOWNLOAD_PROXY` | yt-dlp 下载代理 | - |
 | `GOOGLE_OAUTH_CLIENT_ID` | Google OAuth 客户端 ID | - |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Google OAuth 客户端密钥 | - |
 | **火山引擎 CV（可选）** | | |
 | `VOLC_CV_ACCESS_KEY_ID` | 火山引擎 CV AccessKey ID | - |
-| `VOLC_CV_SECRET_ACCESS_KEY` | 火山引擎 CV SecretAccessKey | - |
+| `VOLC_CV_SECRET_ACCESS_KEY` | 山引擎 CV SecretAccessKey | - |
 | `VOLC_CV_REGION` | 火山引擎 CV 区域 | cn-north-1 |
 | `VOLC_CV_HOST` | 火山引擎 CV Host | - |
 | `VOLC_CV_INPAINT_REQ_KEY` | 火山引擎 CV Inpainting 请求 Key | i2i_inpainting |
@@ -150,7 +175,7 @@ cp .env.example .env
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `VITE_API_BASE_URL` | 后端 API 地址 | http://localhost:8000 |
+| `VITE_API_BASE_URL` | 后端 API 地址（不含 /api 后缀） | http://localhost:8000 |
 | `VITE_FEATURE_INSPIRATION` | 启用灵感池模块 | false |
 | `VITE_FEATURE_AI_CREATOR` | 启用 AI 脚本工坊 | false |
 | `VITE_FEATURE_SOP` | 启用 SOP 工作流 | false |
@@ -164,7 +189,7 @@ cp .env.example .env
 |----|------|
 | 前端 | React 18, Vite, TypeScript, Ant Design, Tailwind CSS, Zustand |
 | 后端 | FastAPI (Python 3.11), async SQLAlchemy, asyncmy, Alembic |
-| 数据库 | MySQL 8.0 |
+| 数据库 | MySQL 8.0（远程实例） |
 | AI/LLM | 火山引擎/Ark (OpenAI 兼容协议)，对话记忆 |
 | 存储 | 阿里云 OSS + 腾讯云 COS（多云切换） |
 | 外部 API | YouTube Data API v3（配额追踪） |
@@ -184,6 +209,7 @@ youtube-compass/
 │   │   ├── schemas/          # Pydantic 请求/响应模型
 │   │   └── services/         # 业务逻辑层
 │   ├── alembic/              # 数据库迁移
+│   ├── .env.example          # 后端环境变量模板（主配置）
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── frontend/                 # React 前端
@@ -195,10 +221,11 @@ youtube-compass/
 │   │   ├── services/         # API 客户端
 │   │   ├── store/            # Zustand 状态管理
 │   │   └── themes/           # 主题系统
+│   ├── .env.example          # 前端环境变量模板
 │   ├── Dockerfile
 │   └── vite.config.ts
-├── docker-compose.yml
-├── .env.example
+├── docker-compose.yml        # Docker 部署配置（env_file 指向 backend/.env）
+├── .env.example              # 根目录环境变量模板（仅 docker-compose 插值）
 ├── LICENSE
 └── CONTRIBUTING.md
 ```
