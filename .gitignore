@@ -101,3 +101,6 @@ htmlcov/
 coverage.xml
 *.cover
 .pytest_cache/
+
+
+.claude

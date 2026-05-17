@@ -1,28 +1,9 @@
 # Docker Compose 配置
 # 所有敏感值均通过环境变量注入，默认值仅供本地开发使用，不可用于生产。
 # 复制 .env.example 为 .env 并填入实际值后启动：cp .env.example .env
+# 数据库使用远程 MySQL，请在 .env 中配置 MYSQL_HOST / DATABASE_URL
 
 services:
-  mysql:
-    image: docker.m.daocloud.io/library/mysql:8.0
-    container_name: creator_mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
-      MYSQL_DATABASE: ${MYSQL_DB:-creator_saas}
-      MYSQL_USER: ${MYSQL_USER:-creator}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
-    ports:
-      - "${MYSQL_PORT:-3306}:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u${MYSQL_USER:-creator}", "-p${MYSQL_PASSWORD}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-
   backend:
     build:
       context: ./backend
@@ -32,17 +13,8 @@ services:
         APT_USE_MIRROR: "1"
     container_name: creator_backend
     restart: unless-stopped
-    depends_on:
-      mysql:
-        condition: service_healthy
     env_file: .env
     environment:
-      MYSQL_USER: ${MYSQL_USER:-creator}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
-      MYSQL_HOST: mysql
-      MYSQL_PORT: 3306
-      MYSQL_DB: ${MYSQL_DB:-creator_saas}
-      DATABASE_URL: mysql+asyncmy://${MYSQL_USER:-creator}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DB:-creator_saas}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
       ALGORITHM: ${ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
@@ -69,6 +41,3 @@ services:
     # 纯镜像部署到生产时，请删除本 volumes 段并仅使用 build 产物镜像
     volumes:
       - ./backend:/app
-
-volumes:
-  mysql_data:

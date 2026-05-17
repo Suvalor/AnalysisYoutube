@@ -5,7 +5,6 @@ import AuthLayout from "@/components/Layout/AuthLayout";
 import { registerApi, sendEmailCodeApi } from "@/services/authApi";
 
 type FormValues = {
-  phone: string;
   email: string;
   password: string;
   confirmPassword: string;
@@ -72,7 +71,6 @@ export default function RegisterPage() {
     setError(null);
     try {
       await registerApi({
-        phone: values.phone,
         email: values.email,
         password: values.password,
         email_code: values.email_code,
@@ -108,16 +106,6 @@ export default function RegisterPage() {
             <Alert type="error" message={error} showIcon closable onClose={() => setError(null)} />
           </div>
         )}
-        <Form.Item
-          label="手机号"
-          name="phone"
-          rules={[
-            { required: true, message: "请输入手机号" },
-            { pattern: /^1\d{10}$/, message: "请输入有效的11位手机号" }
-          ]}
-        >
-          <Input placeholder="11位手机号" size="large" maxLength={11} autoComplete="tel" />
-        </Form.Item>
         <Form.Item
           label="邮箱"
           name="email"

@@ -90,7 +90,7 @@ async def register(
     user_in: RegisterRequest,
     db: DBSessionDep,
 ) -> UserRead:
-    """注册新用户：手机号+邮箱+邮箱验证码。"""
+    """注册新用户：邮箱+邮箱验证码，手机号可选。"""
     # 1. 先检查邮箱是否已注册（避免消耗验证码）
     existing = await get_user_by_email(db, user_in.email)
     if existing:
@@ -99,13 +99,14 @@ async def register(
             detail="该邮箱已被注册",
         )
 
-    # 2. 检查手机号是否已注册
-    existing_phone = await get_user_by_phone(db, user_in.phone)
-    if existing_phone:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="该手机号已被注册",
-        )
+    # 2. 手机号非空时检查是否已注册
+    if user_in.phone:
+        existing_phone = await get_user_by_phone(db, user_in.phone)
+        if existing_phone:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="该手机号已被注册",
+            )
 
     # 3. 校验邮箱验证码（一次性使用，放在重复检查之后）
     if not verify_email_code(user_in.email, user_in.email_code):

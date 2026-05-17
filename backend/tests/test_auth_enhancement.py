@@ -138,21 +138,32 @@ class TestSchemas:
         r = CaptchaResponse(captcha_id="abc", captcha_image="base64data")
         assert r.captcha_id == "abc"
 
-    def test_register_request_phone_validation(self):
+    def test_register_request_phone_optional(self):
+        """手机号为可选字段，不传时默认 None。"""
+        req = RegisterRequest(
+            email="test@example.com",
+            password="12345678abcd",
+            email_code="123456",
+        )
+        assert req.phone is None
+
+    def test_register_request_phone_provided(self):
+        """传入手机号时正常校验。"""
         req = RegisterRequest(
             phone="13800138000",
             email="test@example.com",
-            password="12345678",
+            password="12345678abcd",
             email_code="123456",
         )
         assert req.phone == "13800138000"
 
     def test_register_request_phone_too_short(self):
+        """手机号长度不足 11 位时校验失败。"""
         with pytest.raises(Exception):
             RegisterRequest(
                 phone="138",
                 email="test@example.com",
-                password="12345678",
+                password="12345678abcd",
                 email_code="123456",
             )
 

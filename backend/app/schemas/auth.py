@@ -55,9 +55,9 @@ class CaptchaResponse(BaseModel):
 # ---------- 新增：注册（手机号+邮箱+验证码） ----------
 
 class RegisterRequest(BaseModel):
-    """注册请求体（手机号+邮箱+验证码）."""
+    """注册请求体（邮箱+验证码，手机号可选）."""
 
-    phone: str = Field(..., min_length=11, max_length=11, description="手机号")
+    phone: str | None = Field(None, min_length=11, max_length=11, description="手机号（可选）")
     email: EmailStr = Field(..., description="邮箱")
     password: str = Field(..., min_length=12, max_length=128, repr=False, description="明文密码")
     email_code: str = Field(..., min_length=6, max_length=6, description="邮箱验证码")
