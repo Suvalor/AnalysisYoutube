@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     # yt-dlp 下载代理（可选，如 http://127.0.0.1:7890）
     download_proxy: str = Field("", alias="DOWNLOAD_PROXY")
 
+    # 日志级别：DEBUG 时记录请求/响应 body，INFO 只记录请求行
+    log_level: str = Field("INFO", alias="LOG_LEVEL")
+
     # 支持单个 URL、逗号分隔字符串，或 JSON 数组字符串
     backend_cors_origins: str = Field(
         "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174",
