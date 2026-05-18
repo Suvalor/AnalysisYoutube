@@ -35,6 +35,8 @@ services:
       SMTP_USE_SSL: ${SMTP_USE_SSL:-true}
       # 前端站点地址（用于生成密码重置链接）
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}
+      # 日志级别：DEBUG 记录请求/响应 body（脱敏），INFO 只记录请求行
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
     ports:
       - "8000:8000"
     # 挂载本地 backend：容器内 Alembic/应用代码与仓库一致；宿主 entrypoint.sh 须可执行（chmod +x）
