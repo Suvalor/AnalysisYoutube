@@ -1,5 +1,4 @@
 import logging
-import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -25,8 +24,19 @@ _SENSITIVE_FIELDS = frozenset({"password", "new_password", "confirm_password"})
 async def lifespan(_: FastAPI):
     # 日志级别 + 脱敏过滤器
     level = getattr(logging, settings.log_level.upper(), logging.INFO)
-    logging.getLogger().setLevel(level)
-    logging.getLogger().addFilter(SensitiveDataFilter())
+    root = logging.getLogger()
+    root.setLevel(level)
+    root.addFilter(SensitiveDataFilter())
+    # uvicorn 只配置自身 logger，root 可能无 handler，导致第三方 logger 日志被吞
+    if not root.handlers:
+        handler = logging.StreamHandler()
+        handler.setLevel(level)
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
+        root.addHandler(handler)
+    # 确保 request logger 跟随 LOG_LEVEL
+    logging.getLogger("request").setLevel(level)
     start_scheduler()
     try:
         yield
@@ -40,9 +50,6 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
-
-    # 请求/响应日志（最先注册 = 最外层，捕获完整耗时）
-    app.add_middleware(RequestLoggingMiddleware)
 
     # 速率限制
     app.state.limiter = limiter
@@ -124,6 +131,9 @@ def create_app() -> FastAPI:
 
     app.add_middleware(SecurityHeadersMiddleware)
 
+    # 请求/响应日志（最后注册 = 最外层，捕获完整耗时和 CORS 处理后的响应）
+    app.add_middleware(RequestLoggingMiddleware)
+
     class HTTPSRedirectMiddleware:
         """纯 ASGI 中间件：非 HTTPS 请求重定向到 HTTPS。
 
@@ -145,12 +155,14 @@ def create_app() -> FastAPI:
                     (k.decode("latin-1").lower(), v.decode("latin-1"))
                     for k, v in scope.get("headers", [])
                 )
+                method = scope.get("method", "")
                 scheme = headers.get("x-forwarded-proto", scope.get("scheme", "http"))
                 host = headers.get("host", "").split(":")[0]
                 path = scope.get("path", "")
 
                 if (
                     scheme == "http"
+                    and method != "OPTIONS"
                     and host not in self.EXEMPT_HOSTS
                     and path not in self.EXEMPT_PATHS
                 ):

@@ -1,7 +1,10 @@
-"""结构化请求/响应日志中间件。
+"""结构化请求/响应日志中间件（纯 ASGI 实现）。
 
 - INFO 级别：只记录 method path status duration
 - DEBUG 级别：额外记录请求 body 和响应 body（敏感字段自动脱敏）
+
+不使用 BaseHTTPMiddleware，避免其在异常路径下创建新 Response 对象
+导致 CORSMiddleware 已添加的 Access-Control-* 头被丢弃的问题。
 """
 
 import json
@@ -9,9 +12,7 @@ import logging
 import re
 import time
 
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.requests import Request
-from starlette.responses import Response, StreamingResponse
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 logger = logging.getLogger("request")
 
@@ -51,8 +52,7 @@ def _mask_sensitive(raw: str) -> str:
 
 
 # ── body 处理 ─────────────────────────────────────────
-_MAX_BODY_LOG = 10_000  # 超过此字节数的 body 不记录
-_BODY_PREVIEW = 500
+_MAX_BODY_LOG = 10_000
 
 
 def _safe_body(body: bytes, content_type: str = "") -> str:
@@ -71,7 +71,7 @@ def _safe_body(body: bytes, content_type: str = "") -> str:
 
 
 # ── 路径排除 ──────────────────────────────────────────
-_SKIP_PATHS = frozenset({"/docs", "/redoc", "/openapi.json", "/favicon.ico"})
+_SKIP_PATHS = frozenset({"/docs", "/redoc", "/openapi.json", "/favicon.ico", "/health"})
 _SKIP_PREFIXES = ("/static/", "/assets/")
 
 
@@ -82,56 +82,101 @@ def _should_skip(path: str) -> bool:
 
 
 # ── 中间件 ────────────────────────────────────────────
-class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        if _should_skip(request.url.path):
-            return await call_next(request)
+class RequestLoggingMiddleware:
+    """纯 ASGI 中间件：结构化请求/响应日志。
 
+    不使用 BaseHTTPMiddleware，避免 CORS preflight 响应头丢失问题。
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+        if _should_skip(path):
+            await self.app(scope, receive, send)
+            return
+
+        method = scope.get("method", "")
         start = time.perf_counter()
 
-        # 读取请求 body（需要在 call_next 之前读取，因为 body stream 只能消费一次）
+        # ── 捕获请求 body ──
         request_body = b""
-        if request.method in ("POST", "PUT", "PATCH"):
-            request_body = await request.body()
+        if method in ("POST", "PUT", "PATCH"):
+            # 读取 body 并缓存，下游仍可消费
+            body_messages: list[Message] = []
+            while True:
+                message = await receive()
+                body_messages.append(message)
+                if message["type"] == "http.request.body":
+                    request_body += message.get("body", b"")
+                    if not message.get("more_body", False):
+                        break
+                else:
+                    break
 
-        response = await call_next(request)
+            # 构造新的 receive，让下游仍能读到 body
+            async def _receive() -> Message:
+                if body_messages:
+                    return body_messages.pop(0)
+                return {"type": "http.disconnect"}
+
+            inner_receive = _receive
+        else:
+            inner_receive = receive
+
+        # ── 捕获响应 ──
+        status_code = 0
+        response_headers: list[tuple[bytes, bytes]] = []
+        response_body = b""
+        response_started = False
+
+        async def _send(message: Message) -> None:
+            nonlocal status_code, response_headers, response_body, response_started
+
+            if message["type"] == "http.response.start":
+                status_code = message.get("status", 0)
+                response_headers = list(message.get("headers", []))
+                response_started = True
+                await send(message)
+                return
+
+            if message["type"] == "http.response.body":
+                response_body += message.get("body", b"")
+                await send(message)
+                return
+
+            await send(message)
+
+        # ── 执行下游 ──
+        await self.app(scope, inner_receive, _send)
 
         duration_ms = (time.perf_counter() - start) * 1000
 
-        # INFO：只记录请求行
-        logger.info(
-            "%s %s %d %.0fms",
-            request.method,
-            request.url.path,
-            response.status_code,
-            duration_ms,
-        )
+        # ── INFO：请求行 ──
+        logger.info("%s %s %d %.0fms", method, path, status_code, duration_ms)
 
-        # DEBUG：额外记录 body
+        # ── DEBUG：请求/响应 body ──
         if logger.isEnabledFor(logging.DEBUG):
-            req_body = _safe_body(request_body, request.headers.get("content-type", ""))
+            headers_dict = {
+                k.decode("latin-1").lower(): v.decode("latin-1")
+                for k, v in scope.get("headers", [])
+            }
+            req_ct = headers_dict.get("content-type", "")
+            req_body = _safe_body(request_body, req_ct)
             if req_body:
                 logger.debug("  → body: %s", req_body)
 
-            # 读取响应 body（仅对非流式响应）
-            if not isinstance(response, StreamingResponse):
-                resp_body = b""
-                async for chunk in response.body_iterator:
-                    resp_body += chunk
-                # 重建 response，因为 body_iterator 已被消费
-                response = Response(
-                    content=resp_body,
-                    status_code=response.status_code,
-                    headers=dict(response.headers),
-                    media_type=response.media_type,
-                )
-                resp_text = _safe_body(resp_body, response.media_type or "")
-                if resp_text:
-                    logger.debug(
-                        "  ← %d %.0fms body: %s",
-                        response.status_code,
-                        duration_ms,
-                        resp_text,
-                    )
-
-        return response
+            # 从响应头推断 content-type
+            resp_ct = ""
+            for k, v in response_headers:
+                if k.decode("latin-1").lower() == "content-type":
+                    resp_ct = v.decode("latin-1")
+                    break
+            resp_text = _safe_body(response_body, resp_ct)
+            if resp_text:
+                logger.debug("  ← %d %.0fms body: %s", status_code, duration_ms, resp_text)

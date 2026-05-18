@@ -18,23 +18,16 @@ services:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
       ALGORITHM: ${ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
-      # 兼容本地开发：不同机器/配置可能导致前端 Origin 在 localhost/127.0.0.1、5173/5174 之间切换
-      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174}
+      # 兼容本地开发：不同机器/配置可能导致前端 Origin 在 localhost/127.0.0.1、5173/5174/5175 之间切换
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5175}
       ALIYUN_ACCESS_KEY_ID: ${ALIYUN_ACCESS_KEY_ID:-}
       ALIYUN_ACCESS_KEY_SECRET: ${ALIYUN_ACCESS_KEY_SECRET:-}
       ALIYUN_ROLE_ARN: ${ALIYUN_ROLE_ARN:-}
       ALIYUN_REGION_ID: ${ALIYUN_REGION_ID:-cn-guangzhou}
       ALIYUN_OSS_BUCKET_NAME: ${ALIYUN_OSS_BUCKET_NAME:-}
       ALIYUN_OSS_ENDPOINT: ${ALIYUN_OSS_ENDPOINT:-oss-cn-guangzhou.aliyuncs.com}
-      # SMTP 邮件服务（注册验证码 / 密码重置），不配置则邮件功能不可用
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-465}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
-      SMTP_USE_SSL: ${SMTP_USE_SSL:-true}
       # 前端站点地址（用于生成密码重置链接）
-      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5173}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:5175}
       # 日志级别：DEBUG 记录请求/响应 body（脱敏），INFO 只记录请求行
       LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
     ports:

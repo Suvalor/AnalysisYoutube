@@ -19,5 +19,5 @@ until alembic upgrade head; do
 done
 
 echo "数据库迁移完成，启动 FastAPI..."
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level $(echo ${LOG_LEVEL:-info} | tr '[:upper:]' '[:lower:]')
 
