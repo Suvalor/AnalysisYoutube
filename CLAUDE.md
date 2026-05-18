@@ -58,7 +58,7 @@ alembic revision --autogenerate -m "desc"    # generate from model changes
 - **Radar API family** (`/api/radar/`): `/scan` (deep scan), `/ai-retrospective` (AI parameter review), `/category-opportunity` (niche opportunity report), `/cross-region-compare` (multi-region comparison), `/export-report` (Markdown report generation), `/navigation-guide` (resource-based category+region recommendations).
 - **YouTube quota**: Each `search.list` call costs ~100 quota units. Tracked per-request in `quota_service.py`.
 - **LLM conversation memory**: `llm_conversation` table stores per-entity conversation history. Service layer in `llm_conversation_service.py` with auto-truncation (DEFAULT_MAX_CHARS=8000) and auto-pruning (DEFAULT_MAX_TURNS=20). Entity types: `script`, `ai_script`, `channel_ai`, `radar_retro`, `sop_split`.
-- **Multi-cloud storage**: Active provider set via `ACTIVE_STORAGE_PROVIDER` env var (ALIYUN or TENCENT). New uploads default to Tencent COS.
+- **Multi-cloud storage**: Active provider managed via ConfigCenter UI (`org_settings` table). `ACTIVE_STORAGE_PROVIDER` env var serves as system-level fallback only (default: `TENCENT` in `config.py`). New uploads default to Tencent COS.
 - **Frontend tab system**: `TabbedShell` renders a browser-like tab bar. Each nav item opens a tab via `useTabStore`. Dynamic tabs (channel detail, feishu viewer) matched by URL pattern.
 - **No linter configured**: Frontend `npm run lint` is a no-op echo. No backend linter config found.
  - **LLM 集成规则**：本项目已集成 LLM（Volcengine/Ark OpenAI 兼容协议），所有 LLM
@@ -82,11 +82,9 @@ Backend reads from `.env` (see `backend/.env.example`). Critical ones:
 - `ALGORITHM` — JWT algorithm (default: HS256)
 - `ACCESS_TOKEN_EXPIRE_MINUTES` — Token expiry (default: 1440)
 - `BACKEND_CORS_ORIGINS` — Allowed frontend origins, comma-separated
-- `VOLC_CV_ACCESS_KEY_ID`, `VOLC_CV_SECRET_ACCESS_KEY`, `VOLC_CV_REGION`, `VOLC_CV_HOST` — Volcengine CV (image inpainting)
-- `ALIYUN_ACCESS_KEY_ID`, `ALIYUN_ACCESS_KEY_SECRET`, `ALIYUN_OSS_BUCKET_NAME`, `ALIYUN_OSS_ENDPOINT`, `ALIYUN_CUSTOM_DOMAIN` — Aliyun OSS storage
-- `TENCENT_COS_SECRET_ID`, `TENCENT_COS_SECRET_KEY`, `TENCENT_COS_REGION`, `TENCENT_COS_BUCKET`, `TENCENT_CUSTOM_DOMAIN` — Tencent COS storage
-- `ACTIVE_STORAGE_PROVIDER` — Storage provider switch (ALIYUN or TENCENT, default: TENCENT)
-- `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` — Google OAuth (optional)
+- `ACTIVE_STORAGE_PROVIDER` — 已迁移至 ConfigCenter UI（org_settings 表），env var 仅作系统级 fallback（ALIYUN or TENCENT, default: TENCENT）
+- **阿里云 OSS、火山引擎 CV、腾讯云 COS 凭证已迁移至 ConfigCenter UI（org_settings 表）**：`ALIYUN_*`、`VOLC_CV_*`、`TENCENT_COS_*` 环境变量已从 `.env.example` 移除，`config.py` 中的 Settings 字段保留作为系统级 fallback，运行时优先从 ConfigCenter 读取
+- `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` — 已迁移至 ConfigCenter UI（org_settings 表），env var 仅作系统级 fallback
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, `SMTP_USE_SSL` — SMTP email (optional)
 - `FRONTEND_BASE_URL` — Frontend URL for password reset links (default: http://localhost:5173)
 - `DOWNLOAD_PROXY` — yt-dlp download proxy (optional)

@@ -27,6 +27,10 @@ class IntegrationSettingsRead(BaseModel):
     volc_cv_inpaint_req_key: str = ""
     watermark_video_ai_max_frames: int = 180
     watermark_inpaint_prompt: str = ""
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    google_oauth_redirect_uri: str = ""
+    has_google_oauth_client_secret: bool = False
 
 
 class IntegrationSettingsUpdate(BaseModel):
@@ -53,3 +57,6 @@ class IntegrationSettingsUpdate(BaseModel):
     volc_cv_inpaint_req_key: str | None = None
     watermark_video_ai_max_frames: int | None = None
     watermark_inpaint_prompt: str | None = None
+    google_oauth_client_id: str | None = None
+    google_oauth_client_secret: str | None = None
+    google_oauth_redirect_uri: str | None = None

@@ -46,10 +46,13 @@ export type IntegrationSettingsRead = {
   volc_cv_inpaint_req_key: string;
   watermark_video_ai_max_frames: number;
   watermark_inpaint_prompt: string;
+  google_oauth_client_id: string;
+  google_oauth_redirect_uri: string;
   has_youtube_api_key: boolean;
   has_aliyun_access_key_secret: boolean;
   has_tencent_cos_secret_key: boolean;
   has_volc_cv_secret_access_key: boolean;
+  has_google_oauth_client_secret: boolean;
   youtube_api_key_display: string | null;
   aliyun_access_key_secret_display: string | null;
   tencent_cos_secret_key_display: string | null;
@@ -80,6 +83,9 @@ export type IntegrationSettingsUpdatePayload = Partial<{
   volc_cv_inpaint_req_key: string | null;
   watermark_video_ai_max_frames?: number | null;
   watermark_inpaint_prompt?: string | null;
+  google_oauth_client_id: string | null;
+  google_oauth_client_secret: string | null;
+  google_oauth_redirect_uri: string | null;
 }>;
 
 export async function getIntegrationSettingsApi() {

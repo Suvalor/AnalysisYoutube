@@ -893,17 +893,17 @@ async def competitors_ai_insight(
 
 
 @router.get("/oauth/url", response_model=YouTubeOAuthUrlResponse, summary="生成 Google OAuth 授权地址")
-async def get_youtube_oauth_url(current_user: CurrentUserDep) -> YouTubeOAuthUrlResponse:
-    _ = current_user
-    if not settings.google_oauth_client_id:
-        raise HTTPException(status_code=500, detail="未配置 GOOGLE_OAUTH_CLIENT_ID")
-    redirect_uri = (settings.google_oauth_redirect_uri or "").strip()
+async def get_youtube_oauth_url(current_user: CurrentUserDep, db: DBSessionDep) -> YouTubeOAuthUrlResponse:
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    if not icfg.google_oauth_client_id:
+        raise HTTPException(status_code=500, detail="未配置 Google OAuth Client ID（请在集成设置中配置）")
+    redirect_uri = (icfg.google_oauth_redirect_uri or "").strip()
     if not redirect_uri:
-        raise HTTPException(status_code=500, detail="未配置 GOOGLE_OAUTH_REDIRECT_URI")
+        raise HTTPException(status_code=500, detail="未配置 Google OAuth Redirect URI（请在集成设置中配置）")
 
     state = secrets.token_urlsafe(24)
     params = {
-        "client_id": settings.google_oauth_client_id,
+        "client_id": icfg.google_oauth_client_id,
         "redirect_uri": redirect_uri,
         "response_type": "code",
         "access_type": "offline",
@@ -922,20 +922,21 @@ async def youtube_oauth_callback(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> YouTubeOAuthStatusResponse:
-    if not settings.google_oauth_client_id or not settings.google_oauth_client_secret:
-        raise HTTPException(status_code=500, detail="Google OAuth 配置不完整")
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    if not icfg.google_oauth_client_id or not icfg.google_oauth_client_secret:
+        raise HTTPException(status_code=500, detail="Google OAuth 配置不完整（请在集成设置中配置）")
     # 强制使用服务端配置的 redirect_uri，不接受客户端传入（防止开放重定向攻击）
-    redirect_uri = (settings.google_oauth_redirect_uri or "").strip()
+    redirect_uri = (icfg.google_oauth_redirect_uri or "").strip()
     if not redirect_uri:
-        raise HTTPException(status_code=500, detail="服务端未配置 GOOGLE_OAUTH_REDIRECT_URI")
+        raise HTTPException(status_code=500, detail="服务端未配置 Google OAuth Redirect URI（请在集成设置中配置）")
 
     async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
         token_resp = await client.post(
             "https://oauth2.googleapis.com/token",
             data={
                 "code": payload.code,
-                "client_id": settings.google_oauth_client_id,
-                "client_secret": settings.google_oauth_client_secret,
+                "client_id": icfg.google_oauth_client_id,
+                "client_secret": icfg.google_oauth_client_secret,
                 "redirect_uri": redirect_uri,
                 "grant_type": "authorization_code",
             },
@@ -1093,15 +1094,16 @@ async def _get_valid_youtube_access_token(db: DBSessionDep, current_user: Curren
     refresh_token = try_decrypt(current_user.youtube_refresh_token_encrypted)
     if not refresh_token:
         return access_token
-    if not settings.google_oauth_client_id or not settings.google_oauth_client_secret:
-        raise HTTPException(status_code=500, detail="Google OAuth 配置不完整，无法刷新 token")
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    if not icfg.google_oauth_client_id or not icfg.google_oauth_client_secret:
+        raise HTTPException(status_code=500, detail="Google OAuth 配置不完整，无法刷新 token（请在集成设置中配置）")
 
     async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
         resp = await client.post(
             "https://oauth2.googleapis.com/token",
             data={
-                "client_id": settings.google_oauth_client_id,
-                "client_secret": settings.google_oauth_client_secret,
+                "client_id": icfg.google_oauth_client_id,
+                "client_secret": icfg.google_oauth_client_secret,
                 "refresh_token": refresh_token,
                 "grant_type": "refresh_token",
             },

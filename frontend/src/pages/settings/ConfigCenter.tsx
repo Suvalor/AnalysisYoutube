@@ -98,6 +98,9 @@ type StorageFormValues = {
 
 type YoutubeFormValues = {
   youtube_api_key: string;
+  google_oauth_client_id: string;
+  google_oauth_client_secret: string;
+  google_oauth_redirect_uri: string;
 };
 
 type CVFormValues = {
@@ -204,7 +207,12 @@ export default function ConfigCenter() {
       tencent_cos_bucket: data.tencent_cos_bucket || "",
       tencent_custom_domain: data.tencent_custom_domain || "",
     });
-    youtubeForm.setFieldsValue({ youtube_api_key: "" });
+    youtubeForm.setFieldsValue({
+      youtube_api_key: "",
+      google_oauth_client_id: data.google_oauth_client_id || "",
+      google_oauth_client_secret: "",
+      google_oauth_redirect_uri: data.google_oauth_redirect_uri || "",
+    });
     cvForm.setFieldsValue({
       volc_cv_access_key_id: data.volc_cv_access_key_id || "",
       volc_cv_secret_access_key: "",
@@ -505,6 +513,12 @@ export default function ConfigCenter() {
       const payload: IntegrationSettingsUpdatePayload = {};
       const y = (values.youtube_api_key ?? "").trim();
       if (y && !looksLikeMaskedSecret(y)) payload.youtube_api_key = y;
+      const gcid = (values.google_oauth_client_id ?? "").trim();
+      if (gcid) payload.google_oauth_client_id = gcid;
+      const gcsec = (values.google_oauth_client_secret ?? "").trim();
+      if (gcsec && !looksLikeMaskedSecret(gcsec)) payload.google_oauth_client_secret = gcsec;
+      const guri = (values.google_oauth_redirect_uri ?? "").trim();
+      if (guri) payload.google_oauth_redirect_uri = guri;
       const updated = await updateIntegrationSettingsApi(payload);
       applyIntegrationReadToForms(updated);
       message.success("YouTube 配置已保存");
@@ -855,6 +869,34 @@ export default function ConfigCenter() {
                                   }
                                 >
                                   <Input.Password placeholder="粘贴新 Key 以覆盖组织配置" autoComplete="new-password" />
+                                </Form.Item>
+                                <div className="text-yc-text-secondary text-sm font-medium mt-4 mb-2">Google OAuth（YouTube 用户授权）</div>
+                                <p className="text-yc-text-tertiary text-xs mb-2">
+                                  用于 YouTube OAuth2 用户授权流程（上传视频、读取频道数据）。Client Secret 加密存储，留空不修改。
+                                </p>
+                                <Form.Item
+                                  name="google_oauth_client_id"
+                                  label="Client ID"
+                                >
+                                  <Input placeholder="xxx.apps.googleusercontent.com" autoComplete="off" />
+                                </Form.Item>
+                                <Form.Item
+                                  name="google_oauth_client_secret"
+                                  label="Client Secret"
+                                  extra={
+                                    integrationMeta?.has_google_oauth_client_secret
+                                      ? `已配置（${SECRET_MASK}），留空不修改`
+                                      : undefined
+                                  }
+                                >
+                                  <Input.Password placeholder="留空不修改" autoComplete="new-password" />
+                                </Form.Item>
+                                <Form.Item
+                                  name="google_oauth_redirect_uri"
+                                  label="Redirect URI"
+                                  extra="须与 Google Cloud Console 中 OAuth 应用的授权重定向 URI 一致"
+                                >
+                                  <Input placeholder="https://your-domain.com/api/youtube/oauth/callback" autoComplete="off" />
                                 </Form.Item>
                               </Form>
                             </div>

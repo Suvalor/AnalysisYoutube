@@ -76,6 +76,9 @@ async def _to_read(session, org_id: int, stored: dict[str, str]) -> IntegrationS
         "volc_cv_inpaint_req_key": merged.volc_cv_inpaint_req_key,
         "watermark_video_ai_max_frames": merged.watermark_video_ai_max_frames,
         "watermark_inpaint_prompt": merged.watermark_inpaint_prompt,
+        "google_oauth_client_id": merged.google_oauth_client_id,
+        "google_oauth_client_secret": merged.google_oauth_client_secret,
+        "google_oauth_redirect_uri": merged.google_oauth_redirect_uri,
     }
 
     for key in SECRET_PAYLOAD_KEYS:
@@ -85,6 +88,8 @@ async def _to_read(session, org_id: int, stored: dict[str, str]) -> IntegrationS
     for key in SEMI_SECRET_PAYLOAD_KEYS:
         if key in raw:
             raw[key] = _semi_secret_display(str(raw[key]))
+
+    raw["has_google_oauth_client_secret"] = bool(merged.google_oauth_client_secret)
 
     return IntegrationSettingsRead(**raw)
 

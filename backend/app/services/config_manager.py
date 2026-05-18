@@ -37,6 +37,10 @@ INTEGRATION_PAYLOAD_KEYS: frozenset[str] = frozenset(
         "volc_cv_region",
         "volc_cv_host",
         "volc_cv_inpaint_req_key",
+        # Google OAuth（YouTube 用户授权流程）
+        "google_oauth_client_id",
+        "google_oauth_client_secret",
+        "google_oauth_redirect_uri",
     }
 )
 
@@ -46,6 +50,7 @@ SECRET_PAYLOAD_KEYS: frozenset[str] = frozenset(
         "aliyun_access_key_secret",
         "tencent_cos_secret_key",
         "volc_cv_secret_access_key",
+        "google_oauth_client_secret",
     }
 )
 
@@ -128,6 +133,9 @@ class ResolvedIntegrationConfig:
     volc_cv_inpaint_req_key: str
     watermark_video_ai_max_frames: int
     watermark_inpaint_prompt: str
+    google_oauth_client_id: str
+    google_oauth_client_secret: str
+    google_oauth_redirect_uri: str
 
 
 def merge_integration_config(db_payload: dict[str, str] | None, s: Settings | None = None) -> ResolvedIntegrationConfig:
@@ -157,6 +165,9 @@ def merge_integration_config(db_payload: dict[str, str] | None, s: Settings | No
             d, "watermark_video_ai_max_frames", 180, lo=1, hi=10000
         ),
         watermark_inpaint_prompt=_pick_str(d, "watermark_inpaint_prompt", DEFAULT_WATERMARK_INPAINT_PROMPT),
+        google_oauth_client_id=_pick_str(d, "google_oauth_client_id", base.google_oauth_client_id),
+        google_oauth_client_secret=_pick_str(d, "google_oauth_client_secret", base.google_oauth_client_secret),
+        google_oauth_redirect_uri=_pick_str(d, "google_oauth_redirect_uri", base.google_oauth_redirect_uri),
     )
 
 
