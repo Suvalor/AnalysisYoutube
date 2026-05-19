@@ -1,8 +1,10 @@
-# UI 设计文档：用户分层与订阅管理界面
+# 范围变更：用户分层与订阅管理界面
 
 > 文档类型：UI/UX 设计规范
-> 日期：2026-05-19
-> 状态：待评审
+**日期**：2026-05-19
+**状态**：待处理
+**优先级**：P0 — 核心需求（附属 PRD）
+**技能**：baseline-ui, react-ui-patterns, fixing-accessibility
 > 父文档：[用户分层与权限体系重构 PRD](./20260519-user-tier-permission-redesign.md)
 
 ---
