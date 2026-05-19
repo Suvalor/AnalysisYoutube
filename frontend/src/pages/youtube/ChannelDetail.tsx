@@ -124,11 +124,12 @@ export default function ChannelDetail({ channelId }: Props) {
   };
 
   const videoModelOptions = useMemo(() => {
+    const multiLib = libraryModels.length > 1;
     const dedup = new Map<string, { value: string; label: string }>();
     for (const m of libraryModels) {
       const values = parseSupportedModels(m.supported_models_json);
       for (const v of values) {
-        dedup.set(v, { value: v, label: `${m.name} / ${v}` });
+        dedup.set(v, { value: v, label: multiLib ? `${v} (${m.name})` : v });
       }
     }
     return Array.from(dedup.values());

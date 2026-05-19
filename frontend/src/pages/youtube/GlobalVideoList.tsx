@@ -57,6 +57,7 @@ const VIDEO_SORT_METRICS = [
 type ModelOption = { value: string; label: string };
 
 function toModelOptions(rows: ModelItem[]): ModelOption[] {
+  const multiLib = rows.length > 1;
   const out: ModelOption[] = [];
   for (const row of rows) {
     const raw = row.supported_models_json?.trim();
@@ -66,12 +67,13 @@ function toModelOptions(rows: ModelItem[]): ModelOption[] {
       if (!Array.isArray(arr)) continue;
       for (const item of arr) {
         if (typeof item === "string" && item.trim()) {
-          out.push({ value: item.trim(), label: `${row.name} / ${item.trim()}` });
+          const name = item.trim();
+          out.push({ value: name, label: multiLib ? `${name} (${row.name})` : name });
         } else if (item && typeof item === "object") {
           const v = String(item.value ?? "").trim();
           if (!v) continue;
-          const label = String((item as { label?: string }).label ?? v).trim();
-          out.push({ value: v, label: `${row.name} / ${label}` });
+          const display = String((item as { label?: string }).label ?? v).trim();
+          out.push({ value: v, label: multiLib ? `${display} (${row.name})` : display });
         }
       }
     } catch {
