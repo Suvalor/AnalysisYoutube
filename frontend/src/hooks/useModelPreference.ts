@@ -12,9 +12,13 @@ function readPreferenceMap(): ModelPreferenceMap {
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object") return {};
     const entries = Object.entries(parsed as Record<string, unknown>).filter(
-      ([k, v]) => typeof k === "string" && typeof v === "string"
+      (entry): entry is [string, string] => typeof entry[0] === "string" && typeof entry[1] === "string"
     );
-    return Object.fromEntries(entries);
+    const result: ModelPreferenceMap = {};
+    for (const [k, v] of entries) {
+      result[k] = v;
+    }
+    return result;
   } catch {
     return {};
   }

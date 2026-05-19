@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.models.user import UserRole
 
 
 class UserSettingsRead(BaseModel):
@@ -38,3 +40,21 @@ class UserSettingsUpdate(BaseModel):
         None,
         description="语言偏好（zh-CN/en-US/ja-JP/ko-KR）；null 表示使用默认",
     )
+
+
+class UserRoleUpdate(BaseModel):
+    """管理员修改用户角色请求体；不允许设为 guest。"""
+
+    role: str = Field(
+        ...,
+        description=f"目标角色，可选值：{UserRole.USER}, {UserRole.SUBSCRIBER}, {UserRole.ADMIN}",
+    )
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        """验证角色值合法性，不允许设为 guest。"""
+        allowed = {UserRole.USER, UserRole.SUBSCRIBER, UserRole.ADMIN}
+        if v not in allowed:
+            raise ValueError(f"不允许的角色值：{v}，仅允许 {', '.join(sorted(allowed))}")
+        return v

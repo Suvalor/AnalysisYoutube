@@ -1,8 +1,8 @@
 """蓝海雷达 API（仅查询 YouTube，不落库）。"""
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
-from app.api.deps import CurrentUserDep, DBSessionDep
+from app.api.deps import CurrentUserDep, DBSessionDep, create_quota_guard
 from app.schemas.radar import (
     BlueOceanChannelItem,
     BlueOceanRadarRequest,
@@ -68,6 +68,7 @@ async def blue_ocean_scan(
     body: BlueOceanRadarRequest,
     db: DBSessionDep,
     current_user: CurrentUserDep,
+    _quota: bool = Depends(create_quota_guard("youtube_api")),
 ) -> BlueOceanRadarResponse:
     """
     调用 YouTube search.list + videos.list + channels.list，按粉丝上限与爆款系数过滤。
@@ -104,6 +105,7 @@ async def radar_ai_retrospective(
     body: RadarAiRetrospectiveRequest,
     db: DBSessionDep,
     current_user: CurrentUserDep,
+    _quota: bool = Depends(create_quota_guard("llm_api")),
 ) -> RadarAiRetrospectiveResponse:
     # 加载对话记忆
     entity_type = "radar_retro"

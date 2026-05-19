@@ -25,7 +25,7 @@ import {
   Youtube,
   Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -54,13 +54,16 @@ import SeoScoring from "@/pages/seo/SeoScoring";
 import TrendDiscovery from "@/pages/trend/TrendDiscovery";
 import ChannelGrowthDashboard from "@/pages/growth/ChannelGrowthDashboard";
 import DownloadList from "@/pages/youtube/DownloadList";
-import { isFeatureEnabled, type FeatureKey } from "@/config/features";
+import { isFeatureEnabled, hasRole, type FeatureKey } from "@/config/features";
+import { UserRole } from "@/types/auth";
 import { useThemeStore } from "@/store/useThemeStore";
 import { useI18nStore } from "@/store/useI18nStore";
 import { getUserSettingsApi } from "@/services/userApi";
-
-/** 品牌色使用 CSS 变量，支持主题切换 */
-const BRAND_BLUE = "var(--color-primary)";
+import QuotaProgress from "@/components/QuotaProgress";
+import GuestLimitModal from "@/components/GuestLimitModal";
+import RequireRole from "@/components/RequireRole";
+import { fetchGuestQuotaUsage, isGuestQuotaExhausted } from "@/services/guestService";
+import type { QuotaUsage } from "@/types/auth";
 
 function BrandMark() {
   return (
@@ -91,32 +94,45 @@ type NavDef = {
   type: TabType;
   tabId: string;
   featureKey?: FeatureKey;
+  minRole?: UserRole;
 };
 
-/** 顺序：出海核心 → 监控 → 系统；创作者工具通过 Feature Flag 控制 */
+/** 顺序：出海核心 -> 监控 -> 系统；创作者工具通过 Feature Flag + 角色控制 */
 const navDefs: NavDef[] = [
-  { path: "/dashboard", labelKey: "nav:dashboard", icon: Home, type: "dashboard", tabId: "dashboard" },
-  { path: "/blue-ocean-radar", labelKey: "nav:blueOceanRadar", icon: Waves, type: "blue-ocean-radar", tabId: "blue-ocean-radar" },
-  { path: "/keyword-research", labelKey: "nav:keywordResearch", icon: Search, type: "keyword-research", tabId: "keyword-research" },
-  { path: "/seo-scoring", labelKey: "nav:seoScoring", icon: Zap, type: "seo-scoring", tabId: "seo-scoring" },
-  { path: "/trend-discovery", labelKey: "nav:trendDiscovery", icon: TrendingUp, type: "trend-discovery", tabId: "trend-discovery" },
-  { path: "/navigation-guide", labelKey: "nav:navigationGuide", icon: Compass, type: "navigation-guide", tabId: "navigation-guide" },
-  { path: "/competitor-analysis", labelKey: "nav:competitorAnalysis", icon: BarChart3, type: "competitor-analysis", tabId: "competitor-analysis" },
-  { path: "/channel-growth", labelKey: "nav:channelGrowth", icon: Activity, type: "channel-growth", tabId: "channel-growth" },
-  { path: "/youtube/channels", labelKey: "nav:channelManagement", icon: Youtube, type: "channel-list", tabId: "channel-list" },
-  { path: "/youtube/videos", labelKey: "nav:globalVideos", icon: Video, type: "global-videos", tabId: "global-videos" },
-  { path: "/video-board", labelKey: "nav:videoBoard", icon: Kanban, type: "video-board", tabId: "video-board" },
-  { path: "/downloads", labelKey: "nav:downloadManager", icon: Download, type: "download-list", tabId: "download-list" },
-  { path: "/config-center", labelKey: "nav:configCenter", icon: Settings, type: "config-center", tabId: "config-center" },
-  // 创作者工具（Feature Flag 控制）
-  { path: "/inspiration-pool", labelKey: "nav:inspirationPool", icon: Lightbulb, type: "inspiration-pool", tabId: "inspiration-pool", featureKey: "INSPIRATION_POOL" },
-  { path: "/ai-creator", labelKey: "nav:aiCreator", icon: WandSparkles, type: "ai-creator", tabId: "ai-creator", featureKey: "AI_CREATOR" },
-  { path: "/sop-workflow", labelKey: "nav:sopWorkflow", icon: Clapperboard, type: "sop-workflow", tabId: "sop-workflow", featureKey: "SOP_WORKFLOW" },
-  { path: "/assets", labelKey: "nav:assetLibrary", icon: Image, type: "assets", tabId: "assets", featureKey: "ASSET_LIBRARY" },
-  { path: "/knowledge-base", labelKey: "nav:knowledgeBase", icon: Library, type: "knowledge-base", tabId: "knowledge-base", featureKey: "KNOWLEDGE_BASE" },
-  { path: "/feishu-workspace", labelKey: "nav:feishuWorkspace", icon: Cloud, type: "feishu-workspace", tabId: "feishu-workspace", featureKey: "FEISHU_DOCS" },
+  { path: "/dashboard", labelKey: "nav:dashboard", icon: Home, type: "dashboard", tabId: "dashboard", minRole: UserRole.ADMIN },
+  { path: "/blue-ocean-radar", labelKey: "nav:blueOceanRadar", icon: Waves, type: "blue-ocean-radar", tabId: "blue-ocean-radar", minRole: UserRole.USER },
+  { path: "/keyword-research", labelKey: "nav:keywordResearch", icon: Search, type: "keyword-research", tabId: "keyword-research", minRole: UserRole.GUEST },
+  { path: "/seo-scoring", labelKey: "nav:seoScoring", icon: Zap, type: "seo-scoring", tabId: "seo-scoring", minRole: UserRole.GUEST },
+  { path: "/trend-discovery", labelKey: "nav:trendDiscovery", icon: TrendingUp, type: "trend-discovery", tabId: "trend-discovery", minRole: UserRole.GUEST },
+  { path: "/navigation-guide", labelKey: "nav:navigationGuide", icon: Compass, type: "navigation-guide", tabId: "navigation-guide", minRole: UserRole.USER },
+  { path: "/competitor-analysis", labelKey: "nav:competitorAnalysis", icon: BarChart3, type: "competitor-analysis", tabId: "competitor-analysis", minRole: UserRole.USER },
+  { path: "/channel-growth", labelKey: "nav:channelGrowth", icon: Activity, type: "channel-growth", tabId: "channel-growth", minRole: UserRole.USER },
+  { path: "/youtube/channels", labelKey: "nav:channelManagement", icon: Youtube, type: "channel-list", tabId: "channel-list", minRole: UserRole.USER },
+  { path: "/youtube/videos", labelKey: "nav:globalVideos", icon: Video, type: "global-videos", tabId: "global-videos", minRole: UserRole.USER },
+  { path: "/video-board", labelKey: "nav:videoBoard", icon: Kanban, type: "video-board", tabId: "video-board", minRole: UserRole.USER },
+  { path: "/downloads", labelKey: "nav:downloadManager", icon: Download, type: "download-list", tabId: "download-list", minRole: UserRole.USER },
+  { path: "/config-center", labelKey: "nav:configCenter", icon: Settings, type: "config-center", tabId: "config-center", minRole: UserRole.USER },
+  // 创作者工具（Feature Flag + 角色控制，PRD 6.1 要求仅管理员可见）
+  { path: "/inspiration-pool", labelKey: "nav:inspirationPool", icon: Lightbulb, type: "inspiration-pool", tabId: "inspiration-pool", featureKey: "INSPIRATION_POOL", minRole: UserRole.ADMIN },
+  { path: "/ai-creator", labelKey: "nav:aiCreator", icon: WandSparkles, type: "ai-creator", tabId: "ai-creator", featureKey: "AI_CREATOR", minRole: UserRole.ADMIN },
+  { path: "/sop-workflow", labelKey: "nav:sopWorkflow", icon: Clapperboard, type: "sop-workflow", tabId: "sop-workflow", featureKey: "SOP_WORKFLOW", minRole: UserRole.ADMIN },
+  { path: "/assets", labelKey: "nav:assetLibrary", icon: Image, type: "assets", tabId: "assets", featureKey: "ASSET_LIBRARY", minRole: UserRole.ADMIN },
+  { path: "/knowledge-base", labelKey: "nav:knowledgeBase", icon: Library, type: "knowledge-base", tabId: "knowledge-base", featureKey: "KNOWLEDGE_BASE", minRole: UserRole.ADMIN },
+  { path: "/feishu-workspace", labelKey: "nav:feishuWorkspace", icon: Cloud, type: "feishu-workspace", tabId: "feishu-workspace", featureKey: "FEISHU_DOCS", minRole: UserRole.ADMIN },
 ];
 
+/** 标签页类型到最低角色的映射，用于页面级权限守卫。
+ * 从 navDefs 自动派生，避免 DRY 违规；动态标签页（不在侧边栏导航中）需手动补充。 */
+const TAB_MIN_ROLE: Partial<Record<TabType, UserRole>> = {
+  ...Object.fromEntries(
+    navDefs.filter(d => d.minRole).map(d => [d.type, d.minRole!])
+  ),
+  // 动态标签页守卫：这些标签页不在 navDefs 中，需手动补充纵深防御
+  "agent-edit": UserRole.USER,
+  "personal-settings": UserRole.USER,
+};
+
+/** 根据标签页类型渲染对应的页面组件 */
 function renderTabPanel(tab: TabItem) {
   switch (tab.type) {
     case "dashboard":
@@ -181,7 +197,7 @@ export default function TabbedShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation(["nav", "common"]);
-  const { setToken } = useAuth();
+  const { role, token, setToken, quotaUsage } = useAuth();
   const {
     tabs,
     activeTabId,
@@ -197,10 +213,49 @@ export default function TabbedShell() {
   } = useTabStore();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // 启动时从后端同步主题和语言偏好
+  /** 游客配额弹窗状态 */
+  const [guestLimitOpen, setGuestLimitOpen] = useState(false);
+  const [guestQuotaUsage, setGuestQuotaUsage] = useState<QuotaUsage | null>(null);
+
+  /** 游客模式下初始化配额数据，配额耗尽时自动弹出提示 */
+  useEffect(() => {
+    if (token) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const usage = await fetchGuestQuotaUsage();
+        if (mounted) {
+          setGuestQuotaUsage(usage);
+          if (isGuestQuotaExhausted(usage)) {
+            setGuestLimitOpen(true);
+          }
+        }
+      } catch {
+        // 配额接口不可用时静默处理
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [token]);
+
+  /** 监听 429 配额耗尽全局事件，自动弹出 GuestLimitModal */
+  useEffect(() => {
+    const handleQuotaExhausted = () => {
+      setGuestLimitOpen(true);
+    };
+    window.addEventListener("quota-exhausted", handleQuotaExhausted);
+    return () => {
+      window.removeEventListener("quota-exhausted", handleQuotaExhausted);
+    };
+  }, []);
+
+  // 启动时从后端同步主题和语言偏好（仅已登录用户）
   const syncFromServer = useThemeStore((s) => s.syncFromServer);
   const syncLocaleFromServer = useI18nStore((s) => s.syncFromServer);
   useEffect(() => {
+    /** 未登录时跳过 API 调用，避免游客模式触发 401 */
+    if (!token) return;
     let mounted = true;
     (async () => {
       try {
@@ -216,7 +271,7 @@ export default function TabbedShell() {
     return () => {
       mounted = false;
     };
-  }, [syncFromServer, syncLocaleFromServer]);
+  }, [token, syncFromServer, syncLocaleFromServer]);
 
   // 初始化固定标签 ID 集合（navDefs 中的标签为固定标签，不可被批量关闭）
   useEffect(() => {
@@ -342,7 +397,7 @@ export default function TabbedShell() {
       </div>
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {navDefs
-          .filter((def) => !def.featureKey || isFeatureEnabled(def.featureKey))
+          .filter((def) => (!def.featureKey || isFeatureEnabled(def.featureKey)) && (!def.minRole || hasRole(role, def.minRole)))
           .map((def) => {
           const Icon = def.icon;
           const active = activeTabId === def.tabId;
@@ -366,6 +421,15 @@ export default function TabbedShell() {
           );
         })}
       </nav>
+      {/* 已登录用户显示配额进度摘要 */}
+      {token && quotaUsage && (
+        <div
+          className="px-4 py-3 shrink-0"
+          style={{ borderTop: "1px solid var(--color-border)" }}
+        >
+          <QuotaProgress usage={quotaUsage} />
+        </div>
+      )}
     </aside>
   );
 
@@ -403,49 +467,63 @@ export default function TabbedShell() {
             </h1>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <Dropdown
-              menu={{
-                items: [
-                  {
-                    key: "personal-settings",
-                    icon: <User size={14} />,
-                    label: t("nav:personalSettings"),
-                    onClick: () => {
-                      openTab({
-                        id: "personal-settings",
-                        title: t("nav:personalSettings"),
-                        path: "/personal-settings",
-                        type: "personal-settings",
-                      });
-                      navigate("/personal-settings");
+            {token ? (
+              <Dropdown
+                menu={{
+                  items: [
+                    {
+                      key: "personal-settings",
+                      icon: <User size={14} />,
+                      label: t("nav:personalSettings"),
+                      onClick: () => {
+                        openTab({
+                          id: "personal-settings",
+                          title: t("nav:personalSettings"),
+                          path: "/personal-settings",
+                          type: "personal-settings",
+                        });
+                        navigate("/personal-settings");
+                      },
                     },
-                  },
-                  {
-                    type: "divider",
-                  },
-                  {
-                    key: "logout",
-                    icon: <LogOut size={14} />,
-                    label: t("common:action.logout"),
-                    danger: true,
-                    onClick: logout,
-                  },
-                ],
-              }}
-              trigger={["click"]}
-            >
+                    {
+                      type: "divider",
+                    },
+                    {
+                      key: "logout",
+                      icon: <LogOut size={14} />,
+                      label: t("common:action.logout"),
+                      danger: true,
+                      onClick: logout,
+                    },
+                  ],
+                }}
+                trigger={["click"]}
+              >
+                <button
+                  type="button"
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-sm cursor-pointer"
+                  style={{
+                    backgroundColor: "var(--color-bg-inset)",
+                    color: "var(--color-text-secondary)",
+                  }}
+                  aria-label="用户菜单"
+                >
+                  U
+                </button>
+              </Dropdown>
+            ) : (
               <button
                 type="button"
-                className="h-8 w-8 rounded-full flex items-center justify-center text-sm cursor-pointer"
+                className="px-3 py-1.5 rounded-md text-sm cursor-pointer"
                 style={{
-                  backgroundColor: "var(--color-bg-inset)",
-                  color: "var(--color-text-secondary)",
+                  backgroundColor: "var(--color-primary)",
+                  color: "#fff",
                 }}
-                aria-label="用户菜单"
+                onClick={() => navigate("/login")}
               >
-                U
+                {t("common:action.login")}
               </button>
-            </Dropdown>
+            )}
           </div>
         </header>
 
@@ -530,15 +608,24 @@ export default function TabbedShell() {
         </div>
 
         <main className="flex-1 min-h-0 overflow-hidden relative">
-          {tabs.map((tab) => (
-            <div
-              key={tab.id}
-              className={tab.id === activeTabId ? "h-full overflow-y-auto" : "hidden"}
-              aria-hidden={tab.id !== activeTabId}
-            >
-              {renderTabPanel(tab)}
-            </div>
-          ))}
+          {tabs.map((tab) => {
+            /** 页面级权限守卫：根据标签页类型查找最低角色要求 */
+            const minRole = TAB_MIN_ROLE[tab.type];
+            const content = renderTabPanel(tab);
+            return (
+              <div
+                key={tab.id}
+                className={tab.id === activeTabId ? "h-full overflow-y-auto" : "hidden"}
+                aria-hidden={tab.id !== activeTabId}
+              >
+                {minRole ? (
+                  <RequireRole requiredRole={minRole}>{content}</RequireRole>
+                ) : (
+                  content
+                )}
+              </div>
+            );
+          })}
         </main>
       </div>
 
@@ -548,6 +635,13 @@ export default function TabbedShell() {
           <div className="absolute left-0 top-0 h-full w-72">{SidebarContent}</div>
         </div>
       )}
+
+      {/* 游客配额耗尽弹窗 */}
+      <GuestLimitModal
+        open={guestLimitOpen}
+        onClose={() => setGuestLimitOpen(false)}
+        usage={guestQuotaUsage}
+      />
     </div>
   );
 }

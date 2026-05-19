@@ -30,6 +30,7 @@ class UserRead(BaseModel):
     email_verified: bool = False
     created_at: datetime
     is_active: bool
+    role: str = "user"
 
     model_config = {
         "from_attributes": True,
@@ -41,6 +42,7 @@ class Token(BaseModel):
 
     access_token: str
     token_type: str = "bearer"
+    role: str = "user"
 
 
 # ---------- 新增：图形验证码 ----------
@@ -55,12 +57,13 @@ class CaptchaResponse(BaseModel):
 # ---------- 新增：注册（手机号+邮箱+验证码） ----------
 
 class RegisterRequest(BaseModel):
-    """注册请求体（邮箱+验证码，手机号可选）."""
+    """注册请求体（邮箱+验证码，手机号可选，邀请码可选）."""
 
     phone: str | None = Field(None, min_length=11, max_length=11, description="手机号（可选）")
     email: EmailStr = Field(..., description="邮箱")
     password: str = Field(..., min_length=12, max_length=128, repr=False, description="明文密码")
     email_code: str = Field(..., min_length=6, max_length=6, description="邮箱验证码")
+    invite_code: str | None = Field(None, min_length=6, max_length=6, description="管理员邀请码（可选）")
 
     @field_validator("password")
     @classmethod

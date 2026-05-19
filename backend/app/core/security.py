@@ -24,7 +24,7 @@ def create_access_token(
     data: dict,
     expires_delta: Optional[timedelta] = None,
 ) -> str:
-    """创建 JWT 访问令牌。"""
+    """创建 JWT 访问令牌，data 中应包含 sub（用户标识）和 role（用户角色）。"""
     to_encode: dict[str, Any] = data.copy()
     expire = datetime.now(timezone.utc) + (
         expires_delta

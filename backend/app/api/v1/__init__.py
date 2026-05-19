@@ -27,6 +27,8 @@ from app.api.v1 import users
 from app.api.v1 import video_projects
 from app.api.v1 import videos
 from app.api.v1 import youtube
+from app.api.v1 import subscriptions
+from app.api.v1 import quota
 
 
 api_router_v1 = APIRouter()
@@ -59,4 +61,6 @@ api_router_v1.include_router(users.router, prefix="/users", tags=["users"])
 api_router_v1.include_router(integration_settings.router, prefix="/users", tags=["integration-settings"])
 api_router_v1.include_router(downloads.router, prefix="/downloads", tags=["downloads"])
 api_router_v1.include_router(feishu_docs.router, prefix="/feishu_docs", tags=["feishu-docs"])
+api_router_v1.include_router(subscriptions.router, prefix="/subscriptions", tags=["subscriptions"])
+api_router_v1.include_router(quota.router, prefix="/quota", tags=["quota"])
 

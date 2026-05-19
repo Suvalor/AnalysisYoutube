@@ -21,7 +21,7 @@ _SENSITIVE_FIELDS = frozenset({"password", "new_password", "confirm_password"})
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(app: FastAPI):
     # 日志级别 + 脱敏过滤器
     level = getattr(logging, settings.log_level.upper(), logging.INFO)
     root = logging.getLogger()
@@ -37,6 +37,26 @@ async def lifespan(_: FastAPI):
         root.addHandler(handler)
     # 确保 request logger 跟随 LOG_LEVEL
     logging.getLogger("request").setLevel(level)
+
+    # 启动时检查是否存在 admin 用户，若无则打印邀请链接到日志
+    from app.db.session import AsyncSessionLocal
+    from app.models.user import UserRole
+    from sqlalchemy import select, func
+    from app.models.user import User
+
+    async with AsyncSessionLocal() as session:
+        admin_count = await session.execute(
+            select(func.count()).where(User.role == UserRole.ADMIN)
+        )
+        count = admin_count.scalar()
+        if count == 0:
+            logger = logging.getLogger("startup")
+            logger.warning(
+                "系统中无 admin 用户。请先注册普通用户，然后通过邀请码升级为 admin。"
+                "邀请码可通过 POST /api/auth/admin-invite 生成（需已有 admin）。"
+                "首次部署时请手动在数据库中将用户 role 改为 admin。"
+            )
+
     start_scheduler()
     try:
         yield

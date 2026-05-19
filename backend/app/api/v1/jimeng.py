@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import CurrentUserDep
+from app.api.deps import CurrentUserDep, create_quota_guard
 from app.db.session import get_session
 from app.crud.library import get_by_user
 from app.models.library import ModelLibrary
@@ -65,6 +65,7 @@ async def jimeng_submit(
     req: JimengSubmitRequest,
     user: CurrentUserDep,
     db: AsyncSession = Depends(get_session),
+    _quota: bool = Depends(create_quota_guard("cv_api")),
 ) -> dict[str, Any]:
     cfg = await _resolve_jimeng_config(db, user.id, user.org_id)
     return await submit_task(

@@ -25,4 +25,8 @@ from app.models.seo_score import SeoScoreRecord  # noqa: F401,E402
 from app.models.download_task import DownloadTask  # noqa: F401,E402
 from app.models.mix_task import MixTask  # noqa: F401,E402
 from app.models.video_highlight import VideoHighlight  # noqa: F401,E402
+from app.models.subscription_plan import SubscriptionPlan  # noqa: F401,E402
+from app.models.user_subscription import UserSubscription  # noqa: F401,E402
+from app.models.admin_invitation import AdminInvitation  # noqa: F401,E402
+from app.models.guest_session import GuestSession  # noqa: F401,E402
 

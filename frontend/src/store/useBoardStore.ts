@@ -1,7 +1,21 @@
 import { create } from "zustand";
 import apiClient from "../services/apiClient";
 
-export const BOARD_COLUMNS = [
+/** 看板任务数据结构 */
+type BoardTaskItem = {
+  id: number;
+  title: string;
+  status: string;
+  order_index: number;
+};
+
+/** 看板列定义 */
+type BoardColumn = {
+  id: string;
+  title: string;
+};
+
+export const BOARD_COLUMNS: BoardColumn[] = [
   { id: "idea", title: "构思中 (Idea)" },
   { id: "scripting", title: "写本中 (Scripting)" },
   { id: "shooting", title: "拍摄中 (Shooting)" },
@@ -9,12 +23,13 @@ export const BOARD_COLUMNS = [
   { id: "completed", title: "已完成 (Completed)" },
 ];
 
-function normalizeOrders(tasks) {
-  const grouped = BOARD_COLUMNS.reduce((acc, col) => {
+/** 按列分组并重排 order_index */
+function normalizeOrders(tasks: BoardTaskItem[]): BoardTaskItem[] {
+  const grouped = BOARD_COLUMNS.reduce<Record<string, BoardTaskItem[]>>((acc, col) => {
     acc[col.id] = tasks.filter((t) => t.status === col.id).sort((a, b) => a.order_index - b.order_index);
     return acc;
   }, {});
-  const result = [];
+  const result: BoardTaskItem[] = [];
   for (const col of BOARD_COLUMNS) {
     grouped[col.id].forEach((task, index) => {
       result.push({ ...task, order_index: index });
@@ -23,16 +38,26 @@ function normalizeOrders(tasks) {
   return result;
 }
 
-export const useBoardStore = create((set, get) => ({
+type BoardState = {
+  columns: BoardColumn[];
+  tasks: BoardTaskItem[];
+  fetchTasks: () => Promise<void>;
+  createTask: (title: string) => Promise<void>;
+  moveTask: (activeTaskId: number, targetStatus: string, targetIndex: number) => Promise<void>;
+};
+
+export const useBoardStore = create<BoardState>((set, get) => ({
   columns: BOARD_COLUMNS,
   tasks: [],
 
+  /** 从后端拉取看板任务列表 */
   fetchTasks: async () => {
     const res = await apiClient.get("/api/video-projects");
     set({ tasks: normalizeOrders(res.data || []) });
   },
 
-  createTask: async (title) => {
+  /** 创建新看板任务 */
+  createTask: async (title: string) => {
     const res = await apiClient.post("/api/video-projects", {
       title,
       status: "idea",
@@ -42,7 +67,8 @@ export const useBoardStore = create((set, get) => ({
     }));
   },
 
-  moveTask: async (activeTaskId, targetStatus, targetIndex) => {
+  /** 拖拽移动看板任务到目标列和位置 */
+  moveTask: async (activeTaskId: number, targetStatus: string, targetIndex: number) => {
     const current = [...get().tasks];
     const activeIndex = current.findIndex((t) => t.id === activeTaskId);
     if (activeIndex === -1) return;
@@ -70,4 +96,3 @@ export const useBoardStore = create((set, get) => ({
     await apiClient.put("/api/video-projects/reorder", payload);
   },
 }));
-

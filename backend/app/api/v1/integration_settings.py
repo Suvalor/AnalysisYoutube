@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
 
-from app.api.deps import CurrentUserDep, DBSessionDep
+from app.api.deps import AdminDep, CurrentUserDep, DBSessionDep
 from app.crud.org_settings import (
     delete_org_integration_settings,
     get_org_integration_payload_dict,
@@ -111,13 +111,14 @@ async def get_integration_settings(db: DBSessionDep, current_user: CurrentUserDe
     return await _to_read(db, org_id, stored)
 
 
-@router.put("/me/integration-settings", response_model=IntegrationSettingsRead, summary="增量更新组织集成配置")
+@router.put("/me/integration-settings", response_model=IntegrationSettingsRead, summary="增量更新组织集成配置（仅管理员）")
 async def put_integration_settings(
     body: IntegrationSettingsUpdate,
     db: DBSessionDep,
-    current_user: CurrentUserDep,
+    admin: AdminDep,
 ) -> IntegrationSettingsRead:
-    org_id = _require_org_id(current_user)
+    """管理员增量更新组织集成配置，普通用户无权修改。"""
+    org_id = _require_org_id(admin)
     inner = await get_org_integration_payload_dict(db, org_id)
     incoming = body.model_dump(exclude_unset=True)
 

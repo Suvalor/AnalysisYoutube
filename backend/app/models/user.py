@@ -3,13 +3,22 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
 
 if TYPE_CHECKING:
     from app.models.organization import Organization
+
+
+class UserRole(str):
+    """用户角色枚举常量。"""
+
+    GUEST = "guest"
+    USER = "user"
+    SUBSCRIBER = "subscriber"
+    ADMIN = "admin"
 
 
 class User(Base):
@@ -28,6 +37,11 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="1")
+    role: Mapped[str] = mapped_column(
+        Enum("guest", "user", "subscriber", "admin", name="userrole"),
+        nullable=False,
+        server_default="user",
+    )
     org_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("organizations.id", ondelete="RESTRICT"),

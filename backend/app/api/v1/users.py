@@ -2,10 +2,11 @@ import json
 
 from fastapi import APIRouter, HTTPException, status
 
-from app.api.deps import CurrentUserDep, DBSessionDep
-from app.crud.user import update_user_settings
-from app.models.user import User
-from app.schemas.user import UserSettingsRead, UserSettingsUpdate
+from app.api.deps import AdminDep, CurrentUserDep, DBSessionDep
+from app.crud.user import update_user_role, update_user_settings
+from app.models.user import User, UserRole
+from app.schemas.auth import UserRead
+from app.schemas.user import UserRoleUpdate, UserSettingsRead, UserSettingsUpdate
 from app.services.field_encryption import encrypt_plaintext
 
 
@@ -131,3 +132,32 @@ async def update_me_settings(
 
     user = await update_user_settings(db, current_user, patch=patch)
     return _to_settings_read(user)
+
+
+@router.patch(
+    "/{user_id}/role",
+    response_model=UserRead,
+    summary="管理员修改用户角色",
+)
+async def patch_user_role(
+    user_id: int,
+    role_in: UserRoleUpdate,
+    db: DBSessionDep,
+    _admin: AdminDep,
+) -> UserRead:
+    """管理员修改指定用户的角色，不允许设为 guest。"""
+    # 验证角色值合法性（不允许设为 guest）
+    allowed_roles = {UserRole.USER, UserRole.SUBSCRIBER, UserRole.ADMIN}
+    if role_in.role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"不允许的角色值：{role_in.role}，仅允许 {', '.join(sorted(allowed_roles))}",
+        )
+    try:
+        user = await update_user_role(db, user_id, role_in.role)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    return UserRead.model_validate(user)

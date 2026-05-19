@@ -57,7 +57,7 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
       // Upload audio file if in file mode
       if (audioMode === 'file' && audioFile) {
         try {
-          const uploadRes = await uploadAssetWithProcessApi({ file: audioFile });
+          const uploadRes = await uploadAssetWithProcessApi({ file: audioFile, remove_watermark: false });
           audioFileId = String(uploadRes.id);
         } catch (err: unknown) {
           const d = err && typeof err === 'object' && 'response' in err

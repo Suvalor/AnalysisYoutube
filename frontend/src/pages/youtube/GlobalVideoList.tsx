@@ -446,10 +446,10 @@ export default function GlobalVideoList() {
                   channel_id: undefined,
                   definition: undefined,
                   privacy_status: undefined,
-                  sort_publish_time: "desc",
-                  sort_view_count: undefined,
-                  sort_like_count: undefined,
-                  sort_comment_count: undefined,
+                  sort_publish_time: "desc" as "asc" | "desc" | undefined,
+                  sort_view_count: undefined as "asc" | "desc" | undefined,
+                  sort_like_count: undefined as "asc" | "desc" | undefined,
+                  sort_comment_count: undefined as "asc" | "desc" | undefined,
                 };
                 setFilters(reset);
                 void loadVideos(1, pageSize, reset);

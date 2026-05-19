@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.user import User
+from app.models.user import User, UserRole
 
 # update_user_settings 允许写入的字段白名单，防止 Mass Assignment
 _ALLOWED_SETTINGS_FIELDS = frozenset({
@@ -43,6 +43,7 @@ async def create_user(
     hashed_password: str,
     phone: str | None = None,
     org_id: int = 1,
+    role: str = "user",
 ) -> User:
     """创建新用户，处理唯一约束冲突由上层捕获。"""
     user = User(
@@ -50,6 +51,7 @@ async def create_user(
         hashed_password=hashed_password,
         phone=phone,
         org_id=org_id,
+        role=role,
     )
     session.add(user)
     try:
@@ -71,6 +73,31 @@ async def update_user_settings(
     for key, value in patch.items():
         if key in _ALLOWED_SETTINGS_FIELDS:
             setattr(user, key, value)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise
+    await session.refresh(user)
+    return user
+
+
+async def update_user_role(
+    session: AsyncSession,
+    user_id: int,
+    new_role: str,
+) -> User:
+    """更新指定用户的角色，仅允许 user/subscriber/admin 三种角色。"""
+    allowed_roles = {UserRole.USER, UserRole.SUBSCRIBER, UserRole.ADMIN}
+    if new_role not in allowed_roles:
+        raise ValueError(f"不允许的角色值：{new_role}，仅允许 {', '.join(sorted(allowed_roles))}")
+
+    user = await session.get(User, user_id)
+    if user is None:
+        raise ValueError(f"用户不存在：user_id={user_id}")
+
+    user.role = new_role
+    session.add(user)
     try:
         await session.commit()
     except IntegrityError:

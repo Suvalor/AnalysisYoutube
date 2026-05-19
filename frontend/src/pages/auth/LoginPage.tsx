@@ -1,10 +1,11 @@
 import { Alert, Button, Checkbox, Form, Input, Space } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthLayout from "@/components/Layout/AuthLayout";
 import { getCaptchaApi, loginApi } from "@/services/authApi";
 import { useAuth } from "@/store/authStore";
+import { UserRole } from "@/types/auth";
 
 type FormValues = {
   email: string;
@@ -21,7 +22,8 @@ export default function LoginPage() {
   const [captchaImage, setCaptchaImage] = useState("");
   const [captchaLoading, setCaptchaLoading] = useState(false);
   const navigate = useNavigate();
-  const { setToken } = useAuth();
+  const location = useLocation();
+  const { setToken, setRole, fetchQuotaUsage } = useAuth();
   const { t } = useTranslation("auth");
   const fetchedRef = useRef(false);
 
@@ -63,6 +65,11 @@ export default function LoginPage() {
         captcha_code: values.captcha_code,
       });
       setToken(res.access_token);
+      // 登录成功后从后端同步完整用户信息（角色、配额），避免仅依赖 JWT payload
+      await fetchQuotaUsage();
+      if (res.role && Object.values(UserRole).includes(res.role as UserRole)) {
+        setRole(res.role as UserRole);
+      }
       if (typeof window !== "undefined") {
         if (rememberMe) {
           localStorage.setItem("rememberedEmail", values.email);
@@ -70,14 +77,17 @@ export default function LoginPage() {
           localStorage.removeItem("rememberedEmail");
         }
       }
-      navigate("/blue-ocean-radar");
-    } catch (e: any) {
-      const raw = e?.response?.data?.detail;
+      /* 登录成功后重定向回原始页面，若无来源则默认蓝海雷达 */
+      const from = (location.state as { from?: string } | null)?.from || "/blue-ocean-radar";
+      navigate(from, { replace: true });
+    } catch (e: unknown) {
+      const errObj = e && typeof e === "object" ? e as { response?: { data?: { detail?: string | Array<{ msg?: string }> } }; message?: string } : null;
+      const raw = errObj?.response?.data?.detail;
       const msg = typeof raw === "string"
         ? raw
         : Array.isArray(raw)
-          ? raw.map((err: any) => err?.msg ?? String(err)).join("; ")
-          : e?.message ?? t("common:message.networkError");
+          ? raw.map((item) => item?.msg ?? String(item)).join("; ")
+          : errObj?.message ?? t("common:message.networkError");
       setError(msg);
       fetchCaptcha();
     } finally {

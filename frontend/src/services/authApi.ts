@@ -1,4 +1,5 @@
 import apiClient from "./apiClient";
+import type { QuotaUsage, InviteCodeVerifyResult, AdminRegisterPayload } from "@/types/auth";
 
 // ── 认证 API 类型与函数 ──
 
@@ -24,6 +25,7 @@ export type RegisterPayload = {
 export type TokenResponse = {
   access_token: string;
   token_type: string;
+  role?: string;
 };
 
 export async function getCaptchaApi() {
@@ -54,6 +56,34 @@ export async function forgotPasswordApi(email: string) {
 export async function resetPasswordApi(token: string, new_password: string) {
   const res = await apiClient.post("/api/auth/reset-password", { token, new_password });
   return res.data as { message: string };
+}
+
+// ── 配额与角色管理 API ──
+
+/** 获取当前用户（或游客）的配额使用情况 */
+export async function getQuotaUsageApi(): Promise<QuotaUsage> {
+  const res = await apiClient.get<QuotaUsage>("/api/quota/usage");
+  return res.data;
+}
+
+/** 验证管理员邀请码是否有效 */
+export async function verifyInviteCodeApi(code: string): Promise<InviteCodeVerifyResult> {
+  const res = await apiClient.get<InviteCodeVerifyResult>("/api/auth/admin-invite/verify", {
+    params: { code },
+  });
+  return res.data;
+}
+
+/** 管理员邀请注册：使用邀请码注册为管理员 */
+export async function adminRegisterApi(payload: AdminRegisterPayload): Promise<TokenResponse> {
+  const res = await apiClient.post<TokenResponse>("/api/auth/register", {
+    email: payload.email,
+    password: payload.password,
+    email_code: payload.email_code,
+    invite_code: payload.invite_code,
+    phone: payload.phone,
+  });
+  return res.data;
 }
 
 export type YouTubeAnalyzeResponse = {
@@ -148,11 +178,15 @@ export type BlueOceanChannelItem = {
   thumbnail_url: string | null;
   subscriber_count: number;
   channel_total_views: number;
+  /** 频道总播放量（别名，与 channel_total_views 同义） */
+  total_views: number;
   trigger_video_id: string;
   trigger_video_views: number;
   outlier_score: number;
   channel_url: string;
   viral_video_url: string;
+  /** 爆款视频播放量 */
+  viral_view_count: number;
 };
 
 export type BlueOceanRadarResponse = {

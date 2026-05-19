@@ -2,7 +2,7 @@ import json
 
 from fastapi import APIRouter, HTTPException, status
 
-from app.api.deps import CurrentUserDep, DBSessionDep
+from app.api.deps import AdminDep, CurrentUserDep, DBSessionDep
 from app.crud.library import create_with_user, delete_with_user, ensure_owned_or_404, get_by_user, list_by_user, update_with_user
 from app.models.library import ModelLibrary
 from app.schemas.library import ModelCreate, ModelRead, ModelUpdate
@@ -69,8 +69,9 @@ async def get_model(model_id: int, db: DBSessionDep, current_user: CurrentUserDe
     return _to_read(row)
 
 
-@router.post("", response_model=ModelRead)
-async def create_model(payload: ModelCreate, db: DBSessionDep, current_user: CurrentUserDep) -> ModelRead:
+@router.post("", response_model=ModelRead, summary="创建模型库配置（仅管理员）")
+async def create_model(payload: ModelCreate, db: DBSessionDep, admin: AdminDep) -> ModelRead:
+    """管理员创建模型库配置，普通用户无权创建。"""
     kind = (payload.library_kind or "chat").strip()
     if kind not in {"chat", "image_inpaint"}:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="library_kind 仅支持 chat 或 image_inpaint")
@@ -80,7 +81,7 @@ async def create_model(payload: ModelCreate, db: DBSessionDep, current_user: Cur
     row = await create_with_user(
         db,
         ModelLibrary,
-        current_user.id,
+        admin.id,
         {
             "name": payload.name.strip(),
             "library_kind": kind,
