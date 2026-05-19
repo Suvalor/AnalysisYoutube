@@ -160,6 +160,30 @@ export default function BlueOceanRadar() {
     [importedIds, addingId]
   );
 
+  // 所有库的模型名扁平化选项，选项值格式："{libId}::{modelName}"
+  const allModelNameOpts = useMemo(
+    () =>
+      modelOptions.flatMap((lib) => {
+        try {
+          const parsed: Array<{ value?: string; label?: string } | string> = JSON.parse(
+            lib.supported_models_json || "[]"
+          );
+          return parsed.flatMap((m) => {
+            const name = typeof m === "string" ? m : (m.value ?? "");
+            const display = typeof m === "string" ? m : (m.label ?? m.value ?? "");
+            if (!name) return [];
+            return [{
+              value: `${lib.id}::${name}`,
+              label: modelOptions.length > 1 ? `${display} (${lib.name})` : display,
+            }];
+          });
+        } catch {
+          return [];
+        }
+      }),
+    [modelOptions]
+  );
+
   const handleImport = async (row: BlueOceanChannelItem) => {
     setAddingId(row.yt_channel_id);
     try {
@@ -198,6 +222,7 @@ export default function BlueOceanRadar() {
       }
     };
     void loadAiConfigs();
+
 
     // 自动加载最新推荐参数回填到扫描表单
     const loadLatestParams = async () => {
@@ -432,27 +457,26 @@ export default function BlueOceanRadar() {
                         />
                       </Form.Item>
                       <Space className="mt-4" wrap>
-                        <Form.Item label="AI 模型配置" className="mb-0 min-w-[220px]">
-                          <Select
-                            value={selectedModelLibId}
-                            onChange={(v) => {
-                              setSelectedModelLibId(v);
-                              const target = modelOptions.find((x) => x.id === v);
-                              const firstModelName =
-                                ((target?.supported_models_json || "").match(/"value"\s*:\s*"([^"]+)"/)?.[1] ??
-                                  (target?.supported_models_json || "").match(/"([^"]+)"/)?.[1] ??
-                                  "").trim();
-                              setSelectedLlmModelName(firstModelName);
-                            }}
-                            options={modelOptions.map((m) => ({ value: m.id, label: m.name }))}
-                            placeholder="选择模型配置"
-                          />
-                        </Form.Item>
                         <Form.Item label="模型名" className="mb-0 min-w-[260px]">
-                          <Input
-                            value={selectedLlmModelName}
-                            onChange={(e) => setSelectedLlmModelName(e.target.value)}
-                            placeholder="例如 ep-xxxx / gpt-4o-mini"
+                          <Select
+                            showSearch
+                            value={
+                              selectedModelLibId !== undefined && selectedLlmModelName
+                                ? `${selectedModelLibId}::${selectedLlmModelName}`
+                                : undefined
+                            }
+                            onChange={(v: string) => {
+                              const idx = v.indexOf("::");
+                              setSelectedModelLibId(Number(v.slice(0, idx)));
+                              setSelectedLlmModelName(v.slice(idx + 2));
+                            }}
+                            options={allModelNameOpts}
+                            placeholder="选择模型名"
+                            filterOption={(input, opt) =>
+                              String(opt?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                            }
+                            allowClear
+                            onClear={() => { setSelectedModelLibId(undefined); setSelectedLlmModelName(""); }}
                           />
                         </Form.Item>
                         <Form.Item label="AI 智能体" className="mb-0 min-w-[220px]">

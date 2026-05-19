@@ -134,6 +134,33 @@ export default function ChannelDetail({ channelId }: Props) {
     return Array.from(dedup.values());
   }, [libraryModels]);
 
+  // 频道级 AI 分析：所有库的模型名扁平化选项，格式："{libId}::{modelName}"
+  const channelModelNameOpts = useMemo(
+    () =>
+      libraryModels.flatMap((lib) => {
+        if (!lib.has_api_key) return [];
+        try {
+          const parsed: Array<{ value?: string; label?: string } | string> = JSON.parse(
+            lib.supported_models_json || "[]"
+          );
+          return parsed.flatMap((m) => {
+            const name = typeof m === "string" ? m : (m.value ?? "");
+            const display = typeof m === "string" ? m : (m.label ?? m.value ?? "");
+            if (!name) return [];
+            return [{
+              value: `${lib.id}::${name}`,
+              label: libraryModels.filter((l) => l.has_api_key).length > 1
+                ? `${display} (${lib.name})`
+                : display,
+            }];
+          });
+        } catch {
+          return [];
+        }
+      }),
+    [libraryModels]
+  );
+
   const loadVideos = async (p: number, ps: number, f: typeof filters) => {
     setLoading(true);
     try {
@@ -536,38 +563,25 @@ export default function ChannelDetail({ channelId }: Props) {
           )}
           <Space wrap className="w-full" size="middle">
             <Select
-              placeholder="选择模型配置 (LLM)"
-              allowClear={false}
-              className="min-w-[200px]"
-              value={selectedModelLibId}
-              onChange={(v) => {
-                setSelectedModelLibId(v);
-                const row = libraryModels.find((m) => m.id === v);
-                const opts = parseSupportedModels(row?.supported_models_json ?? null);
-                setLlmModelName(opts.length ? opts[0]! : "");
+              showSearch
+              placeholder="选择模型名"
+              className="min-w-[220px]"
+              value={
+                selectedModelLibId !== undefined && llmModelName
+                  ? `${selectedModelLibId}::${llmModelName}`
+                  : undefined
+              }
+              onChange={(v: string) => {
+                const idx = v.indexOf("::");
+                setSelectedModelLibId(Number(v.slice(0, idx)));
+                setLlmModelName(v.slice(idx + 2));
               }}
-              options={libraryModels.map((m) => ({
-                value: m.id,
-                label: m.has_api_key ? m.name : `${m.name}（未配置 API Key）`,
-                disabled: !m.has_api_key,
-              }))}
+              options={channelModelNameOpts}
+              filterOption={(input, opt) =>
+                String(opt?.label ?? "").toLowerCase().includes(input.toLowerCase())
+              }
+              allowClear={false}
             />
-            {llmNameOptions.length > 0 ? (
-              <Select
-                placeholder="选择具体模型名"
-                className="min-w-[200px]"
-                value={llmModelName || undefined}
-                onChange={(v) => setLlmModelName(v)}
-                options={llmNameOptions.map((v) => ({ value: v, label: v }))}
-              />
-            ) : (
-              <Input
-                placeholder="模型名称（JSON 未配置时在网关使用的 model 名）"
-                className="min-w-[220px] max-w-xs"
-                value={llmModelName}
-                onChange={(e) => setLlmModelName(e.target.value)}
-              />
-            )}
             <Select
               allowClear
               placeholder="选择智能体 (Agent，可选)"

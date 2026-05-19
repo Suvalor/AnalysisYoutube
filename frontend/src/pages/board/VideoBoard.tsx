@@ -120,16 +120,40 @@ export default function VideoBoard() {
         setModelOptions(chatModels);
         setAgentOptions(prompts);
         if (chatModels.length > 0) {
-          setSelectedModelLibId(chatModels[0].id);
           const first = chatModels[0];
-          const name = ((first.supported_models_json || "").match(/"value"\s*:\s*"([^"]+)"/)?.[1] ?? "").trim();
-          setSelectedLlmModelName(name);
+          const firstName = ((first.supported_models_json || "").match(/"value"\s*:\s*"([^"]+)"/)?.[1] ?? "").trim();
+          setSelectedModelLibId(first.id);
+          setSelectedLlmModelName(firstName);
         }
         if (prompts.length > 0) setSelectedAgentId(prompts[0].id);
       } catch { /* 静默 */ }
     };
     void loadConfigs();
   }, []);
+
+  // 所有库的模型名扁平化选项，选项值格式："{libId}::{modelName}"
+  const allModelNameOpts = useMemo(
+    () =>
+      modelOptions.flatMap((lib) => {
+        try {
+          const parsed: Array<{ value?: string; label?: string } | string> = JSON.parse(
+            lib.supported_models_json || "[]"
+          );
+          return parsed.flatMap((m) => {
+            const name = typeof m === "string" ? m : (m.value ?? "");
+            const display = typeof m === "string" ? m : (m.label ?? m.value ?? "");
+            if (!name) return [];
+            return [{
+              value: `${lib.id}::${name}`,
+              label: modelOptions.length > 1 ? `${display} (${lib.name})` : display,
+            }];
+          });
+        } catch {
+          return [];
+        }
+      }),
+    [modelOptions]
+  );
 
   useEffect(() => {
     void fetchTasks();
@@ -201,7 +225,7 @@ export default function VideoBoard() {
 
   const onAiSuggest = async () => {
     if (!selectedModelLibId || !selectedLlmModelName) {
-      message.warning("请先选择 AI 模型配置");
+      message.warning("请先选择模型名");
       return;
     }
     setAiLoading(true);
@@ -226,19 +250,25 @@ export default function VideoBoard() {
       <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm mb-6" title="AI 内容策略建议">
         <div className="flex items-center gap-3 flex-wrap mb-3">
           <Select
-            style={{ width: 200 }}
-            placeholder="AI 模型配置"
-            value={selectedModelLibId}
-            onChange={(v) => {
-              setSelectedModelLibId(v);
-              const target = modelOptions.find((m) => m.id === v);
-              if (target) {
-                const name = ((target.supported_models_json || "").match(/"value"\s*:\s*"([^"]+)"/)?.[1] ?? "").trim();
-                setSelectedLlmModelName(name);
-              }
+            showSearch
+            style={{ width: 240 }}
+            placeholder="选择模型名"
+            value={
+              selectedModelLibId !== undefined && selectedLlmModelName
+                ? `${selectedModelLibId}::${selectedLlmModelName}`
+                : undefined
+            }
+            onChange={(v: string) => {
+              const idx = v.indexOf("::");
+              setSelectedModelLibId(Number(v.slice(0, idx)));
+              setSelectedLlmModelName(v.slice(idx + 2));
             }}
-            options={modelOptions.map((m) => ({ value: m.id, label: m.name }))}
+            options={allModelNameOpts}
+            filterOption={(input, opt) =>
+              String(opt?.label ?? "").toLowerCase().includes(input.toLowerCase())
+            }
             allowClear
+            onClear={() => { setSelectedModelLibId(undefined); setSelectedLlmModelName(""); }}
           />
           <Select
             style={{ width: 200 }}

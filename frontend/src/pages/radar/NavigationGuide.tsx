@@ -39,7 +39,7 @@ import {
   DeleteOutlined,
   EyeOutlined,
 } from "@ant-design/icons";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getYouTubeQuotaDashboardApi,
   navigationGuideApi,
@@ -130,31 +130,6 @@ const WEEKLY_HOURS_OPTIONS = [
 ];
 
 // ── 工具函数 ──
-
-/** 解析模型配置的 supported_models_json 为下拉选项 */
-type ModelNameOption = { value: string; label: string };
-
-function parseModelNames(supportedModelsJson: string | null | undefined): ModelNameOption[] {
-  const raw = supportedModelsJson?.trim();
-  if (!raw) return [];
-  try {
-    const arr = JSON.parse(raw) as Array<string | { value?: string; label?: string }>;
-    if (!Array.isArray(arr)) return [];
-    return arr
-      .map((item) => {
-        if (typeof item === "string" && item.trim()) {
-          return { value: item.trim(), label: item.trim() };
-        }
-        if (item && typeof item === "object" && item.value?.trim()) {
-          return { value: item.value.trim(), label: item.label?.trim() || item.value.trim() };
-        }
-        return null;
-      })
-      .filter((x): x is ModelNameOption => x !== null);
-  } catch {
-    return [];
-  }
-}
 
 function matchScoreColor(score: number): string {
   if (score >= 80) return "var(--color-success)";
@@ -672,7 +647,9 @@ export default function NavigationGuide() {
   const [channelInfo, setChannelInfo] = useState<Record<string, unknown> | null>(null);
   const [modelOptions, setModelOptions] = useState<ModelItem[]>([]);
   const [agentOptions, setAgentOptions] = useState<PromptItem[]>([]);
-  const [llmModelNameOptions, setLlmModelNameOptions] = useState<ModelNameOption[]>([]);
+  // 所选模型（不走 Form 字段）
+  const [navModelLibId, setNavModelLibId] = useState<number | undefined>(undefined);
+  const [navModelName, setNavModelName] = useState<string>("");
   // 保存当前使用的 LLM 配置，供追问使用
   const [activeModelId, setActiveModelId] = useState<number | null>(null);
   const [activeModelName, setActiveModelName] = useState<string | null>(null);
@@ -699,6 +676,30 @@ export default function NavigationGuide() {
     };
     void loadConfigs();
   }, []);
+
+  // 所有库的模型名扁平化选项，选项值格式："{libId}::{modelName}"
+  const allModelNameOpts = useMemo(
+    () =>
+      modelOptions.flatMap((lib) => {
+        try {
+          const parsed: Array<{ value?: string; label?: string } | string> = JSON.parse(
+            lib.supported_models_json || "[]"
+          );
+          return parsed.flatMap((m) => {
+            const name = typeof m === "string" ? m : (m.value ?? "");
+            const display = typeof m === "string" ? m : (m.label ?? m.value ?? "");
+            if (!name) return [];
+            return [{
+              value: `${lib.id}::${name}`,
+              label: modelOptions.length > 1 ? `${display} (${lib.name})` : display,
+            }];
+          });
+        } catch {
+          return [];
+        }
+      }),
+    [modelOptions]
+  );
 
   // ── 历史记录加载 ──
   const loadHistory = async (page = 1) => {
@@ -749,10 +750,10 @@ export default function NavigationGuide() {
     try {
       const values = await form.validateFields();
       setLoading(true);
-      // llm_model_name 直接从表单获取（用户通过下拉选择）
-      const llm_model_name = values.llm_model_name || undefined;
-      // 保存当前 LLM 配置
-      setActiveModelId(values.model_library_id ?? null);
+      // llm 配置从独立 state 读取（不走 Form 字段）
+      const llm_model_name = navModelName || undefined;
+      // 保存当前 LLM 配置，供追问区使用
+      setActiveModelId(navModelLibId ?? null);
       setActiveModelName(llm_model_name ?? null);
       setActiveAgentId(values.agent_id ?? null);
 
@@ -765,7 +766,7 @@ export default function NavigationGuide() {
         existing_channel_url: values.existing_channel_url || null,
         target_regions: values.target_regions || [],
         weekly_hours: values.weekly_hours || null,
-        model_library_id: values.model_library_id,
+        model_library_id: navModelLibId,
         llm_model_name,
         agent_id: values.agent_id,
       });
@@ -804,7 +805,7 @@ export default function NavigationGuide() {
   return (
     <div className="min-h-screen bg-yc-bg-base p-6 md:p-10 text-yc-text-primary">
       <div className="max-w-5xl mx-auto space-y-6">
-        <QuotaDashboardCard quotaCheck={quotaCheck} />
+        {/* <QuotaDashboardCard quotaCheck={quotaCheck} /> */}
 
         {/* 页面标题 */}
         <div className="mb-2 flex items-start justify-between">
@@ -898,31 +899,26 @@ export default function NavigationGuide() {
             </div>
 
             <Space wrap className="w-full" size="large">
-              <Form.Item name="model_library_id" label="AI 模型配置" className="mb-0 min-w-[200px]">
+              <Form.Item label="模型名" className="mb-0 min-w-[220px]">
                 <Select
-                  options={modelOptions.map((m) => ({ value: m.id, label: m.name }))}
+                  showSearch
+                  value={
+                    navModelLibId !== undefined && navModelName
+                      ? `${navModelLibId}::${navModelName}`
+                      : undefined
+                  }
+                  onChange={(v: string) => {
+                    const idx = v.indexOf("::");
+                    setNavModelLibId(Number(v.slice(0, idx)));
+                    setNavModelName(v.slice(idx + 2));
+                  }}
+                  options={allModelNameOpts}
                   placeholder="可选"
                   allowClear
-                  onChange={(value: number | undefined) => {
-                    // 切换模型配置时，解析其支持的模型名称列表
-                    const target = modelOptions.find((m) => m.id === value);
-                    const names = parseModelNames(target?.supported_models_json);
-                    setLlmModelNameOptions(names);
-                    // 自动选中第一个模型名称
-                    if (names.length > 0) {
-                      form.setFieldsValue({ llm_model_name: names[0].value });
-                    } else {
-                      form.setFieldsValue({ llm_model_name: undefined });
-                    }
-                  }}
-                />
-              </Form.Item>
-              <Form.Item name="llm_model_name" label="模型名称" className="mb-0 min-w-[200px]">
-                <Select
-                  options={llmModelNameOptions}
-                  placeholder="选择模型配置后可选"
-                  allowClear
-                  disabled={llmModelNameOptions.length === 0}
+                  onClear={() => { setNavModelLibId(undefined); setNavModelName(""); }}
+                  filterOption={(input, opt) =>
+                    String(opt?.label ?? "").toLowerCase().includes(input.toLowerCase())
+                  }
                 />
               </Form.Item>
               <Form.Item name="agent_id" label="AI 智能体" className="mb-0 min-w-[200px]">
