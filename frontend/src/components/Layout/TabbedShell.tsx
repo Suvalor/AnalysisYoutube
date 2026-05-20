@@ -278,6 +278,23 @@ export default function TabbedShell() {
     registerPinnedIds(navDefs.map((d) => d.tabId));
   }, [registerPinnedIds]);
 
+  // 当 role 变化时（如登出、角色降级），清除当前用户无权限访问的标签页
+  useEffect(() => {
+    const { tabs: currentTabs } = useTabStore.getState();
+    const unauthorizedTabs = currentTabs.filter((tab) => {
+      const minRole = TAB_MIN_ROLE[tab.type];
+      return minRole && !hasRole(role, minRole);
+    });
+    unauthorizedTabs.forEach((tab) => {
+      useTabStore.getState().closeTab(tab.id);
+    });
+    // 若所有标签都被关闭，导航到当前角色的默认安全页
+    if (unauthorizedTabs.length > 0 && unauthorizedTabs.length === currentTabs.length) {
+      const defaultPath = hasRole(role, UserRole.USER) ? "/blue-ocean-radar" : "/keyword-research";
+      navigate(defaultPath, { replace: true });
+    }
+  }, [role, navigate]);
+
   // 批量关闭后，若活跃标签已变则自动导航
   // 当 openTab 改变 activeTabId 时（由 location useEffect 触发），
   // _suppressNavigation 为 true，跳过导航以避免反复横跳
@@ -312,7 +329,7 @@ export default function TabbedShell() {
     const path = location.pathname;
     const fullPath = location.search ? `${path}${location.search}` : path;
     const def = navDefs.find((n) => n.path === path);
-    if (def) {
+    if (def && hasRole(role, def.minRole ?? UserRole.GUEST)) {
       openTab({ id: def.tabId, title: t(def.labelKey), path: fullPath, type: def.type });
     }
     const m = path.match(/^\/youtube\/channel\/(\d+)$/);

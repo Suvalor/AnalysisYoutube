@@ -19,6 +19,9 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/store/authStore";
+import { hasRole } from "@/config/features";
+import { UserRole } from "@/types/auth";
 import {
   createModelApi,
   createPromptApi,
@@ -116,7 +119,11 @@ type CVFormValues = {
 export default function ConfigCenter() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<ActiveTabKey>("models");
+  const { role } = useAuth();
+  const isAdmin = hasRole(role, UserRole.ADMIN);
+  const [activeTab, setActiveTab] = useState<ActiveTabKey>(() =>
+    hasRole(role, UserRole.ADMIN) ? "models" : "prompts"
+  );
   const [loading, setLoading] = useState(false);
 
   const [models, setModels] = useState<ModelItem[]>([]);
@@ -238,19 +245,29 @@ export default function ConfigCenter() {
 
   useEffect(() => {
     const queryTab = new URLSearchParams(location.search).get("tab");
+    const adminTabs = new Set<ActiveTabKey>(["models", "integration"]);
     if (
       queryTab === "models" ||
       queryTab === "prompts" ||
       queryTab === "styles" ||
       queryTab === "integration"
     ) {
+      // Non-admins cannot access admin-only tabs via URL params
+      if (adminTabs.has(queryTab as ActiveTabKey) && !isAdmin) return;
       setActiveTab(queryTab);
     }
-  }, [location.search]);
+  }, [location.search, isAdmin]);
+
+  // If role changes (e.g. admin logs out), reset to a permitted tab
+  useEffect(() => {
+    if (!isAdmin && (activeTab === "models" || activeTab === "integration")) {
+      setActiveTab("prompts");
+    }
+  }, [isAdmin, activeTab]);
 
   useEffect(() => {
-    if (activeTab === "integration") void loadIntegration();
-  }, [activeTab, loadIntegration]);
+    if (activeTab === "integration" && isAdmin) void loadIntegration();
+  }, [activeTab, loadIntegration, isAdmin]);
 
   const openCreateModel = () => {
     setModelMode("create");
@@ -651,7 +668,7 @@ export default function ConfigCenter() {
                 navigate(`/config-center?tab=${tab}`, { replace: true });
               }
             }}
-            items={[
+            items={([
               {
                 key: "models",
                 label: "模型管理",
@@ -982,7 +999,9 @@ export default function ConfigCenter() {
                   </Spin>
                 ),
               },
-            ]}
+            ]).filter(
+              (item) => isAdmin || (item.key !== "models" && item.key !== "integration")
+            )}
           />
         </div>
       </Spin>
