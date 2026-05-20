@@ -150,14 +150,41 @@ export type DiscoverChannelItem = {
   thumbnail_url: string | null;
   subscriber_count: number;
   channel_total_views: number;
+  video_count: number;
   trigger_video_views: number;
+  trigger_video_title: string | null;
+  avg_views_per_video: number;
+  channel_created_at: string | null;
   channel_url: string;
   viral_video_url: string;
+  /** 频道缓存增强字段 */
+  avatar_url: string | null;
+  description: string | null;
+  view_count: number;
+  published_at: string | null;
+  country: string | null;
+  custom_url: string | null;
+  cached: boolean;
 };
 
 export type ChannelDiscoverResponse = {
   items: DiscoverChannelItem[];
   warnings: string[];
+};
+
+/** 频道详情响应（与后端 ChannelDetailResponse 一致） */
+export type ChannelDetailResponse = {
+  channel_id: string;
+  title: string;
+  description: string | null;
+  avatar_url: string | null;
+  subscriber_count: number;
+  video_count: number;
+  view_count: number;
+  published_at: string | null;
+  country: string | null;
+  custom_url: string | null;
+  cached: boolean;
 };
 
 /** 关键词挖掘小号（仅查询 YouTube，不落库；单次 search 约消耗 100 quota） */
@@ -169,6 +196,12 @@ export async function discoverChannelsApi(payload: {
 }) {
   const res = await apiClient.post("/api/channels/discover", payload);
   return res.data as ChannelDiscoverResponse;
+}
+
+/** 获取频道详情（优先缓存，后端 GET /api/channels/discover/channels/:channel_id） */
+export async function discoverChannelDetailApi(channelId: string) {
+  const res = await apiClient.get(`/api/channels/discover/channels/${channelId}`);
+  return res.data as ChannelDetailResponse;
 }
 
 /** 蓝海雷达单条结果（与后端 BlueOceanChannelItem 一致） */
@@ -187,6 +220,12 @@ export type BlueOceanChannelItem = {
   viral_video_url: string;
   /** 爆款视频播放量 */
   viral_view_count: number;
+  /** 频道富化字段（后端缓存增强，可能为空） */
+  video_count?: number;
+  avg_views_per_video?: number;
+  channel_created_at?: string | null;
+  description?: string | null;
+  avatar_url?: string | null;
 };
 
 export type BlueOceanRadarResponse = {

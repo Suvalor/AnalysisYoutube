@@ -12,7 +12,7 @@ class ChannelDiscoverRequest(BaseModel):
         description="发布时间下限为「距今天数」，仅允许 7、14、30",
     )
     max_subscribers: int = Field(default=50000, ge=0, description="保留订阅数小于该值的频道")
-    max_results: int = Field(default=25, ge=1, le=50, description="search.list 单次条数上限（YouTube 最大 50）")
+    max_results: int = Field(default=50, ge=1, le=50, description="search.list 单次条数上限（YouTube 最大 50）")
 
     @field_validator("keyword")
     @classmethod
@@ -31,16 +31,28 @@ class ChannelDiscoverRequest(BaseModel):
 
 
 class DiscoverChannelItem(BaseModel):
-    """单条挖掘结果（内存态）。"""
+    """单条挖掘结果（内存态），含频道缓存增强字段。"""
 
     yt_channel_id: str
     title: str
     thumbnail_url: str | None = None
     subscriber_count: int
     channel_total_views: int
+    video_count: int = 0
     trigger_video_views: int
+    trigger_video_title: str | None = None
+    avg_views_per_video: float = 0.0
+    channel_created_at: str | None = None
     channel_url: str
     viral_video_url: str
+    # 频道缓存增强字段
+    avatar_url: str | None = None
+    description: str | None = None
+    view_count: int = 0
+    published_at: str | None = None
+    country: str | None = None
+    custom_url: str | None = None
+    cached: bool = False
 
 
 class QuickTrackRequest(BaseModel):
@@ -61,6 +73,22 @@ class QuickTrackResponse(BaseModel):
 class ChannelDiscoverResponse(BaseModel):
     items: list[DiscoverChannelItem]
     warnings: list[str] = Field(default_factory=list)
+
+
+class ChannelDetailResponse(BaseModel):
+    """频道详情响应：包含频道统计与缓存标记。"""
+
+    channel_id: str
+    title: str
+    description: str | None = None
+    avatar_url: str | None = None
+    subscriber_count: int = 0
+    video_count: int = 0
+    view_count: int = 0
+    published_at: str | None = None
+    country: str | None = None
+    custom_url: str | None = None
+    cached: bool = False
 
 
 # ---------------------------------------------------------------------------

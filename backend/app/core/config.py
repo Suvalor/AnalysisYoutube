@@ -61,8 +61,15 @@ class Settings(BaseSettings):
     # yt-dlp 下载代理（可选，如 http://127.0.0.1:7890）
     download_proxy: str = Field("", alias="DOWNLOAD_PROXY")
 
+    # 频道缓存 TTL（小时），默认 24 小时
+    channel_cache_ttl_hours: int = Field(24, alias="CHANNEL_CACHE_TTL_HOURS")
+
     # 日志级别：DEBUG 时记录请求/响应 body，INFO 只记录请求行
     log_level: str = Field("INFO", alias="LOG_LEVEL")
+
+    # 信任的反向代理层数：0 表示不信任任何代理头（直接使用 request.client.host），
+    # >0 时从 X-Forwarded-For 右侧倒数第 N 个位置取客户端真实 IP
+    trusted_proxy_count: int = Field(0, alias="TRUSTED_PROXY_COUNT")
 
     # 支持单个 URL、逗号分隔字符串，或 JSON 数组字符串
     backend_cors_origins: str = Field(

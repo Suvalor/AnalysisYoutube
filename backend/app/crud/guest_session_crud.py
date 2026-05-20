@@ -74,6 +74,32 @@ async def increment_guest_quota(
     return guest
 
 
+async def get_guest_session_by_ip(
+    session: AsyncSession,
+    ip_address: str,
+) -> GuestSession | None:
+    """按 IP 查找当日游客会话，用于无 Cookie 时按 IP 关联配额。
+
+    仅返回当日有效的会话（daily_quotas.date 匹配今天），取 last_active_at 最新的一条。
+    """
+    today_str = date.today().isoformat()
+    stmt = (
+        select(GuestSession)
+        .where(GuestSession.ip_address == ip_address)
+        .order_by(GuestSession.last_active_at.desc())
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    row = result.scalar_one_or_none()
+    if row is None:
+        return None
+    # 仅复用当日记录，日期不匹配视为过期
+    quotas = row.daily_quotas or {}
+    if quotas.get("date") != today_str:
+        return None
+    return row
+
+
 async def get_guest_daily_usage(
     session: AsyncSession,
     guest_id: str,

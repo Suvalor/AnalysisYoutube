@@ -17,7 +17,7 @@ import {
   message,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/store/authStore";
 import { hasRole } from "@/config/features";
@@ -258,11 +258,18 @@ export default function ConfigCenter() {
     }
   }, [location.search, isAdmin]);
 
-  // If role changes (e.g. admin logs out), reset to a permitted tab
+  /** 当角色变化导致当前 activeTab 不再可见时，自动切换到第一个可见 Tab。
+   * 使用 useRef 追踪上一次 isAdmin，仅在 isAdmin 真正从 true 变为 false 时执行重置，
+   * 避免每次 activeTab 变化都触发 effect。 */
+  const prevIsAdminRef = useRef(isAdmin);
   useEffect(() => {
-    if (!isAdmin && (activeTab === "models" || activeTab === "integration")) {
-      setActiveTab("prompts");
+    if (prevIsAdminRef.current && !isAdmin) {
+      const adminOnlyTabs: Set<ActiveTabKey> = new Set(["models", "integration"]);
+      if (adminOnlyTabs.has(activeTab)) {
+        setActiveTab("prompts");
+      }
     }
+    prevIsAdminRef.current = isAdmin;
   }, [isAdmin, activeTab]);
 
   useEffect(() => {

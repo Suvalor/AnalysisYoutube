@@ -17,7 +17,7 @@ class GuestSession(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
     guest_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, index=True)
-    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True, index=True)
     daily_quotas: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,

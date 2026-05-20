@@ -23,8 +23,8 @@ async def _resolve_jimeng_config(
 ) -> JimengConfig:
     """从 model_libraries 表解析即梦运行时配置。
 
-    查找 library_kind='jimeng' 的记录，取第一条。
-    若未配置则抛 500，提示用户在智能体管理中配置。
+    仅查找当前用户关联的 jimeng 模型库，不做 org 级回退。
+    若未配置则抛 400，提示用户在智能体管理中配置。
     """
     from app.services.integration_config_service import resolve_integration_config
 
@@ -37,20 +37,8 @@ async def _resolve_jimeng_config(
         ml = await get_by_user(db, ModelLibrary, user_id, int(jimeng_library_id))
 
     if ml is None:
-        # fallback: 尝试查找 library_kind='jimeng' 的记录
-        from sqlalchemy import select
-
-        stmt = (
-            select(ModelLibrary)
-            .where(ModelLibrary.org_id == org_id, ModelLibrary.library_kind == "jimeng")
-            .limit(1)
-        )
-        result = await db.execute(stmt)
-        ml = result.scalar_one_or_none()
-
-    if ml is None:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="未配置即梦 AI，请在智能体管理中添加即梦模型配置",
         )
 

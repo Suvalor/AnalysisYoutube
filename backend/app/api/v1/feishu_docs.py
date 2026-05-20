@@ -2,7 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from app.api.deps import CurrentUserDep, DBSessionDep
-from app.crud.feishu_doc import create_feishu_doc, delete_feishu_doc, get_feishu_doc, list_feishu_docs
+from app.crud.feishu_doc import check_doc_ownership, create_feishu_doc, get_feishu_doc, list_feishu_docs
 from app.schemas.feishu_doc import FeishuDocArchiveTriggerResponse, FeishuDocCreate, FeishuDocListResponse, FeishuDocRead
 from app.services.feishu_doc_archive import run_feishu_doc_archive_task
 
@@ -18,6 +18,7 @@ async def list_docs(
     page_size: int = Query(20, ge=1, le=100, description="每页条数"),
     search: str | None = Query(None, max_length=255, description="按标题模糊搜索"),
 ) -> FeishuDocListResponse:
+    """按 org_id 分页查询飞书文档列表，org 内所有用户可见。"""
     rows, total = await list_feishu_docs(
         db,
         org_id=current_user.org_id,
@@ -39,9 +40,11 @@ async def create_doc(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> FeishuDocRead:
+    """创建飞书文档，写入创建者 user_id 用于后续权限校验。"""
     row = await create_feishu_doc(
         db,
         org_id=current_user.org_id,
+        user_id=current_user.id,
         title=body.title.strip(),
         url=body.url.strip(),
     )
@@ -56,6 +59,7 @@ async def get_doc(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> FeishuDocRead:
+    """获取单个飞书文档详情，org 内用户可查看。"""
     row = await get_feishu_doc(db, org_id=current_user.org_id, doc_id=doc_id)
     if row is None:
         raise HTTPException(status_code=404, detail="文档不存在")
@@ -68,9 +72,13 @@ async def delete_doc(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> dict:
-    ok = await delete_feishu_doc(db, org_id=current_user.org_id, doc_id=doc_id)
-    if not ok:
+    """删除飞书文档，仅创建者或 user_id 为空的历史文档可删除。"""
+    row = await get_feishu_doc(db, org_id=current_user.org_id, doc_id=doc_id)
+    if row is None:
         raise HTTPException(status_code=404, detail="文档不存在")
+    if not check_doc_ownership(row, current_user.id):
+        raise HTTPException(status_code=403, detail="无权删除他人创建的文档")
+    await db.delete(row)
     await db.commit()
     return {"success": True}
 
@@ -86,9 +94,13 @@ async def archive_doc(
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ):
+    """触发飞书文档归档，仅创建者或 user_id 为空的历史文档可归档。"""
     row = await get_feishu_doc(db, org_id=current_user.org_id, doc_id=doc_id)
     if row is None:
         raise HTTPException(status_code=404, detail="文档不存在")
+
+    if not check_doc_ownership(row, current_user.id):
+        raise HTTPException(status_code=403, detail="无权归档他人创建的文档")
 
     if row.archive_status == "ARCHIVING":
         raise HTTPException(status_code=409, detail="文档正在归档中，请稍候")

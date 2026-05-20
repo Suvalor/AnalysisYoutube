@@ -25,7 +25,7 @@ import {
   Youtube,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -213,6 +213,9 @@ export default function TabbedShell() {
   } = useTabStore();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  /** 标记是否已由 pathname useEffect 重定向到安全页，防止与 activeTabId useEffect 形成环路 */
+  const redirectedToSafeRef = useRef(false);
+
   /** 游客配额弹窗状态 */
   const [guestLimitOpen, setGuestLimitOpen] = useState(false);
   const [guestQuotaUsage, setGuestQuotaUsage] = useState<QuotaUsage | null>(null);
@@ -278,8 +281,13 @@ export default function TabbedShell() {
     registerPinnedIds(navDefs.map((d) => d.tabId));
   }, [registerPinnedIds]);
 
-  // 当 role 变化时（如登出、角色降级），清除当前用户无权限访问的标签页
+  /** 当 role 真正变化时（如登出、角色降级），清除当前用户无权限访问的标签页。
+   * 使用 useRef 追踪上一次 role，只在 role 值真正变化时执行清理逻辑，
+   * 避免 Zustand store 更新导致 tabs 数组引用变化而触发不必要的重复执行。 */
+  const prevRoleRef = useRef(role);
   useEffect(() => {
+    if (prevRoleRef.current === role) return;
+    prevRoleRef.current = role;
     const { tabs: currentTabs } = useTabStore.getState();
     const unauthorizedTabs = currentTabs.filter((tab) => {
       const minRole = TAB_MIN_ROLE[tab.type];
@@ -295,6 +303,25 @@ export default function TabbedShell() {
     }
   }, [role, navigate]);
 
+  /** 当标签栏为空时，自动导航到合适的页面。
+   * 刷新场景：若当前 URL 是用户有权限访问的已知路由，则不导航（由 pathname→openTab useEffect
+   * 为当前 URL 打开标签页即可），避免与 pathname useEffect 形成反复横跳；
+   * 仅当标签栏为空且当前 URL 无效或无权限时，才导航到角色默认安全页。 */
+  useEffect(() => {
+    if (tabs.length === 0) {
+      // 检查当前 URL 是否是用户有权限访问的已知路由
+      const currentDef = navDefs.find((n) => n.path === location.pathname);
+      const isDynamicRoute = /^\/youtube\/channel\/\d+$/.test(location.pathname)
+        || /^\/config\/agent\/edit\/\d+$/.test(location.pathname)
+        || /^\/feishu\/view\/\d+$/.test(location.pathname);
+      const hasCurrentPageAccess = (currentDef && hasRole(role, currentDef.minRole ?? UserRole.GUEST)) || isDynamicRoute;
+      if (!hasCurrentPageAccess) {
+        const defaultPath = hasRole(role, UserRole.USER) ? "/blue-ocean-radar" : "/keyword-research";
+        navigate(defaultPath, { replace: true });
+      }
+    }
+  }, [tabs.length, role, navigate, location.pathname]);
+
   // 批量关闭后，若活跃标签已变则自动导航
   // 当 openTab 改变 activeTabId 时（由 location useEffect 触发），
   // _suppressNavigation 为 true，跳过导航以避免反复横跳
@@ -308,20 +335,51 @@ export default function TabbedShell() {
     const activeTab = tabs.find((t) => t.id === activeTabId);
     // 只比较 pathname 部分，忽略 search params（tab.path 可能含 ?tab=xxx）
     if (activeTab && location.pathname !== activeTab.path.split("?")[0]) {
-      navigate(activeTab.path);
+      // 若当前 URL 对应一个用户无权限的 navDef，导航到角色默认安全页而非拉回活跃标签，
+      // 避免与 RequireRole 的重定向形成环路（如游客访问 /downloads 时 RequireRole 重定向
+      // 到安全页，TabSync 又拉回 /trend-discovery，RequireRole 再次触发...）
+      const currentDef = navDefs.find((n) => n.path === location.pathname);
+      if (currentDef && !hasRole(role, currentDef.minRole ?? UserRole.GUEST)) {
+        const safePath = hasRole(role, UserRole.USER) ? "/blue-ocean-radar" : "/keyword-research";
+        navigate(safePath, { replace: true });
+        // 标记已重定向到安全页，防止 pathname useEffect 重复执行权限检查
+        redirectedToSafeRef.current = true;
+      } else {
+        navigate(activeTab.path);
+      }
     }
-  }, [activeTabId, tabs, navigate, location.pathname]);
+  }, [activeTabId, tabs, navigate, location.pathname, role]);
 
+  /** 路径变化时的重定向守卫：仅处理根路径、旧链接兼容、以及用户直接访问无权限 URL 的场景。
+   * 通过 redirectedToSafeRef 防止与 activeTabId useEffect 形成环路：
+   * - 当本 effect 将用户重定向到安全页时，标记 ref，后续触发跳过权限检查
+   * - 当用户正常导航到有权限的页面时，清除 ref，恢复正常检查 */
   useEffect(() => {
     if (location.pathname === "/" || location.pathname === "") {
       // 根据用户角色动态选择默认着陆页：已登录用户导航到蓝海雷达，游客导航到关键词研究
       const defaultPath = hasRole(role, UserRole.USER) ? "/blue-ocean-radar" : "/keyword-research";
       navigate(defaultPath, { replace: true });
+      redirectedToSafeRef.current = true;
       return;
     }
     // 兼容旧链接：YouTube API 仪表盘已合并到仪表盘
     if (location.pathname === "/youtube-quota") {
       navigate("/dashboard", { replace: true });
+      redirectedToSafeRef.current = true;
+      return;
+    }
+    // 当用户直接访问无权限的 URL（如游客访问 /downloads）时，重定向到角色默认安全页，
+    // 避免停留在无权限页面触发 RequireRole 重定向与 TabSync 拉回形成环路。
+    // 守卫条件：仅在路径有 minRole 定义、用户确实无权限、且非已重定向到安全页时执行。
+    const unauthorizedDef = navDefs.find((n) => n.path === location.pathname);
+    if (unauthorizedDef && !hasRole(role, unauthorizedDef.minRole ?? UserRole.GUEST)) {
+      if (redirectedToSafeRef.current) return;
+      const safePath = hasRole(role, UserRole.USER) ? "/blue-ocean-radar" : "/keyword-research";
+      navigate(safePath, { replace: true });
+      redirectedToSafeRef.current = true;
+    } else {
+      // 用户有权限访问当前路径（正常标签切换），清除重定向标记
+      redirectedToSafeRef.current = false;
     }
   }, [location.pathname, navigate, role]);
 

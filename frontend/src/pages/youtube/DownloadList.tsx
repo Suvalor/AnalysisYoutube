@@ -202,7 +202,7 @@ export default function DownloadList() {
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-yc-text-primary truncate" title={record.video_title ?? undefined}>
+            <div className="text-sm font-medium text-yc-text-primary break-words" title={record.video_title ?? undefined}>
               {record.video_title || record.video_id}
             </div>
             <div className="text-xs text-yc-text-tertiary truncate">

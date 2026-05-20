@@ -15,12 +15,14 @@ from app.schemas.discovery import (
     BlueOceanChannelItem,
     BlueOceanRadarRequest,
     BlueOceanRadarResponse,
+    ChannelDetailResponse,
     ChannelDiscoverRequest,
     ChannelDiscoverResponse,
     DiscoverChannelItem,
     QuickTrackRequest,
     QuickTrackResponse,
 )
+from app.services.channel_cache_service import enrich_channels_with_cache, get_channel_detail_with_cache
 from app.services.config_manager import resolve_integration_config
 from app.services.quota_service import record_api_quota_usage
 from app.services.youtube_service import blue_ocean_radar_scan, discover_channels_by_keyword, fetch_channel_info
@@ -151,7 +153,52 @@ async def discover_channels(
     await db.commit()
 
     items = [DiscoverChannelItem.model_validate(x) for x in result.items]
+
+    # 利用频道缓存批量增强搜索结果（补充 avatar_url、description 等字段）
+    channel_ids = [item.yt_channel_id for item in items]
+    if channel_ids:
+        try:
+            cache_map = await enrich_channels_with_cache(db, channel_ids, icfg.youtube_api_key)
+            for item in items:
+                cache_info = cache_map.get(item.yt_channel_id)
+                if cache_info:
+                    item.avatar_url = cache_info.get("avatar_url")
+                    item.description = cache_info.get("description")
+                    item.view_count = cache_info.get("view_count", 0)
+                    item.published_at = cache_info.get("published_at")
+                    item.country = cache_info.get("country")
+                    item.custom_url = cache_info.get("custom_url")
+                    item.cached = cache_info.get("cached", False)
+        except Exception:
+            # 缓存增强失败不影响主搜索结果返回
+            pass
+
     return ChannelDiscoverResponse(items=items, warnings=result.warnings)
+
+
+@router.get(
+    "/discover/channels/{channel_id}",
+    response_model=ChannelDetailResponse,
+    summary="频道详情（优先缓存）",
+)
+async def get_channel_detail(
+    channel_id: str,
+    db: DBSessionDep,
+    current_user: CurrentUserDep,
+) -> ChannelDetailResponse:
+    """
+    获取频道详情，优先从缓存读取，未命中则调用 YouTube API 并写入缓存。
+    """
+    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    try:
+        detail = await get_channel_detail_with_cache(
+            session=db,
+            channel_id=channel_id,
+            youtube_api_key=icfg.youtube_api_key,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return ChannelDetailResponse.model_validate(detail)
 
 
 @router.post(

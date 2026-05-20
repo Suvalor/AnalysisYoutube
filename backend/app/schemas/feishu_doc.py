@@ -13,6 +13,7 @@ class FeishuDocRead(BaseModel):
     title: str
     url: str
     org_id: int
+    user_id: int | None = None
     created_at: datetime
     archive_status: str = "UNARCHIVED"
     archive_file_url: str | None = None

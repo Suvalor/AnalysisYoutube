@@ -8,8 +8,6 @@ from sqlalchemy import func, select
 from app.api.deps import CurrentUserDep, DBSessionDep, GuestInfoDep, OptionalUserDep
 from app.models.seo_score import SeoScoreRecord
 from app.models.library import ModelLibrary
-from app.models.trend_cache import TrendHistory
-from app.models.user import UserRole
 from app.crud.library import get_by_user
 from app.schemas.seo_scoring import (
     SeoScoringRequest,
@@ -23,12 +21,11 @@ from app.schemas.seo_scoring import (
 from app.schemas.trend_discovery import TrendDiscoveryRequest, TrendDiscoveryResponse
 from app.schemas.trend_cache import TrendHistoryItem, TrendHistoryListResponse
 from app.services.config_manager import resolve_integration_config
-from app.services.guest_service import set_guest_cookie
+from app.services.guest_service import reserve_guest_quota, consume_guest_quota, set_guest_cookie
 from app.services.seo_scoring_service import calculate_seo_score
 from app.services.trend_discovery_service import fetch_trending
 from app.services.trend_cache_service import get_cached_trend, get_saved_trend, save_trend_cache, add_trend_history, list_trend_history
 from app.services.quota_service import record_api_quota_usage
-from app.services.rate_limit_service import check_quota, increment_usage
 
 router = APIRouter()
 
@@ -62,36 +59,32 @@ async def seo_scoring_endpoint(
     如配置了 YouTube API Key，将获取竞品视频数据。
     评分结果自动保存（仅已登录用户），可通过历史接口查看趋势。
     """
-    # 游客配额检查与计数
+    # 游客配额预留检查（不扣减，仅检查是否充足）
     if not current_user:
-        role = UserRole.GUEST
-        user_id = None
         guest_id = guest_info.guest_id
-        subscription_quotas = None
         set_guest_cookie(response, guest_id)
-        allowed, used, limit = await check_quota(
-            db, user_id=user_id, role=role, guest_id=guest_id,
-            api_type="youtube_api", subscription_quotas=subscription_quotas,
-        )
+        allowed, used, limit = await reserve_guest_quota(db, guest_id, "youtube_api")
         if not allowed:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"配额已用尽：youtube_api 已用 {used}/{limit}，请升级套餐或明日再试",
+                detail="游客配额已用完，请登录以获取更多配额",
             )
-        await increment_usage(
-            db, user_id=user_id, role=role, guest_id=guest_id,
-            api_type="youtube_api",
-        )
-        await db.commit()
-    else:
-        role = current_user.role
-        user_id = current_user.id
-        guest_id = None
 
     # 解析集成配置（游客使用系统级 fallback）
     org_id = current_user.org_id if current_user else None
     icfg = await resolve_integration_config(db, org_id=org_id)
     youtube_api_key = icfg.youtube_api_key or None
+
+    # 未配置 YouTube API Key 时返回 503，避免配额先扣后失败
+    if not youtube_api_key and (body.target_keyword or body.title):
+        if current_user:
+            detail = "未配置 YouTube API Key，请在设置中心配置"
+        else:
+            detail = "服务暂不可用，请稍后重试"
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=detail,
+        )
 
     # 解析模型配置（用于 AI 竞品分析，仅已登录用户可用）
     model_library = None
@@ -108,6 +101,10 @@ async def seo_scoring_endpoint(
         youtube_api_key=youtube_api_key,
         model_library=model_library,
     )
+
+    # API 调用成功后，实际扣减游客配额
+    if not current_user:
+        await consume_guest_quota(db, guest_info.guest_id, "youtube_api")
 
     # 记录 YouTube API 配额消耗（search.list 1次 + videos.list 1次）
     if youtube_api_key and (body.target_keyword or body.title):
@@ -313,28 +310,19 @@ async def trend_discovery_endpoint(
     获取指定地区的 YouTube 热门趋势视频。
     支持游客访问（受限配额），已登录用户使用组织级配置。
     相同地区+品类+1小时内复用缓存，不重复调用 YouTube API。
+
+    配额策略：先 reserve 检查 -> 调用 API -> 成功后 consume 扣减，失败不扣减。
     """
-    # 游客配额检查与计数
+    # 游客配额预留检查（不扣减，仅检查是否充足）
     if not current_user:
-        role = UserRole.GUEST
-        user_id = None
         guest_id = guest_info.guest_id
-        subscription_quotas = None
         set_guest_cookie(response, guest_id)
-        allowed, used, limit = await check_quota(
-            db, user_id=user_id, role=role, guest_id=guest_id,
-            api_type="youtube_api", subscription_quotas=subscription_quotas,
-        )
+        allowed, used, limit = await reserve_guest_quota(db, guest_id, "youtube_api")
         if not allowed:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"配额已用尽：youtube_api 已用 {used}/{limit}，请升级套餐或明日再试",
+                detail="游客配额已用完，请登录以获取更多配额",
             )
-        await increment_usage(
-            db, user_id=user_id, role=role, guest_id=guest_id,
-            api_type="youtube_api",
-        )
-        await db.commit()
 
     category_id = body.category_id or ""
 
@@ -358,9 +346,14 @@ async def trend_discovery_endpoint(
     org_id = current_user.org_id if current_user else None
     icfg = await resolve_integration_config(db, org_id=org_id)
     if not icfg.youtube_api_key:
+        # 区分游客和管理员的错误提示
+        if current_user:
+            detail = "未配置 YouTube API Key，请在设置中心配置"
+        else:
+            detail = "服务暂不可用，请稍后重试"
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="未配置 YouTube API Key，请在设置中心配置",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=detail,
         )
 
     result = await fetch_trending(
@@ -369,6 +362,10 @@ async def trend_discovery_endpoint(
         category_id=body.category_id,
         max_results=body.max_results,
     )
+
+    # API 调用成功后，实际扣减游客配额
+    if not current_user:
+        await consume_guest_quota(db, guest_info.guest_id, "youtube_api")
 
     # 记录配额消耗
     await record_api_quota_usage(db, "videos", times=1, part_count=3)

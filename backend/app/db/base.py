@@ -3,6 +3,7 @@ from app.db.base_class import Base
 
 # 导入模型以便 Alembic 自动发现元数据
 from app.models.user import User  # noqa: F401,E402
+from app.models.channel_cache import ChannelCache  # noqa: F401,E402
 from app.models.yt_channel import YtChannel  # noqa: F401,E402
 from app.models.library import AssetLibrary, ModelLibrary, PromptLibrary, ScriptLibrary, StyleLibrary  # noqa: F401,E402
 from app.models.video_project import VideoProject  # noqa: F401,E402
@@ -29,4 +30,5 @@ from app.models.subscription_plan import SubscriptionPlan  # noqa: F401,E402
 from app.models.user_subscription import UserSubscription  # noqa: F401,E402
 from app.models.admin_invitation import AdminInvitation  # noqa: F401,E402
 from app.models.guest_session import GuestSession  # noqa: F401,E402
+from app.models.keyword_history import KeywordHistory  # noqa: F401,E402
 

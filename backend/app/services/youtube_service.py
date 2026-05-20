@@ -208,12 +208,13 @@ async def discover_channels_by_keyword(
                     seen_video_ids.add(vid)
                     ordered_video_ids.append(vid)
 
+            trigger_video_title_map: dict[str, str] = {}
             for group in chunked(ordered_video_ids, MAX_IDS_PER_REQUEST):
                 videos_list_calls += 1
                 resp = await client.get(
                     f"{YOUTUBE_API_BASE}/videos",
                     params={
-                        "part": "statistics",
+                        "part": "snippet,statistics",
                         "id": ",".join(group),
                         "key": youtube_api_key,
                     },
@@ -229,6 +230,7 @@ async def discover_channels_by_keyword(
                     except (TypeError, ValueError):
                         trigger_views = 0
                     trigger_video_views_map[vid] = trigger_views
+                    trigger_video_title_map[vid] = ((video.get("snippet") or {}).get("title") or "")
 
             for group in chunked(ordered_cids, MAX_IDS_PER_REQUEST):
                 channels_list_calls += 1
@@ -270,13 +272,20 @@ async def discover_channels_by_keyword(
                 total_views = int(stats.get("viewCount", 0))
             except (TypeError, ValueError):
                 total_views = 0
+            try:
+                video_count = int(stats.get("videoCount", 0))
+            except (TypeError, ValueError):
+                video_count = 0
+            avg_views = round(total_views / video_count, 1) if video_count > 0 else 0.0
             snippet = ch.get("snippet") or {}
             title = snippet.get("title") or ""
+            channel_created_at = snippet.get("publishedAt")
             thumbs = snippet.get("thumbnails") or {}
             high = thumbs.get("high") or {}
             default = thumbs.get("default") or {}
             thumbnail_url = high.get("url") or default.get("url")
             trigger_views = trigger_video_views_map.get(video_id, 0)
+            trigger_title = trigger_video_title_map.get(video_id)
 
             items.append(
                 {
@@ -285,7 +294,11 @@ async def discover_channels_by_keyword(
                     "thumbnail_url": thumbnail_url,
                     "subscriber_count": sub,
                     "channel_total_views": total_views,
+                    "video_count": video_count,
                     "trigger_video_views": trigger_views,
+                    "trigger_video_title": trigger_title,
+                    "avg_views_per_video": avg_views,
+                    "channel_created_at": channel_created_at,
                     "channel_url": f"https://www.youtube.com/channel/{cid}",
                     "viral_video_url": f"https://www.youtube.com/watch?v={video_id}",
                 }

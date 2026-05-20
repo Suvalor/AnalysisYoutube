@@ -1,119 +1,143 @@
 {
-  "project": "YouTube Compass — 用户分层与权限体系重构（更简方案）",
+  "project": "YouTube Compass — 游客配额+数据隔离审计修复",
   "task_level": "L2",
-  "requirement": "建立四层用户体系（游客→普通用户→付费订阅→管理员），实现 API 分层限额管控，游客 Cookie+IP 识别，管理员邀请注册，基础订阅管理。无 Redis/指纹依赖。",
+  "requirement": "实施 docs/20260520-guest-quota-and-isolation-audit.md：修复游客配额形同虚设（Cookie绕过）、配额先扣后失败、状态码语义错误、keyword-history缺失、feishu_docs越权删除、jimeng模型库横向回退",
+  "source_task_document": "docs/20260520-guest-quota-and-isolation-audit.md",
+  "task_document_status": "completed",
   "current_phase": 7,
-  "created_at": "2026-05-19T03:00:00Z",
-  "updated_at": "2026-05-19T12:00:00Z",
+  "created_at": "2026-05-20T21:00:00Z",
+  "updated_at": "2026-05-20T22:30:00Z",
   "phases": {
     "1": {
-      "name": "PM需求沟通+PRD落盘",
-      "agent": "pm + scribe",
+      "name": "PM需求沟通+定级",
+      "agent": "pm",
       "status": "completed",
-      "deliverables": ["docs/requirements.md"],
-      "started_at": "2026-05-19T03:00:00Z",
-      "completed_at": "2026-05-19T03:30:00Z",
-      "notes": "L2 更简方案"
+      "deliverables": ["docs/requirements-guest-quota-audit.md"],
+      "started_at": "2026-05-20T21:00:00Z",
+      "completed_at": "2026-05-20T21:05:00Z",
+      "notes": "L2定级确认：跨6个缺陷、7个后端文件，跨安全/配额/隔离三维度"
     },
     "1.5": {
       "name": "价值审查",
       "agent": "gemini-thinking-protocol",
       "status": "completed",
-      "verdict": "SIMPLER_PROPOSAL",
-      "deliverables": ["docs/cognition/value-review.md"],
-      "started_at": "2026-05-19T03:10:00Z",
-      "completed_at": "2026-05-19T03:20:00Z",
-      "notes": "用户采纳更简方案"
+      "verdict": "PASS",
+      "deliverables": ["docs/cognition/value-review-guest-quota-audit.md"],
+      "started_at": "2026-05-20T21:05:00Z",
+      "completed_at": "2026-05-20T21:10:00Z",
+      "notes": "VERDICT: PASS — 安全漏洞+数据隔离是硬需求，修复代价低收益高"
     },
     "2": {
       "name": "设计+架构",
-      "agent": "product-designer ∥ architect",
+      "agent": "product-designer + architect",
       "status": "completed",
-      "deliverables": ["docs/design/design-spec.md", "docs/architecture/architecture-spec.md"],
-      "started_at": "2026-05-19T03:30:00Z",
-      "completed_at": "2026-05-19T04:30:00Z",
-      "notes": "并行完成"
+      "deliverables": ["docs/design/design-spec-guest-quota-audit.md", "docs/architecture/architecture-spec-guest-quota-audit.md"],
+      "started_at": "2026-05-20T21:10:00Z",
+      "completed_at": "2026-05-20T21:30:00Z",
+      "notes": "并行完成；3个ADR；3个Sprint规划；前端零改动确认"
     },
     "3": {
-      "name": "Sprint 1+2 编码",
+      "name": "Sprint迭代编码",
       "agent": "developer",
       "status": "completed",
-      "deliverables": [],
-      "started_at": "2026-05-19T04:30:00Z",
-      "completed_at": "2026-05-19T10:00:00Z",
-      "notes": "Sprint 1 + Sprint 2 全部完成，含 3 轮 code-reviewer 修复"
+      "deliverables": [
+        "backend/app/models/guest_session.py",
+        "backend/app/crud/guest_session_crud.py",
+        "backend/app/services/guest_service.py",
+        "backend/app/api/v1/seo.py",
+        "backend/app/api/v1/keyword.py",
+        "backend/app/models/keyword_history.py",
+        "backend/app/schemas/keyword_history.py",
+        "backend/app/crud/keyword_history.py",
+        "backend/app/db/base.py",
+        "backend/app/models/feishu_doc.py",
+        "backend/app/schemas/feishu_doc.py",
+        "backend/app/crud/feishu_doc.py",
+        "backend/app/api/v1/feishu_docs.py",
+        "backend/app/api/v1/jimeng.py",
+        "backend/app/core/config.py",
+        "backend/alembic/versions/20260520_000003_add_ip_address_index_to_guest_sessions.py",
+        "backend/alembic/versions/20260520_000004_create_keyword_history_table.py",
+        "backend/alembic/versions/20260520_000005_add_user_id_to_feishu_docs.py",
+        "backend/alembic/versions/20260520_000006_add_user_id_index_to_keyword_history.py"
+      ],
+      "started_at": "2026-05-20T21:30:00Z",
+      "completed_at": "2026-05-20T22:00:00Z",
+      "notes": "Sprint1: P0游客配额Cookie绕过+配额先扣后失败; Sprint2: P1状态码+keyword-history; Sprint3: P2 feishu_docs越权+jimeng回退+seo_scoring遗留"
     },
     "4": {
-      "name": "code-reviewer 审查",
+      "name": "代码审查",
       "agent": "code-reviewer",
       "status": "completed",
-      "deliverables": ["3轮审查报告"],
-      "started_at": "2026-05-19T05:30:00Z",
-      "completed_at": "2026-05-19T11:00:00Z",
-      "notes": "Sprint 1 审查通过（P0+P1 已修复）；Sprint 2 三轮审查：5P0+8P1→3CRITICAL+3MAJOR→2MAJOR+2MINOR→全部修复通过"
+      "deliverables": [],
+      "started_at": "2026-05-20T22:00:00Z",
+      "completed_at": "2026-05-20T22:10:00Z",
+      "notes": "1 P0(X-Forwarded-For注入)+2 P1→全部修复; P2: 3个记入技术债"
     },
     "5": {
-      "name": "business-tester 业务验收",
+      "name": "业务验收",
       "agent": "business-tester",
       "status": "completed",
-      "deliverables": ["frontend/src/__tests__/sprint2Acceptance.test.ts"],
-      "started_at": "2026-05-19T06:00:00Z",
-      "completed_at": "2026-05-19T09:00:00Z",
-      "notes": "Sprint 1 验收 APPROVED（6个测试文件，覆盖 AC-1 到 AC-6）；Sprint 2 验收 APPROVED（45个前端测试全绿，122个后端回归全绿，构建成功）"
+      "deliverables": ["backend/tests/test_guest_quota_audit.py"],
+      "started_at": "2026-05-20T22:10:00Z",
+      "completed_at": "2026-05-20T22:30:00Z",
+      "notes": "APPROVED — 17/17验收标准通过, 33/33测试用例通过"
     }
   },
   "sprints": [
     {
       "id": 1,
       "status": "completed",
-      "scope": "数据模型 + 后端 API + 权限中间件",
+      "scope": "P0：游客配额Cookie绕过+配额先扣后失败",
       "tasks": {
         "completed": [
-          "2个 Alembic migration",
-          "4个新 Model + db/base.py 注册",
-          "deps.py 扩展",
-          "security.py JWT role claim",
-          "rate_limit_service.py",
-          "3个 API 注入点",
-          "auth.py 扩展",
-          "GET /api/users/me 扩展",
-          "main.py startup 事件",
-          "P0/P1 修复"
+          "guest_session_crud.py: get_by_ip_address + SELECT FOR UPDATE",
+          "guest_service.py: identify_guest IP优先 + reserve/consume两阶段配额",
+          "seo.py: trending路由reserve→API→consume",
+          "keyword.py: keyword_research路由reserve→API→consume",
+          "Alembic迁移: ip_address索引"
         ],
         "failed": [],
         "pending": []
       },
-      "review_status": "passed_with_fixes",
-      "test_status": "approved"
+      "review_status": "passed_with_p0_p1_fixes",
+      "test_status": "passed"
     },
     {
       "id": 2,
       "status": "completed",
-      "scope": "前端页面 + 游客体验 + 集成测试",
+      "scope": "P1：状态码修复+keyword-history路由",
       "tasks": {
         "completed": [
-          "authStore 扩展（role + subscription 字段）",
-          "authApi.ts 类型更新",
-          "features.ts 新增 hasRole()",
-          "TabbedShell.tsx 导航 minRole 过滤",
-          "RequireRole 路由守卫组件",
-          "游客端点改造（3个路由改 OptionalUserDep + IP限流）",
-          "Cookie 写入 + guest_daily_quotas 读写",
-          "管理员注册页面",
-          "设置中心子模块权限拆分",
-          "配额进度组件",
-          "游客超限 Modal",
-          "端到端测试 + 回归测试",
-          "C-01/C-02/C-03 CRITICAL 修复（RequireRole集成、GuestLimitModal集成、7模块minRole修正）",
-          "M-01/M-02/M-03 MAJOR 修复（死导入清理+QuotaProgress渲染、游客菜单、条件API调用）",
-          "M-05/M-06 MAJOR 修复（TAB_MIN_ROLE DRY、agent-edit守卫）",
-          "m-01/m-02 MINOR 修复（登录重定向、personal-settings纵深防御）"
+          "seo.py/keyword.py: 配额不足400→503+消息优化",
+          "KeywordHistory模型+schema+CRUD",
+          "keyword.py: GET /keyword-history路由",
+          "keyword.py: keyword_research写入历史",
+          "Alembic迁移: keyword_history表"
         ],
         "failed": [],
         "pending": []
       },
-      "review_status": "passed_with_fixes",
-      "test_status": "approved"
+      "review_status": "passed_with_p1_fixes",
+      "test_status": "passed"
+    },
+    {
+      "id": 3,
+      "status": "completed",
+      "scope": "P2：feishu_docs越权+jimeng回退+seo_scoring遗留",
+      "tasks": {
+        "completed": [
+          "FeishuDoc模型: 新增user_id nullable列",
+          "feishu_docs.py: 删除/归档user_id校验",
+          "jimeng.py: 删除org级回退逻辑+状态码500→400",
+          "seo.py: seo_scoring_endpoint配额两阶段修复",
+          "Alembic迁移: feishu_docs加user_id + keyword_history加索引"
+        ],
+        "failed": [],
+        "pending": []
+      },
+      "review_status": "passed_with_p0_p1_fixes",
+      "test_status": "passed"
     }
   ],
   "skipped_commands": [],

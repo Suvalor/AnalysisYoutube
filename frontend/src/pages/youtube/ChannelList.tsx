@@ -1,4 +1,4 @@
-import { Alert, Button, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Popover, Select, Spin, Table, Tag, Typography, message } from "antd";
+import { Alert, Button, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Popover, Select, Spin, Table, Tag, Tooltip, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -10,9 +10,11 @@ import {
   blueOceanRadarApi,
   deleteYouTubeChannelApi,
   discoverChannelsApi,
+  discoverChannelDetailApi,
   getYouTubeQuotaDashboardApi,
   listYouTubeChannelsApi,
   type BlueOceanChannelItem,
+  type ChannelDetailResponse,
   type DiscoverChannelItem,
   type YouTubeAnalyzeResponse,
 } from "@/services/authApi";
@@ -72,6 +74,35 @@ export default function ChannelList() {
   const [followedBlueOceanIds, setFollowedBlueOceanIds] = useState<Set<string>>(new Set());
   const [blueOceanForm] = Form.useForm<BlueOceanFormValues>();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  /** 频道详情 Drawer 状态 */
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [channelDetail, setChannelDetail] = useState<ChannelDetailResponse | null>(null);
+
+  /** 打开频道详情 Drawer，调用后端缓存增强接口 */
+  const handleViewDetail = useCallback(async (channelId: string) => {
+    setDetailVisible(true);
+    setDetailLoading(true);
+    setDetailError(null);
+    setChannelDetail(null);
+    try {
+      const data = await discoverChannelDetailApi(channelId);
+      setChannelDetail(data);
+    } catch {
+      setDetailError("获取频道详情失败，请稍后重试");
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  /** 关闭频道详情 Drawer */
+  const handleCloseDetail = useCallback(() => {
+    setDetailVisible(false);
+    setChannelDetail(null);
+    setDetailError(null);
+  }, []);
 
   const monitoredYtIds = useMemo(() => new Set(allRows.map((r) => r.channel.yt_channel_id)), [allRows]);
 
@@ -193,7 +224,7 @@ export default function ChannelList() {
       keyword: "",
       published_after: 14,
       max_subscribers: 50000,
-      max_results: 25,
+      max_results: 50,
     });
     setDiscoverOpen(true);
   };
@@ -314,22 +345,34 @@ export default function ChannelList() {
     {
       title: "频道信息",
       key: "ch",
+      width: 220,
       render: (_, r) => (
         <div className="flex items-center gap-2 min-w-0">
-          <img src={r.thumbnail_url || ""} alt="" className="w-9 h-9 rounded-full border border-slate-200 shrink-0" />
+          <img
+            src={r.avatar_url || r.thumbnail_url || ""}
+            alt={r.title}
+            className="w-9 h-9 rounded-full border border-yc-border shrink-0 object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
           <div className="min-w-0">
-            <Typography.Text ellipsis={{ tooltip: r.title }} className="font-medium text-slate-900 block">
-              {r.title}
-            </Typography.Text>
             <Typography.Link
-              href={r.channel_url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs"
-              onClick={(e) => e.stopPropagation()}
+              onClick={() => handleViewDetail(r.yt_channel_id)}
+              className="font-medium text-yc-text-primary"
             >
-              打开频道
+              {r.title}
             </Typography.Link>
+            {r.description && (
+              <Tooltip title={r.description} placement="topLeft">
+                <div className="text-xs text-yc-text-secondary mt-0.5 truncate max-w-[200px]">
+                  {r.description}
+                </div>
+              </Tooltip>
+            )}
+            {r.channel_created_at && (
+              <div className="text-xs text-yc-text-secondary mt-0.5">
+                {dayjs(r.channel_created_at).fromNow()} 创建
+              </div>
+            )}
           </div>
         </div>
       ),
@@ -349,6 +392,20 @@ export default function ChannelList() {
       render: (v: number) => formatNumber(v),
     },
     {
+      title: "视频数",
+      dataIndex: "video_count",
+      width: 90,
+      sorter: (a, b) => (a.video_count ?? 0) - (b.video_count ?? 0),
+      render: (v: number) => formatNumber(v ?? 0),
+    },
+    {
+      title: "均播放量",
+      dataIndex: "avg_views_per_video",
+      width: 100,
+      sorter: (a, b) => (a.avg_views_per_video ?? 0) - (b.avg_views_per_video ?? 0),
+      render: (v: number) => formatNumber(Math.round(v ?? 0)),
+    },
+    {
       title: "爆款视频",
       key: "vurl",
       width: 180,
@@ -357,7 +414,7 @@ export default function ChannelList() {
           <Typography.Link href={r.viral_video_url} target="_blank" rel="noreferrer">
             打开视频
           </Typography.Link>
-          <span className="text-xs text-slate-500">播放：{formatNumber(r.trigger_video_views)}</span>
+          <span className="text-xs text-yc-text-secondary">播放：{formatNumber(r.trigger_video_views)}</span>
         </div>
       ),
     },
@@ -394,71 +451,127 @@ export default function ChannelList() {
     },
   ];
 
-  const discoverColumns: ColumnsType<DiscoverChannelItem> = [
-    {
-      title: "频道",
-      key: "ch",
-      render: (_, r) => (
-        <div className="flex items-center gap-2 min-w-0">
-          <img src={r.thumbnail_url || ""} alt="" className="w-9 h-9 rounded-full border border-yc-border shrink-0" />
-          <Typography.Text ellipsis={{ tooltip: r.title }} className="font-medium text-yc-text-primary">
-            {r.title}
-          </Typography.Text>
-        </div>
-      ),
-    },
-    {
-      title: "订阅数",
-      dataIndex: "subscriber_count",
-      width: 100,
-      render: (v: number) => formatNumber(v),
-    },
-    {
-      title: "总播放量",
-      dataIndex: "total_views",
-      width: 110,
-      render: (v: number) => formatNumber(v),
-    },
-    {
-      title: "频道链接",
-      key: "curl",
-      width: 88,
-      render: (_, r) => (
-        <Typography.Link href={r.channel_url} target="_blank" rel="noreferrer">
-          打开
-        </Typography.Link>
-      ),
-    },
-    {
-      title: "爆款视频",
-      key: "vurl",
-      width: 88,
-      render: (_, r) => (
-        <Typography.Link href={r.viral_video_url} target="_blank" rel="noreferrer">
-          打开
-        </Typography.Link>
-      ),
-    },
-    {
-      title: "操作",
-      key: "op",
-      width: 108,
-      render: (_, r) => {
-        const already = monitoredYtIds.has(r.yt_channel_id);
-        return (
-          <Button
-            type="primary"
-            size="small"
-            disabled={already}
-            loading={addingDiscoverYtId === r.yt_channel_id}
-            onClick={() => void onDiscoverAddFollow(r)}
-          >
-            {already ? "已关注" : "添加关注"}
-          </Button>
-        );
+  /** discoverColumns — 频道卡片富化版 */
+  const discoverColumns: ColumnsType<DiscoverChannelItem> = useMemo(
+    () => [
+      {
+        title: "频道",
+        key: "ch",
+        width: 280,
+        render: (_, r) => (
+          <div className="flex items-start gap-2 min-w-0">
+            <img
+              src={r.avatar_url || r.thumbnail_url || ""}
+              alt={r.title}
+              className="w-10 h-10 rounded-full border border-yc-border shrink-0 object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+            <div className="min-w-0 flex-1">
+              <Typography.Link
+                onClick={() => handleViewDetail(r.yt_channel_id)}
+                className="font-medium text-yc-text-primary"
+              >
+                {r.title}
+              </Typography.Link>
+              {r.description && (
+                <Tooltip title={r.description} placement="topLeft">
+                  <div className="text-xs text-yc-text-secondary mt-0.5 truncate max-w-[200px]">
+                    {r.description}
+                  </div>
+                </Tooltip>
+              )}
+              {r.published_at && (
+                <div className="text-xs text-yc-text-secondary mt-0.5">
+                  {dayjs(r.published_at).fromNow()} 创建
+                </div>
+              )}
+            </div>
+          </div>
+        ),
       },
-    },
-  ];
+      {
+        title: "订阅数",
+        dataIndex: "subscriber_count",
+        width: 100,
+        sorter: (a, b) => a.subscriber_count - b.subscriber_count,
+        render: (v: number) => formatNumber(v),
+      },
+      {
+        title: "视频数",
+        dataIndex: "video_count",
+        width: 90,
+        sorter: (a, b) => (a.video_count ?? 0) - (b.video_count ?? 0),
+        render: (v: number) => formatNumber(v),
+      },
+      {
+        title: "总播放量",
+        dataIndex: "channel_total_views",
+        width: 110,
+        sorter: (a, b) => a.channel_total_views - b.channel_total_views,
+        render: (v: number) => formatNumber(v),
+      },
+      {
+        title: "均播放量",
+        dataIndex: "avg_views_per_video",
+        width: 100,
+        sorter: (a, b) => (a.avg_views_per_video ?? 0) - (b.avg_views_per_video ?? 0),
+        render: (v: number) => formatNumber(Math.round(v ?? 0)),
+      },
+      {
+        title: "爆款视频播放",
+        dataIndex: "trigger_video_views",
+        width: 140,
+        sorter: (a, b) => a.trigger_video_views - b.trigger_video_views,
+        render: (v: number, r) => (
+          <div>
+            <span className="font-semibold text-orange-500">{formatNumber(v)}</span>
+            {r.trigger_video_title && (
+              <Tooltip title={r.trigger_video_title} placement="topLeft">
+                <div className="text-xs text-yc-text-secondary mt-0.5 truncate max-w-[120px]">
+                  {r.trigger_video_title}
+                </div>
+              </Tooltip>
+            )}
+          </div>
+        ),
+      },
+      {
+        title: "链接",
+        key: "links",
+        width: 120,
+        render: (_, r) => (
+          <div className="flex flex-col gap-1">
+            <Typography.Link href={r.channel_url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+              频道
+            </Typography.Link>
+            <Typography.Link href={r.viral_video_url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+              爆款视频
+            </Typography.Link>
+          </div>
+        ),
+      },
+      {
+        title: "操作",
+        key: "op",
+        width: 100,
+        render: (_, r) => {
+          const already = monitoredYtIds.has(r.yt_channel_id);
+          return (
+            <Button
+              type="primary"
+              size="small"
+              disabled={already}
+              loading={addingDiscoverYtId === r.yt_channel_id}
+              onClick={() => void onDiscoverAddFollow(r)}
+            >
+              {already ? "已关注" : "添加关注"}
+            </Button>
+          );
+        },
+      },
+    ],
+    [handleViewDetail, monitoredYtIds, addingDiscoverYtId],
+  );
 
   const onBatchUpdate = async () => {
     const q = await getYouTubeQuotaDashboardApi();
@@ -697,7 +810,7 @@ export default function ChannelList() {
             form={discoverForm}
             layout="vertical"
             className="mb-4"
-            initialValues={{ published_after: 14, max_subscribers: 50000, max_results: 25 }}
+            initialValues={{ published_after: 14, max_subscribers: 50000, max_results: 50 }}
             onFinish={(v) => void onDiscoverSubmit(v)}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
@@ -855,6 +968,84 @@ export default function ChannelList() {
             }}
           />
         </Spin>
+      </Drawer>
+
+      {/* 频道详情 Drawer */}
+      <Drawer
+        title="频道详情"
+        open={detailVisible}
+        onClose={handleCloseDetail}
+        width={480}
+        destroyOnClose
+      >
+        {detailLoading && !channelDetail ? (
+          <div className="flex items-center justify-center py-16">
+            <Spin size="large" />
+          </div>
+        ) : detailError ? (
+          <Alert
+            type="error"
+            showIcon
+            message="加载失败"
+            description={detailError}
+            className="mb-4"
+          />
+        ) : channelDetail ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              {channelDetail.avatar_url && (
+                <img
+                  src={channelDetail.avatar_url}
+                  alt={channelDetail.title}
+                  className="w-12 h-12 rounded-full border border-yc-border object-cover"
+                />
+              )}
+              <div>
+                <div className="font-semibold text-yc-text-primary text-lg">{channelDetail.title}</div>
+                {channelDetail.custom_url && (
+                  <Typography.Text type="secondary" className="text-xs">
+                    {channelDetail.custom_url}
+                  </Typography.Text>
+                )}
+              </div>
+            </div>
+            {channelDetail.description && (
+              <div>
+                <div className="text-sm font-medium text-yc-text-secondary mb-1">频道简介</div>
+                <Typography.Paragraph className="text-sm text-yc-text-primary whitespace-pre-wrap">
+                  {channelDetail.description}
+                </Typography.Paragraph>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-yc-bg-inset rounded-lg p-3">
+                <div className="text-xs text-yc-text-secondary">订阅数</div>
+                <div className="font-semibold text-yc-text-primary">{formatNumber(channelDetail.subscriber_count)}</div>
+              </div>
+              <div className="bg-yc-bg-inset rounded-lg p-3">
+                <div className="text-xs text-yc-text-secondary">视频数</div>
+                <div className="font-semibold text-yc-text-primary">{formatNumber(channelDetail.video_count)}</div>
+              </div>
+              <div className="bg-yc-bg-inset rounded-lg p-3">
+                <div className="text-xs text-yc-text-secondary">总播放量</div>
+                <div className="font-semibold text-yc-text-primary">{formatNumber(channelDetail.view_count)}</div>
+              </div>
+              <div className="bg-yc-bg-inset rounded-lg p-3">
+                <div className="text-xs text-yc-text-secondary">创建时间</div>
+                <div className="font-semibold text-yc-text-primary">
+                  {channelDetail.published_at ? dayjs(channelDetail.published_at).format("YYYY-MM-DD") : "-"}
+                </div>
+              </div>
+            </div>
+            {channelDetail.country && (
+              <div className="text-sm text-yc-text-secondary">
+                国家/地区：{channelDetail.country}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-center text-yc-text-tertiary py-8">暂无数据</div>
+        )}
       </Drawer>
     </div>
   );
