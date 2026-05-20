@@ -2,6 +2,30 @@ import { createContext, useContext, useMemo, useState, useCallback, type ReactNo
 import { UserRole, type SubscriptionInfo, type QuotaUsage } from "@/types/auth";
 import { getQuotaUsageApi } from "@/services/authApi";
 
+/** 解码 JWT payload，无效 token 返回 null */
+function parseJwt(token: string): Record<string, unknown> | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    return JSON.parse(atob(payload));
+  } catch {
+    return null;
+  }
+}
+
+/** 从 localStorage 的 token 中同步提取角色，确保首次渲染时 role 即为正确值，消除竞态条件 */
+function extractRoleFromStoredToken(): UserRole {
+  if (typeof window === "undefined") return UserRole.GUEST;
+  const token = localStorage.getItem("access_token");
+  if (!token) return UserRole.GUEST;
+  const payload = parseJwt(token);
+  if (!payload || typeof payload.exp !== "number" || payload.exp * 1000 < Date.now()) return UserRole.GUEST;
+  if (payload.role && typeof payload.role === "string" && Object.values(UserRole).includes(payload.role as UserRole)) {
+    return payload.role as UserRole;
+  }
+  return UserRole.GUEST;
+}
+
 type AuthContextValue = {
   token: string | null;
   role: UserRole;
@@ -31,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setTokenState] = useState<string | null>(() =>
     typeof window !== "undefined" ? localStorage.getItem("access_token") : null
   );
-  const [role, setRoleState] = useState<UserRole>(UserRole.GUEST);
+  const [role, setRoleState] = useState<UserRole>(extractRoleFromStoredToken);
   const [subscription, setSubscriptionState] = useState<SubscriptionInfo | null>(loadSavedSubscription);
   const [quotaUsage, setQuotaUsageState] = useState<QuotaUsage | null>(null);
 
@@ -52,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  /** 设置用户角色（不持久化到 localStorage，每次刷新从后端同步） */
+  /** 设置用户角色（不持久化到 localStorage，每次刷新从 JWT payload 同步初始化，运行时从后端同步） */
   const setRole = useCallback((newRole: UserRole) => {
     setRoleState(newRole);
   }, []);

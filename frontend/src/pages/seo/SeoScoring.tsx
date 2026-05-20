@@ -37,6 +37,7 @@ import {
   type AiBenchmarkResult,
   type ScoreBreakdown,
 } from "@/services/authApi";
+import { useAuth } from "@/store/authStore";
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
@@ -64,6 +65,7 @@ function getSeoLevel(score: number, max: number): { label: string; tagColor: str
 }
 
 export default function SeoScoring() {
+  const { token } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [tagsText, setTagsText] = useState("");
@@ -102,7 +104,9 @@ export default function SeoScoring() {
     }
   };
 
+  /** 加载 SEO 评分历史（仅已登录用户，游客无历史记录） */
   const loadHistory = async (page = 1) => {
+    if (!token) return;
     setHistoryLoading(true);
     try {
       const res = await seoScoreHistoryApi(page, 20);
@@ -150,12 +154,15 @@ export default function SeoScoring() {
           <SearchOutlined style={{ marginRight: 8 }} />
           SEO 评分
         </Title>
-        <Button
-          icon={<HistoryOutlined />}
-          onClick={() => setHistoryVisible(true)}
-        >
-          评分历史
-        </Button>
+        {/* 评分历史按钮（仅已登录用户显示） */}
+        {token && (
+          <Button
+            icon={<HistoryOutlined />}
+            onClick={() => setHistoryVisible(true)}
+          >
+            评分历史
+          </Button>
+        )}
       </div>
 
       {/* 输入区 */}

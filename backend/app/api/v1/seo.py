@@ -2,13 +2,14 @@
 
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 
-from app.api.deps import CurrentUserDep, DBSessionDep
+from app.api.deps import CurrentUserDep, DBSessionDep, GuestInfoDep, OptionalUserDep
 from app.models.seo_score import SeoScoreRecord
 from app.models.library import ModelLibrary
 from app.models.trend_cache import TrendHistory
+from app.models.user import UserRole
 from app.crud.library import get_by_user
 from app.schemas.seo_scoring import (
     SeoScoringRequest,
@@ -22,10 +23,12 @@ from app.schemas.seo_scoring import (
 from app.schemas.trend_discovery import TrendDiscoveryRequest, TrendDiscoveryResponse
 from app.schemas.trend_cache import TrendHistoryItem, TrendHistoryListResponse
 from app.services.config_manager import resolve_integration_config
+from app.services.guest_service import set_guest_cookie
 from app.services.seo_scoring_service import calculate_seo_score
 from app.services.trend_discovery_service import fetch_trending
 from app.services.trend_cache_service import get_cached_trend, get_saved_trend, save_trend_cache, add_trend_history, list_trend_history
 from app.services.quota_service import record_api_quota_usage
+from app.services.rate_limit_service import check_quota, increment_usage
 
 router = APIRouter()
 
@@ -41,10 +44,13 @@ router = APIRouter()
 async def seo_scoring_endpoint(
     body: SeoScoringRequest,
     db: DBSessionDep,
-    current_user: CurrentUserDep,
+    current_user: OptionalUserDep,
+    guest_info: GuestInfoDep,
+    response: Response,
 ) -> SeoScoringResponse:
     """
     对视频标题/描述/标签/缩略图进行 SEO 质量评分（0-100）。
+    支持游客访问（受限配额），已登录用户使用组织级配置。
 
     评分维度（各 25 分）：
     - 标题：规则评分 + AI 竞品对标加分
@@ -54,15 +60,42 @@ async def seo_scoring_endpoint(
 
     如提供 model_library_id，将调用 AI 进行竞品对标分析。
     如配置了 YouTube API Key，将获取竞品视频数据。
-    评分结果自动保存，可通过历史接口查看趋势。
+    评分结果自动保存（仅已登录用户），可通过历史接口查看趋势。
     """
-    # 解析集成配置
-    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    # 游客配额检查与计数
+    if not current_user:
+        role = UserRole.GUEST
+        user_id = None
+        guest_id = guest_info.guest_id
+        subscription_quotas = None
+        set_guest_cookie(response, guest_id)
+        allowed, used, limit = await check_quota(
+            db, user_id=user_id, role=role, guest_id=guest_id,
+            api_type="youtube_api", subscription_quotas=subscription_quotas,
+        )
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"配额已用尽：youtube_api 已用 {used}/{limit}，请升级套餐或明日再试",
+            )
+        await increment_usage(
+            db, user_id=user_id, role=role, guest_id=guest_id,
+            api_type="youtube_api",
+        )
+        await db.commit()
+    else:
+        role = current_user.role
+        user_id = current_user.id
+        guest_id = None
+
+    # 解析集成配置（游客使用系统级 fallback）
+    org_id = current_user.org_id if current_user else None
+    icfg = await resolve_integration_config(db, org_id=org_id)
     youtube_api_key = icfg.youtube_api_key or None
 
-    # 解析模型配置（用于 AI 竞品分析）
+    # 解析模型配置（用于 AI 竞品分析，仅已登录用户可用）
     model_library = None
-    if body.model_library_id:
+    if current_user and body.model_library_id:
         model_library = await get_by_user(db, ModelLibrary, current_user.id, body.model_library_id)
 
     # 执行评分
@@ -81,28 +114,31 @@ async def seo_scoring_endpoint(
         await record_api_quota_usage(db, "search", times=1, part_count=1)
         await record_api_quota_usage(db, "videos", times=1, part_count=1)
 
-    # 保存评分记录
-    record = SeoScoreRecord(
-        user_id=current_user.id,
-        title=body.title,
-        description=body.description,
-        tags=body.tags,
-        thumbnail_url=body.thumbnail_url,
-        target_keyword=body.target_keyword,
-        total_score=result["total_score"],
-        title_score=result["title_score"],
-        description_score=result["description_score"],
-        tags_score=result["tags_score"],
-        thumbnail_score=result["thumbnail_score"],
-        suggestions=result.get("suggestions", []),
-        ai_benchmark=result.get("ai_benchmark"),
-        competitor_summary=result.get("competitor_summary"),
-        score_breakdown=result.get("score_breakdown"),
-        model_library_id=body.model_library_id,
-    )
-    db.add(record)
-    await db.commit()
-    await db.refresh(record)
+    # 保存评分记录（仅已登录用户）
+    record_id = 0
+    if current_user:
+        record = SeoScoreRecord(
+            user_id=current_user.id,
+            title=body.title,
+            description=body.description,
+            tags=body.tags,
+            thumbnail_url=body.thumbnail_url,
+            target_keyword=body.target_keyword,
+            total_score=result["total_score"],
+            title_score=result["title_score"],
+            description_score=result["description_score"],
+            tags_score=result["tags_score"],
+            thumbnail_score=result["thumbnail_score"],
+            suggestions=result.get("suggestions", []),
+            ai_benchmark=result.get("ai_benchmark"),
+            competitor_summary=result.get("competitor_summary"),
+            score_breakdown=result.get("score_breakdown"),
+            model_library_id=body.model_library_id,
+        )
+        db.add(record)
+        await db.commit()
+        await db.refresh(record)
+        record_id = record.id
 
     # 构建响应
     ai_benchmark = None
@@ -128,7 +164,7 @@ async def seo_scoring_endpoint(
         score_breakdown = ScoreBreakdown(**sb)
 
     return SeoScoringResponse(
-        record_id=record.id,
+        record_id=record_id,
         total_score=result["total_score"],
         title_score=result["title_score"],
         title_max=result["title_max"],
@@ -145,13 +181,13 @@ async def seo_scoring_endpoint(
     )
 
 
-# ── SEO 评分历史 ──
+# ── SEO 评分历史（仅已登录用户） ──
 
 
 @router.get(
     "/seo-score/history",
     response_model=SeoScoreHistoryResponse,
-    summary="SEO 评分历史记录",
+    summary="SEO 评分历史记录（需登录）",
 )
 async def seo_score_history(
     db: DBSessionDep,
@@ -159,7 +195,7 @@ async def seo_score_history(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页条数"),
 ) -> SeoScoreHistoryResponse:
-    """获取当前用户的 SEO 评分历史记录，按时间倒序。"""
+    """获取当前用户的 SEO 评分历史记录，按时间倒序。仅已登录用户可用。"""
     # 总数
     count_q = select(func.count()).select_from(SeoScoreRecord).where(
         SeoScoreRecord.user_id == current_user.id
@@ -185,14 +221,14 @@ async def seo_score_history(
 @router.get(
     "/seo-score/history/{record_id}",
     response_model=SeoScoreRecordDetail,
-    summary="SEO 评分记录详情",
+    summary="SEO 评分记录详情（需登录）",
 )
 async def seo_score_record_detail(
     record_id: int,
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> SeoScoreRecordDetail:
-    """获取单条 SEO 评分记录的完整详情。"""
+    """获取单条 SEO 评分记录的完整详情。仅已登录用户可用。"""
     q = select(SeoScoreRecord).where(
         SeoScoreRecord.id == record_id,
         SeoScoreRecord.user_id == current_user.id,
@@ -237,14 +273,14 @@ async def seo_score_record_detail(
 
 @router.delete(
     "/seo-score/history/{record_id}",
-    summary="删除 SEO 评分记录",
+    summary="删除 SEO 评分记录（需登录）",
 )
 async def delete_seo_score_record(
     record_id: int,
     db: DBSessionDep,
     current_user: CurrentUserDep,
 ) -> dict:
-    """删除单条 SEO 评分记录。"""
+    """删除单条 SEO 评分记录。仅已登录用户可用。"""
     q = select(SeoScoreRecord).where(
         SeoScoreRecord.id == record_id,
         SeoScoreRecord.user_id == current_user.id,
@@ -269,30 +305,58 @@ async def delete_seo_score_record(
 async def trend_discovery_endpoint(
     body: TrendDiscoveryRequest,
     db: DBSessionDep,
-    current_user: CurrentUserDep,
+    current_user: OptionalUserDep,
+    guest_info: GuestInfoDep,
+    response: Response,
 ) -> TrendDiscoveryResponse:
     """
     获取指定地区的 YouTube 热门趋势视频。
+    支持游客访问（受限配额），已登录用户使用组织级配置。
     相同地区+品类+1小时内复用缓存，不重复调用 YouTube API。
     """
+    # 游客配额检查与计数
+    if not current_user:
+        role = UserRole.GUEST
+        user_id = None
+        guest_id = guest_info.guest_id
+        subscription_quotas = None
+        set_guest_cookie(response, guest_id)
+        allowed, used, limit = await check_quota(
+            db, user_id=user_id, role=role, guest_id=guest_id,
+            api_type="youtube_api", subscription_quotas=subscription_quotas,
+        )
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"配额已用尽：youtube_api 已用 {used}/{limit}，请升级套餐或明日再试",
+            )
+        await increment_usage(
+            db, user_id=user_id, role=role, guest_id=guest_id,
+            api_type="youtube_api",
+        )
+        await db.commit()
+
     category_id = body.category_id or ""
 
     # 检查缓存
     cached = await get_cached_trend(db, region=body.region, category_id=category_id)
     if cached is not None:
-        # 缓存命中，仅记录历史
-        await add_trend_history(
-            db,
-            user_id=current_user.id,
-            region=body.region,
-            category_id=category_id,
-            region_label=body.region_label,
-            category_label=body.category_label,
-        )
-        await db.commit()
+        # 缓存命中，仅已登录用户记录历史
+        if current_user:
+            await add_trend_history(
+                db,
+                user_id=current_user.id,
+                region=body.region,
+                category_id=category_id,
+                region_label=body.region_label,
+                category_label=body.category_label,
+            )
+            await db.commit()
         return TrendDiscoveryResponse(**cached)
 
-    icfg = await resolve_integration_config(db, org_id=current_user.org_id)
+    # 解析集成配置（游客使用系统级 fallback）
+    org_id = current_user.org_id if current_user else None
+    icfg = await resolve_integration_config(db, org_id=org_id)
     if not icfg.youtube_api_key:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -313,15 +377,16 @@ async def trend_discovery_endpoint(
     # 保存缓存
     await save_trend_cache(db, region=body.region, category_id=category_id, data=result)
 
-    # 记录历史
-    await add_trend_history(
-        db,
-        user_id=current_user.id,
-        region=body.region,
-        category_id=category_id,
-        region_label=body.region_label,
-        category_label=body.category_label,
-    )
+    # 已登录用户记录历史
+    if current_user:
+        await add_trend_history(
+            db,
+            user_id=current_user.id,
+            region=body.region,
+            category_id=category_id,
+            region_label=body.region_label,
+            category_label=body.category_label,
+        )
     await db.commit()
 
     return TrendDiscoveryResponse(**result)
@@ -337,13 +402,14 @@ async def trend_discovery_endpoint(
 )
 async def get_trend_cache_endpoint(
     db: DBSessionDep,
-    current_user: CurrentUserDep,
+    current_user: OptionalUserDep,
     region: str = Query(..., max_length=5, description="地区代码，如 US/GB/JP/KR"),
     category_id: str = Query("", max_length=20, description="YouTube 品类 ID（空字符串表示全部品类）"),
     cache_date: str | None = Query(None, description="缓存日期 YYYY-MM-DD，不传则查当天"),
 ) -> TrendDiscoveryResponse:
     """
     获取已缓存的趋势数据，不检查 TTL。
+    支持游客访问（只读缓存，无配额消耗）。
     适用于历史记录回溯场景，避免因缓存过期而重复调用 YouTube API。
     如果没有对应缓存记录则返回 404。
     """
@@ -365,20 +431,20 @@ async def get_trend_cache_endpoint(
     return TrendDiscoveryResponse(**data)
 
 
-# ── 趋势历史 ──
+# ── 趋势历史（仅已登录用户） ──
 
 
 @router.get(
     "/trend-history",
     response_model=TrendHistoryListResponse,
-    summary="趋势查阅历史",
+    summary="趋势查阅历史（需登录）",
 )
 async def trend_history_list(
     db: DBSessionDep,
     current_user: CurrentUserDep,
     limit: int = Query(10, ge=1, le=50, description="返回条数"),
 ) -> TrendHistoryListResponse:
-    """获取当前用户最近的趋势查阅历史。"""
+    """获取当前用户最近的趋势查阅历史。仅已登录用户可用，游客无历史记录。"""
     items = await list_trend_history(db, user_id=current_user.id, limit=limit)
     return TrendHistoryListResponse(
         items=[

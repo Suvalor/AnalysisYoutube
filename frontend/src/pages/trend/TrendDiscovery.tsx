@@ -37,6 +37,7 @@ import {
   type TrendHistoryItem,
   type TrendDiscoveryResponse,
 } from "@/services/authApi";
+import { useAuth } from "@/store/authStore";
 
 const { Title, Text } = Typography;
 
@@ -115,6 +116,7 @@ function SortHeader({
 }
 
 export default function TrendDiscovery() {
+  const { token } = useAuth();
   const [region, setRegion] = useState("US");
   const [categoryId, setCategoryId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -142,7 +144,9 @@ export default function TrendDiscovery() {
     }
   };
 
+  /** 获取趋势查阅历史（仅已登录用户，游客无历史记录） */
   const fetchHistory = useCallback(async () => {
+    if (!token) return;
     setHistoryLoading(true);
     try {
       const res = await trendHistoryApi(10);
@@ -152,7 +156,7 @@ export default function TrendDiscovery() {
     } finally {
       setHistoryLoading(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     fetchHistory();
@@ -231,8 +235,9 @@ export default function TrendDiscovery() {
     return () => observer.disconnect();
   }, [result, displayCount, sortedVideos.length]);
 
-  // 点击历史记录回溯
+  /** 点击历史记录回溯（仅已登录用户，游客无历史记录） */
   const handleHistoryClick = async (item: TrendHistoryItem) => {
+    if (!token) return;
     setLoading(true);
     try {
       // 优先从缓存读取已保存的趋势数据（不消耗 YouTube 配额）
@@ -480,6 +485,7 @@ export default function TrendDiscovery() {
                   </div>
                   <div>{formatNumber(record.channel_subscribers)}</div>
                   <div>
+                    {token && (
                     <Button
                       type="primary"
                       size="small"
@@ -492,6 +498,7 @@ export default function TrendDiscovery() {
                     >
                       入库
                     </Button>
+                    )}
                   </div>
                 </div>
               ))}

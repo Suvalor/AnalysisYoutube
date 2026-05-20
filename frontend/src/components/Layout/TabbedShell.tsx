@@ -297,14 +297,16 @@ export default function TabbedShell() {
 
   useEffect(() => {
     if (location.pathname === "/" || location.pathname === "") {
-      navigate("/blue-ocean-radar", { replace: true });
+      // 根据用户角色动态选择默认着陆页：已登录用户导航到蓝海雷达，游客导航到关键词研究
+      const defaultPath = hasRole(role, UserRole.USER) ? "/blue-ocean-radar" : "/keyword-research";
+      navigate(defaultPath, { replace: true });
       return;
     }
     // 兼容旧链接：YouTube API 仪表盘已合并到仪表盘
     if (location.pathname === "/youtube-quota") {
       navigate("/dashboard", { replace: true });
     }
-  }, [location.pathname, navigate]);
+  }, [location.pathname, navigate, role]);
 
   useEffect(() => {
     const path = location.pathname;

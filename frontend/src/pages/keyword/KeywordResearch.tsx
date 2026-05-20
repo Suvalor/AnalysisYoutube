@@ -31,6 +31,7 @@ import {
   keywordHistoryApi,
   type KeywordHistoryItem,
 } from "@/services/authApi";
+import { useAuth } from "@/store/authStore";
 
 const { Title, Text } = Typography;
 
@@ -73,6 +74,7 @@ function getLanguageLabel(language: string): string {
 }
 
 export default function KeywordResearch() {
+  const { token } = useAuth();
   const [keyword, setKeyword] = useState("");
   const [region, setRegion] = useState("US");
   const [language, setLanguage] = useState("zh");
@@ -85,7 +87,9 @@ export default function KeywordResearch() {
   const [displayCount, setDisplayCount] = useState(10);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
+  /** 获取关键词研究历史（仅已登录用户，游客无历史记录） */
   const fetchHistory = useCallback(async () => {
+    if (!token) return;
     setHistoryLoading(true);
     try {
       const res = await keywordHistoryApi(10);
@@ -95,7 +99,7 @@ export default function KeywordResearch() {
     } finally {
       setHistoryLoading(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     fetchHistory();
@@ -145,8 +149,9 @@ export default function KeywordResearch() {
 
   const visibleVideos = result?.popular_videos?.slice(0, displayCount) || [];
 
-  // 点击历史记录回溯
+  /** 点击历史记录回溯（仅已登录用户，游客无历史记录） */
   const handleHistoryClick = async (item: KeywordHistoryItem) => {
+    if (!token) return;
     setKeyword(item.keyword);
     setRegion(item.region);
     setLanguage(item.language);
@@ -258,8 +263,8 @@ export default function KeywordResearch() {
         </Row>
       </Card>
 
-      {/* 关键词历史 */}
-      {history.length > 0 && (
+      {/* 关键词历史（仅已登录用户显示） */}
+      {token && history.length > 0 && (
         <Card
           title={<><HistoryOutlined style={{ marginRight: 8 }} />研究历史</>}
           style={{ marginBottom: 24 }}

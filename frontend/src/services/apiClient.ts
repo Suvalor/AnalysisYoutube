@@ -30,7 +30,11 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-/** 受保护接口返回 401 时清除本地令牌并跳转登录（登录/注册接口的 401 不跳转） */
+/** 受保护接口返回 401 时清除本地令牌并跳转登录。
+ * 仅当用户持有 token（已登录）时才重定向，因为已登录用户收到 401 说明 token 已失效。
+ * 游客（无 token）收到 401 是正常行为（访问需认证的接口），不应强制跳转登录页，
+ * 否则会破坏 minRole=GUEST 的页面访问——游客有权查看 GUEST 级页面，
+ * 页面内的 API 调用失败应由组件自行处理（静默或提示），而非全局劫持路由。 */
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -39,9 +43,13 @@ apiClient.interceptors.response.use(
     if (status === 401 && typeof window !== "undefined") {
       const isAuthRoute = url.includes("/api/auth/login") || url.includes("/api/auth/register") || url.includes("/api/auth/forgot-password") || url.includes("/api/auth/reset-password") || url.includes("/api/auth/send-email-code") || url.includes("/api/auth/captcha") || url.includes("/api/auth/admin-invite/verify") || url.includes("/api/quota/usage");
       if (!isAuthRoute) {
-        localStorage.removeItem("access_token");
-        if (!window.location.pathname.startsWith("/login")) {
-          window.location.href = "/login";
+        const hasToken = !!localStorage.getItem("access_token");
+        /* M-01: 仅已登录用户 token 失效时清除 token 并重定向；游客收到 401 不清除不跳转 */
+        if (hasToken) {
+          localStorage.removeItem("access_token");
+          if (!window.location.pathname.startsWith("/login")) {
+            window.location.href = "/login";
+          }
         }
       }
     }
@@ -58,6 +66,7 @@ export default apiClient;
 /**
  * 统一认证 fetch：用于 SSE/流式等需要原生 fetch 的场景，
  * 自动注入 Authorization header 并处理 401。
+ * 仅已登录用户 token 失效时重定向到登录页；游客收到 401 不跳转。
  */
 export async function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
@@ -65,9 +74,13 @@ export async function authFetch(url: string, init: RequestInit = {}): Promise<Re
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const resp = await fetch(url, { ...init, headers });
   if (resp.status === 401 && typeof window !== "undefined") {
-    localStorage.removeItem("access_token");
-    if (!window.location.pathname.startsWith("/login")) {
-      window.location.href = "/login";
+    /* M-02: 实时读取 localStorage，避免并发请求时误删新 token */
+    const currentToken = localStorage.getItem("access_token");
+    if (currentToken) {
+      localStorage.removeItem("access_token");
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login";
+      }
     }
   }
   return resp;
