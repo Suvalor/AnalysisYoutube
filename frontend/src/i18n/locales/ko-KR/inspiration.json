@@ -1,0 +1,57 @@
+{
+  "title": "인스피레이션 센터",
+  "desc": "창작 영감을 수집하고 관리하며, 스크립트와 샷으로 빠르게 변환하세요.",
+  "form": {
+    "searchPlaceholder": "인스피레이션 제목 또는 내용 검색",
+    "title": "제목",
+    "content": "내용",
+    "tag": "태그",
+    "source": "출처"
+  },
+  "action": {
+    "add": "인스피레이션 추가",
+    "edit": "편집",
+    "delete": "삭제",
+    "generatePlot": "플롯 생성",
+    "toSop": "SOP 워크플로우로 이동",
+    "refresh": "새로고침"
+  },
+  "message": {
+    "addSuccess": "인스피레이션이 추가되었습니다",
+    "addFailed": "인스피레이션 추가 실패",
+    "updateSuccess": "인스피레이션이 업데이트되었습니다",
+    "updateFailed": "인스피레이션 업데이트 실패",
+    "deleteSuccess": "인스피레이션이 삭제되었습니다",
+    "deleteFailed": "삭제 실패",
+    "loadFailed": "인스피레이션 목록 로드 실패",
+    "confirmDelete": "이 인스피레이션을 삭제하시겠습니까?",
+    "generatePlotSuccess": "플롯 생성 작업이 제출되었습니다",
+    "generatePlotFailed": "플롯 생성 실패"
+  },
+  "table": {
+    "title": "제목",
+    "content": "내용",
+    "tag": "태그",
+    "source": "출처",
+    "createdAt": "생성일",
+    "actions": "작업"
+  },
+  "card": {
+    "inspirationList": "인스피레이션 목록",
+    "inspirationDetail": "인스피레이션 상세"
+  },
+  "modal": {
+    "addTitle": "인스피레이션 추가",
+    "editTitle": "인스피레이션 편집",
+    "confirm": "확인",
+    "cancel": "취소"
+  },
+  "tag": {
+    "draft": "초안",
+    "generated": "플롯 생성됨",
+    "pending": "대기 중"
+  },
+  "empty": {
+    "noData": "인스피레이션 데이터가 없습니다. '인스피레이션 추가'를 클릭하여 시작하세요"
+  }
+}

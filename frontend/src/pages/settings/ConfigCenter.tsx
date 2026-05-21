@@ -19,6 +19,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/store/authStore";
 import { hasRole } from "@/config/features";
 import { UserRole } from "@/types/auth";
@@ -117,6 +118,7 @@ type CVFormValues = {
 };
 
 export default function ConfigCenter() {
+  const { t } = useTranslation("settings");
   const navigate = useNavigate();
   const location = useLocation();
   const { role } = useAuth();
@@ -187,7 +189,7 @@ export default function ConfigCenter() {
       setPrompts(promptList);
       setStyles(styleList);
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "加载设置中心数据失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("configCenter.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -237,7 +239,7 @@ export default function ConfigCenter() {
       const data = await getIntegrationSettingsApi();
       applyIntegrationReadToForms(data);
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "加载集成配置失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("configCenter.loadFailed"));
     } finally {
       setIntegrationLoading(false);
     }
@@ -322,7 +324,7 @@ export default function ConfigCenter() {
       }));
       const hasPartial = supportedModels.some((x) => (x.label && !x.value) || (!x.label && x.value));
       if (hasPartial) {
-        message.warning("模型名称和模型 ID 需要成对填写");
+        message.warning(t("configCenter.modelLabelPair"));
         setSaving(false);
         return;
       }
@@ -335,16 +337,16 @@ export default function ConfigCenter() {
       }
       if (modelMode === "create") {
         await createModelApi(payload as Required<Pick<typeof payload, "name" | "api_base_url">> & typeof payload);
-        message.success("模型创建成功");
+        message.success(t("configCenter.modelCreateSuccess"));
       } else if (editingModel) {
         await updateModelApi(editingModel.id, payload);
-        message.success("模型更新成功");
+        message.success(t("configCenter.modelUpdateSuccess"));
       }
       setModelOpen(false);
       await loadAll();
     } catch (e: any) {
       if (e?.errorFields) return;
-      message.error(e?.response?.data?.detail ?? e?.message ?? "保存模型失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("configCenter.saveModelFailed"));
     } finally {
       setSaving(false);
     }
@@ -372,25 +374,25 @@ export default function ConfigCenter() {
       if (activeTab === "prompts") {
         if (textMode === "create") {
           await createPromptApi(payload);
-          message.success("智能体创建成功");
+          message.success(t("configCenter.promptCreateSuccess"));
         } else if (editingTextId != null) {
           await updatePromptApi(editingTextId, payload);
-          message.success("智能体更新成功");
+          message.success(t("configCenter.promptUpdateSuccess"));
         }
       } else {
         if (textMode === "create") {
           await createStyleApi(payload);
-          message.success("风格创建成功");
+          message.success(t("configCenter.styleCreateSuccess"));
         } else if (editingTextId != null) {
           await updateStyleApi(editingTextId, payload);
-          message.success("风格更新成功");
+          message.success(t("configCenter.styleUpdateSuccess"));
         }
       }
       setTextOpen(false);
       await loadAll();
     } catch (e: any) {
       if (e?.errorFields) return;
-      message.error(e?.response?.data?.detail ?? e?.message ?? "保存失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("configCenter.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -398,26 +400,26 @@ export default function ConfigCenter() {
 
   const modelColumns: ColumnsType<ModelItem> = useMemo(
     () => [
-      { title: "名称", dataIndex: "name", key: "name" },
+      { title: t("configCenter.modelName"), dataIndex: "name", key: "name" },
       {
-        title: "用途",
+        title: t("configCenter.modelKind"),
         key: "library_kind",
         width: 120,
         render: (_: unknown, row: ModelItem) =>
           row.library_kind === "image_inpaint" ? (
-            <Tag color="purple">图像修复</Tag>
+            <Tag color="purple">{t("configCenter.modelKindInpaint")}</Tag>
           ) : (
-            <Tag>对话</Tag>
+            <Tag>{t("configCenter.modelKindChat")}</Tag>
           ),
       },
-      { title: "URL", dataIndex: "api_base_url", key: "api_base_url" },
+      { title: t("configCenter.modelUrl"), dataIndex: "api_base_url", key: "api_base_url" },
       {
-        title: "Key",
+        title: t("configCenter.modelKey"),
         key: "key",
-        render: (_, row) => (row.has_api_key ? "********" : "未设置"),
+        render: (_, row) => (row.has_api_key ? "********" : t("configCenter.keyPlaceholder")),
       },
       {
-        title: "支持模型",
+        title: t("configCenter.supportedModels"),
         dataIndex: "supported_models_json",
         key: "supported_models_json",
         render: (v: string | null) => {
@@ -435,23 +437,23 @@ export default function ConfigCenter() {
         },
       },
       {
-        title: "操作",
+        title: t("action.edit"),
         key: "op",
         render: (_, row) => (
           <Space>
             <Button size="small" onClick={() => openEditModel(row)}>
-              编辑
+              {t("action.edit")}
             </Button>
             <Popconfirm
-              title="确认删除该模型配置？"
+              title={t("configCenter.deleteModel")}
               onConfirm={async () => {
                 await deleteModelApi(row.id);
-                message.success("删除成功");
+                message.success(t("message.deleteSuccess"));
                 await loadAll();
               }}
             >
               <Button size="small" danger>
-                删除
+                {t("action.delete")}
               </Button>
             </Popconfirm>
           </Space>
@@ -463,26 +465,26 @@ export default function ConfigCenter() {
 
   const promptColumns: ColumnsType<PromptItem> = useMemo(
     () => [
-      { title: "名称", dataIndex: "title", key: "title" },
-      { title: "系统提示词规则", dataIndex: "content", key: "content", ellipsis: true },
+      { title: t("configCenter.modelName"), dataIndex: "title", key: "title" },
+      { title: t("configCenter.promptContent"), dataIndex: "content", key: "content", ellipsis: true },
       {
-        title: "操作",
+        title: t("configCenter.editPrompt"),
         key: "op",
         render: (_, row) => (
           <Space>
             <Button size="small" onClick={() => navigate(`/config/agent/edit/${row.id}`)}>
-              编辑
+              {t("configCenter.editPrompt")}
             </Button>
             <Popconfirm
-              title="确认删除该智能体？"
+              title={t("configCenter.deletePrompt")}
               onConfirm={async () => {
                 await deletePromptApi(row.id);
-                message.success("删除成功");
+                message.success(t("message.deleteSuccess"));
                 await loadAll();
               }}
             >
               <Button size="small" danger>
-                删除
+                {t("action.delete")}
               </Button>
             </Popconfirm>
           </Space>
@@ -521,10 +523,10 @@ export default function ConfigCenter() {
 
       const updated = await updateIntegrationSettingsApi(payload);
       applyIntegrationReadToForms(updated);
-      message.success("云存储配置已保存（仅提交本页字段，组织内成员共享）");
+      message.success(t("configCenter.storageSaveSuccess"));
     } catch (e: any) {
       if (e?.errorFields) return;
-      message.error(e?.response?.data?.detail ?? e?.message ?? "保存失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("configCenter.saveFailed"));
     } finally {
       setIntegrationSaving(false);
     }
@@ -545,10 +547,10 @@ export default function ConfigCenter() {
       if (guri) payload.google_oauth_redirect_uri = guri;
       const updated = await updateIntegrationSettingsApi(payload);
       applyIntegrationReadToForms(updated);
-      message.success("YouTube 配置已保存");
+      message.success(t("configCenter.youtubeSaveSuccess"));
     } catch (e: any) {
       if (e?.errorFields) return;
-      message.error(e?.response?.data?.detail ?? e?.message ?? "保存失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("configCenter.saveFailed"));
     } finally {
       setIntegrationSaving(false);
     }
@@ -576,10 +578,10 @@ export default function ConfigCenter() {
       if (vcsk && !looksLikeMaskedSecret(vcsk)) payload.volc_cv_secret_access_key = vcsk;
       const updated = await updateIntegrationSettingsApi(payload);
       applyIntegrationReadToForms(updated);
-      message.success("智能视觉配置已保存");
+      message.success(t("configCenter.cvSaveSuccess"));
     } catch (e: any) {
       if (e?.errorFields) return;
-      message.error(e?.response?.data?.detail ?? e?.message ?? "保存失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("configCenter.saveFailed"));
     } finally {
       setIntegrationSaving(false);
     }
@@ -592,7 +594,7 @@ export default function ConfigCenter() {
       if (r.ok) message.success(r.message);
       else message.error(r.message);
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "测试失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("configCenter.testFailed"));
     } finally {
       setTestYoutubeLoading(false);
     }
@@ -605,7 +607,7 @@ export default function ConfigCenter() {
       if (r.ok) message.success(r.message);
       else message.error(r.message);
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "测试失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("configCenter.testFailed"));
     } finally {
       setTestStorageLoading(false);
     }
@@ -615,7 +617,7 @@ export default function ConfigCenter() {
     const field = platform === "aliyun" ? "aliyun_custom_domain" : "tencent_custom_domain";
     const domain = ((storageForm.getFieldValue(field) as string | undefined) ?? "").trim();
     if (!domain) {
-      message.warning("请先填写自定义访问域名（须含 https:// 或 http://）");
+      message.warning(t("configCenter.domainCheckWarning"));
       return;
     }
     setDomainCheckLoading(platform);
@@ -624,7 +626,7 @@ export default function ConfigCenter() {
       if (r.ok) message.success(r.message);
       else message.error(r.message);
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "校验失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("configCenter.domainCheckFailed"));
     } finally {
       setDomainCheckLoading(null);
     }
@@ -632,26 +634,26 @@ export default function ConfigCenter() {
 
   const styleColumns: ColumnsType<StyleItem> = useMemo(
     () => [
-      { title: "名称", dataIndex: "title", key: "title" },
-      { title: "风格描述/附加提示词", dataIndex: "content", key: "content", ellipsis: true },
+      { title: t("configCenter.modelName"), dataIndex: "title", key: "title" },
+      { title: t("configCenter.styleContent"), dataIndex: "content", key: "content", ellipsis: true },
       {
-        title: "操作",
+        title: t("configCenter.editStyle"),
         key: "op",
         render: (_, row) => (
           <Space>
             <Button size="small" onClick={() => openEditText(row.id, row.title, row.content)}>
-              编辑
+              {t("configCenter.editStyle")}
             </Button>
             <Popconfirm
-              title="确认删除该风格？"
+              title={t("configCenter.deleteStyle")}
               onConfirm={async () => {
                 await deleteStyleApi(row.id);
-                message.success("删除成功");
+                message.success(t("configCenter.styleDeleteSuccess"));
                 await loadAll();
               }}
             >
               <Button size="small" danger>
-                删除
+                {t("configCenter.deleteStyle")}
               </Button>
             </Popconfirm>
           </Space>
@@ -678,12 +680,12 @@ export default function ConfigCenter() {
             items={([
               {
                 key: "models",
-                label: "模型管理",
+                label: t("configCenter.models"),
                 children: (
                   <>
                     <div className="mb-3">
                       <Button type="primary" onClick={openCreateModel}>
-                        新增模型
+                        {t("configCenter.addModel")}
                       </Button>
                     </div>
                     <Table rowKey="id" columns={modelColumns} dataSource={models} pagination={{ pageSize: 10 }} />
@@ -692,12 +694,12 @@ export default function ConfigCenter() {
               },
               {
                 key: "prompts",
-                label: "智能体管理",
+                label: t("configCenter.prompts"),
                 children: (
                   <>
                     <div className="mb-3">
                       <Button type="primary" onClick={openCreateText}>
-                        新增智能体
+                        {t("configCenter.addPrompt")}
                       </Button>
                     </div>
                     <Table rowKey="id" columns={promptColumns} dataSource={prompts} pagination={{ pageSize: 10 }} />
@@ -706,12 +708,12 @@ export default function ConfigCenter() {
               },
               {
                 key: "styles",
-                label: "风格管理",
+                label: t("configCenter.styles"),
                 children: (
                   <>
                     <div className="mb-3">
                       <Button type="primary" onClick={openCreateText}>
-                        新增风格
+                        {t("configCenter.addStyle")}
                       </Button>
                     </div>
                     <Table rowKey="id" columns={styleColumns} dataSource={styles} pagination={{ pageSize: 10 }} />
@@ -720,30 +722,30 @@ export default function ConfigCenter() {
               },
               {
                 key: "integration",
-                label: "云存储与外部 API",
+                label: t("configCenter.integration"),
                 children: (
                   <Spin spinning={integrationLoading}>
                     <p className="text-yc-text-secondary text-sm mb-3">
-                      配置归属组织：<strong>{integrationMeta?.org_name || "—"}</strong>
-                      （org_id: {integrationMeta?.org_id ?? "—"}）。<strong>组织库内配置优先于环境变量</strong>
-                      ；同组织成员共享。每页仅提交当前 Tab 的字段（增量合并）。请勿将接口返回的{" "}
-                      <code className="text-xs">{SECRET_MASK}</code> 当作新密钥填写。
+                      {t("configCenter.orgInfo")}：<strong>{integrationMeta?.org_name || "—"}</strong>
+                      （{t("configCenter.orgId")}：{integrationMeta?.org_id ?? "—"}）。<strong>{t("configCenter.orgPriority")}</strong>
+                      ；{t("configCenter.orgShared")}。{t("configCenter.secretMaskPrefix")}{" "}
+                      <code className="text-xs">{SECRET_MASK}</code> {t("configCenter.secretMaskSuffix")}
                     </p>
                     <div className="mb-3 flex flex-wrap gap-2">
                       <Popconfirm
-                        title="确认清除本组织在库内的全部集成覆盖？"
-                        description="清除后本组织将完全依赖环境变量默认值。"
+                        title={t("configCenter.clearOrgConfirm")}
+                        description={t("configCenter.clearOrgDesc")}
                         onConfirm={async () => {
                           try {
                             await deleteIntegrationSettingsApi();
-                            message.success("已清除");
+                            message.success(t("configCenter.clearSuccess"));
                             await loadIntegration();
                           } catch (e: any) {
-                            message.error(e?.response?.data?.detail ?? e?.message ?? "清除失败");
+                            message.error(e?.response?.data?.detail ?? e?.message ?? t("configCenter.clearFailed"));
                           }
                         }}
                       >
-                        <Button danger>清除本组织覆盖</Button>
+                        <Button danger>{t("configCenter.clearOrg")}</Button>
                       </Popconfirm>
                     </div>
                     <Tabs
@@ -752,31 +754,31 @@ export default function ConfigCenter() {
                       items={[
                         {
                           key: "storage",
-                          label: "云存储",
+                          label: t("configCenter.storage.title"),
                           children: (
                             <div className="pt-2">
                               <div className="mb-3 flex flex-wrap gap-2">
                                 <Button type="primary" loading={integrationSaving} onClick={() => void submitStorageSettings()}>
-                                  保存云存储配置
+                                  {t("configCenter.storage.save")}
                                 </Button>
                                 <Button loading={testStorageLoading} onClick={() => void runTestStorage()}>
-                                  测试连接
+                                  {t("configCenter.storage.test")}
                                 </Button>
                               </div>
                               <Form form={storageForm} layout="vertical" disabled={integrationLoading}>
-                                <Card size="small" title="存储平台（新上传默认）" className="mb-4">
+                                <Card size="small" title={t("configCenter.storage.title")} className="mb-4">
                                   <Form.Item
                                     name="active_storage_provider"
-                                    label="默认提供商"
-                                    rules={[{ required: true, message: "请选择存储平台" }]}
+                                    label={t("configCenter.storage.provider")}
+                                    rules={[{ required: true, message: t("configCenter.selectProvider") }]}
                                   >
                                     <Radio.Group>
-                                      <Radio value="ALIYUN">阿里云 OSS</Radio>
-                                      <Radio value="TENCENT">腾讯云 COS</Radio>
+                                      <Radio value="ALIYUN">{t("configCenter.storage.aliyun")}</Radio>
+                                      <Radio value="TENCENT">{t("configCenter.storage.tencent")}</Radio>
                                     </Radio.Group>
                                   </Form.Item>
                                 </Card>
-                                <Card size="small" title="阿里云 OSS" className="mb-4">
+                                <Card size="small" title={t("configCenter.storage.aliyun")} className="mb-4">
                                   <Form.Item name="aliyun_access_key_id" label="AccessKey ID">
                                     <Input autoComplete="off" />
                                   </Form.Item>
@@ -785,15 +787,15 @@ export default function ConfigCenter() {
                                     label="AccessKey Secret"
                                     extra={
                                       integrationMeta?.has_aliyun_access_key_secret
-                                        ? `已配置（展示为 ${SECRET_MASK}），留空不修改`
+                                        ? t("configCenter.keyHasValue")
                                         : undefined
                                     }
                                   >
                                     <Input.Password
                                       placeholder={
                                         integrationMeta?.has_aliyun_access_key_secret
-                                          ? "留空不修改"
-                                          : "填写后写入组织配置"
+                                          ? t("configCenter.keyPlaceholder")
+                                          : t("configCenter.keyCreatePlaceholder")
                                       }
                                       autoComplete="new-password"
                                     />
@@ -811,8 +813,8 @@ export default function ConfigCenter() {
                                     <Input placeholder="oss-cn-xxx.aliyuncs.com" />
                                   </Form.Item>
                                   <Form.Item
-                                    label="自定义访问域名 (Custom Domain)"
-                                    extra="对外展示与签名链接的 Host 将使用该域名（须与阿里云/CDN 绑定一致）。示例：https://cdn.example.com"
+                                    label={t("configCenter.storage.customDomain")}
+                                    extra={t("configCenter.storage.customDomainExtra")}
                                   >
                                     <Space.Compact className="w-full max-w-xl">
                                       <Form.Item name="aliyun_custom_domain" noStyle>
@@ -822,12 +824,12 @@ export default function ConfigCenter() {
                                         loading={domainCheckLoading === "aliyun"}
                                         onClick={() => void runValidateStorageDomain("aliyun")}
                                       >
-                                        检查
+                                        {t("configCenter.storage.checkDomain")}
                                       </Button>
                                     </Space.Compact>
                                   </Form.Item>
                                 </Card>
-                                <Card size="small" title="腾讯云 COS">
+                                <Card size="small" title={t("configCenter.storage.tencent")}>
                                   <Form.Item name="tencent_cos_secret_id" label="SecretId">
                                     <Input autoComplete="off" />
                                   </Form.Item>
@@ -836,11 +838,11 @@ export default function ConfigCenter() {
                                     label="SecretKey"
                                     extra={
                                       integrationMeta?.has_tencent_cos_secret_key
-                                        ? `已配置（${SECRET_MASK}），留空不修改`
+                                        ? t("configCenter.keyHasValue")
                                         : undefined
                                     }
                                   >
-                                    <Input.Password placeholder="留空不修改" autoComplete="new-password" />
+                                    <Input.Password placeholder={t("configCenter.keyPlaceholder")} autoComplete="new-password" />
                                   </Form.Item>
                                   <Form.Item name="tencent_cos_region" label="Region">
                                     <Input placeholder="ap-guangzhou" />
@@ -849,8 +851,8 @@ export default function ConfigCenter() {
                                     <Input />
                                   </Form.Item>
                                   <Form.Item
-                                    label="自定义访问域名 (Custom Domain)"
-                                    extra="对外展示与签名链接的 Host 将使用该域名（须与 COS 自定义域名/CDN 一致）。示例：https://cdn.example.com"
+                                    label={t("configCenter.storage.customDomain")}
+                                    extra={t("configCenter.storage.customDomainExtraTencent")}
                                   >
                                     <Space.Compact className="w-full max-w-xl">
                                       <Form.Item name="tencent_custom_domain" noStyle>
@@ -860,7 +862,7 @@ export default function ConfigCenter() {
                                         loading={domainCheckLoading === "tencent"}
                                         onClick={() => void runValidateStorageDomain("tencent")}
                                       >
-                                        检查
+                                        {t("configCenter.storage.checkDomain")}
                                       </Button>
                                     </Space.Compact>
                                   </Form.Item>
@@ -871,54 +873,54 @@ export default function ConfigCenter() {
                         },
                         {
                           key: "youtube",
-                          label: "YouTube Data API",
+                          label: t("configCenter.youtube.title"),
                           children: (
                             <div className="pt-2 max-w-xl">
                               <div className="mb-3 flex flex-wrap gap-2">
                                 <Button type="primary" loading={integrationSaving} onClick={() => void submitYoutubeSettings()}>
-                                  保存 YouTube 配置
+                                  {t("configCenter.youtube.save")}
                                 </Button>
                                 <Button loading={testYoutubeLoading} onClick={() => void runTestYoutube()}>
-                                  测试连接
+                                  {t("configCenter.youtube.test")}
                                 </Button>
                               </div>
                               <Form form={youtubeForm} layout="vertical" disabled={integrationLoading}>
                                 <Form.Item
                                   name="youtube_api_key"
-                                  label="YouTube API Key"
+                                  label={t("configCenter.youtube.keyLabel")}
                                   extra={
                                     integrationMeta?.has_youtube_api_key
-                                      ? `已配置（${SECRET_MASK}），留空不修改；定时任务按组织使用该 Key`
-                                      : "未配置，请在下方填写"
+                                      ? t("configCenter.youtube.keyExtra")
+                                      : t("configCenter.youtube.keyExtraNoConfig")
                                   }
                                 >
-                                  <Input.Password placeholder="粘贴新 Key 以覆盖组织配置" autoComplete="new-password" />
+                                  <Input.Password placeholder={t("configCenter.youtube.keyPlaceholder")} autoComplete="new-password" />
                                 </Form.Item>
-                                <div className="text-yc-text-secondary text-sm font-medium mt-4 mb-2">Google OAuth（YouTube 用户授权）</div>
+                                <div className="text-yc-text-secondary text-sm font-medium mt-4 mb-2">{t("configCenter.youtube.oauthTitle")}</div>
                                 <p className="text-yc-text-tertiary text-xs mb-2">
-                                  用于 YouTube OAuth2 用户授权流程（上传视频、读取频道数据）。Client Secret 加密存储，留空不修改。
+                                  {t("configCenter.youtube.oauthDesc")}
                                 </p>
                                 <Form.Item
                                   name="google_oauth_client_id"
-                                  label="Client ID"
+                                  label={t("configCenter.youtube.clientId")}
                                 >
                                   <Input placeholder="xxx.apps.googleusercontent.com" autoComplete="off" />
                                 </Form.Item>
                                 <Form.Item
                                   name="google_oauth_client_secret"
-                                  label="Client Secret"
+                                  label={t("configCenter.youtube.clientSecret")}
                                   extra={
                                     integrationMeta?.has_google_oauth_client_secret
-                                      ? `已配置（${SECRET_MASK}），留空不修改`
+                                      ? t("configCenter.keyHasValue")
                                       : undefined
                                   }
                                 >
-                                  <Input.Password placeholder="留空不修改" autoComplete="new-password" />
+                                  <Input.Password placeholder={t("configCenter.keyPlaceholder")} autoComplete="new-password" />
                                 </Form.Item>
                                 <Form.Item
                                   name="google_oauth_redirect_uri"
-                                  label="Redirect URI"
-                                  extra="须与 Google Cloud Console 中 OAuth 应用的授权重定向 URI 一致"
+                                  label={t("configCenter.youtube.redirectUri")}
+                                  extra={t("configCenter.youtube.redirectUriExtra")}
                                 >
                                   <Input placeholder="https://your-domain.com/api/youtube/oauth/callback" autoComplete="off" />
                                 </Form.Item>
@@ -928,31 +930,30 @@ export default function ConfigCenter() {
                         },
                         {
                           key: "cv",
-                          label: "智能视觉（CV）",
+                          label: t("configCenter.volc.cvTitle"),
                           children: (
                             <div className="pt-2 max-w-xl">
                               <div className="mb-3">
                                 <Button type="primary" loading={integrationSaving} onClick={() => void submitCVSettings()}>
-                                  保存智能视觉配置
+                                  {t("configCenter.volc.save")}
                                 </Button>
                               </div>
                               <Form form={cvForm} layout="vertical" disabled={integrationLoading}>
                                 <div className="text-yc-text-secondary text-sm font-medium mb-2">
-                                  智能视觉 CV（去水印 / 图像修补）
+                                  {t("configCenter.volc.cvTitle")}
                                 </div>
                                 <p className="text-yc-text-tertiary text-xs mb-2">
-                                  AccessKey（ID）+ SecretAccessKey，用于火山 CV Img2ImgInpainting。
-                                  配置后将优先于 OpenAI 兼容通道；未配置时可仅用「图像修复」模型库。
+                                  {t("configCenter.volc.cvDesc")}
                                 </p>
-                                <Form.Item name="volc_cv_access_key_id" label="CV AccessKey ID">
-                                  <Input placeholder="AK 留空不修改" autoComplete="off" />
+                                <Form.Item name="volc_cv_access_key_id" label={t("configCenter.volc.cvAccessKeyId")}>
+                                  <Input placeholder={t("configCenter.volc.cvAccessKeyPlaceholder")} autoComplete="off" />
                                 </Form.Item>
                                 <Form.Item
                                   name="volc_cv_secret_access_key"
-                                  label="CV SecretAccessKey"
+                                  label={t("configCenter.volc.cvSecretAccessKey")}
                                   extra={
                                     integrationMeta?.has_volc_cv_secret_access_key
-                                      ? `已配置（${SECRET_MASK}），留空不修改`
+                                      ? t("configCenter.volc.cvSecretExtra")
                                       : undefined
                                   }
                                 >
@@ -960,42 +961,41 @@ export default function ConfigCenter() {
                                 </Form.Item>
                                 <Form.Item
                                   name="volc_cv_region"
-                                  label="Region"
-                                  extra="默认 cn-north-1；与控制台开通区域一致"
+                                  label={t("configCenter.volc.cvRegion")}
+                                  extra={t("configCenter.volc.cvRegionExtra")}
                                 >
                                   <Input placeholder="cn-north-1" />
                                 </Form.Item>
                                 <Form.Item
                                   name="volc_cv_host"
-                                  label="自定义 Host（可选）"
-                                  extra="一般留空，由 SDK 解析；特殊网络环境可填 visual 域名（不含 https://）"
+                                  label={t("configCenter.volc.cvHost")}
+                                  extra={t("configCenter.volc.cvHostExtra")}
                                 >
-                                  <Input placeholder="可选" />
+                                  <Input placeholder={t("configCenter.volc.cvHostPlaceholder")} />
                                 </Form.Item>
                                 <Form.Item
                                   name="volc_cv_inpaint_req_key"
-                                  label="Inpaint req_key"
-                                  extra="默认 i2i_inpainting；与控制台开通能力一致"
+                                  label={t("configCenter.volc.cvInpaintReqKey")}
+                                  extra={t("configCenter.volc.cvInpaintExtra")}
                                 >
                                   <Input placeholder="i2i_inpainting" />
                                 </Form.Item>
-                                <div className="text-yc-text-secondary text-sm font-medium mt-4 mb-2">去水印（AI 修复）组织默认</div>
+                                <div className="text-yc-text-secondary text-sm font-medium mt-4 mb-2">{t("configCenter.volc.watermarkTitle")}</div>
                                 <p className="text-yc-text-tertiary text-xs mb-2">
-                                  可选：在「模型管理」新增用途为「图像修复」的条目，填写 OpenAI 兼容 Base URL 与 images.edit 模型 ID。
-                                  若已配置火山 CV，将优先走火山；否则走该条目。以下为提示词与视频帧数上限。
+                                  {t("configCenter.volc.watermarkDesc")}
                                 </p>
                                 <Form.Item
                                   name="watermark_video_ai_max_frames"
-                                  label="视频逐帧 AI 最大帧数"
-                                  extra="超出则整段视频改用 FFmpeg delogo；避免长视频刷爆接口。"
+                                  label={t("configCenter.volc.maxFrames")}
+                                  extra={t("configCenter.volc.maxFramesExtra")}
                                 >
                                   <InputNumber min={1} max={10000} className="w-full" />
                                 </Form.Item>
                                 <Form.Item
                                   name="watermark_inpaint_prompt"
-                                  label="Inpaint 提示词（英文推荐）"
+                                  label={t("configCenter.volc.inpaintPrompt")}
                                 >
-                                  <Input.TextArea rows={3} placeholder="描述如何自然填补水印区域" />
+                                  <Input.TextArea rows={3} placeholder={t("configCenter.volc.inpaintPlaceholder")} />
                                 </Form.Item>
                               </Form>
                             </div>
@@ -1014,7 +1014,7 @@ export default function ConfigCenter() {
       </Spin>
 
       <Modal
-        title={modelMode === "create" ? "新增模型" : "编辑模型"}
+        title={modelMode === "create" ? t("configCenter.addModel") : t("configCenter.editModel")}
         open={modelOpen}
         onOk={submitModel}
         onCancel={() => setModelOpen(false)}
@@ -1022,53 +1022,53 @@ export default function ConfigCenter() {
         destroyOnHidden
       >
         <Form form={modelForm} layout="vertical" initialValues={{ library_kind: "chat", protocol: "anthropic" }}>
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入名称" }]}>
+          <Form.Item name="name" label={t("configCenter.modelName")} rules={[{ required: true, message: t("configCenter.nameRequired") }]}>
             <Input />
           </Form.Item>
           <Form.Item
             name="library_kind"
-            label="用途"
-            rules={[{ required: true, message: "请选择用途" }]}
-            extra="图像修复：用于去水印插件（OpenAI 兼容 POST /v1/images/edit）；与火山对话接口不同，需单独配置可访问该路径的网关。"
+            label={t("configCenter.modelKind")}
+            rules={[{ required: true, message: t("configCenter.kindRequired") }]}
+            extra={t("configCenter.kindExtra")}
           >
             <Select
               options={[
-                { value: "chat", label: "对话 / 脚本工坊（默认）" },
-                { value: "image_inpaint", label: "图像修复（去水印 Inpainting）" },
+                { value: "chat", label: t("configCenter.kindChat") },
+                { value: "image_inpaint", label: t("configCenter.kindInpaint") },
               ]}
             />
           </Form.Item>
           <Form.Item
             name="api_base_url"
-            label="Base URL"
-            rules={[{ required: true, message: "请输入 Base URL" }]}
-            extra="标准 OpenAI 兼容网关直接填写完整根路径。"
+            label={t("configCenter.baseUrlLabel")}
+            rules={[{ required: true, message: t("configCenter.baseUrlRequired") }]}
+            extra={t("configCenter.baseUrlExtra")}
           >
-            <Input placeholder="例如 https://api.openai.com/v1" />
+            <Input placeholder={t("configCenter.baseUrlPlaceholder")} />
           </Form.Item>
           <Form.Item
             name="protocol"
-            label="协议"
-            extra="Anthropic：使用 Messages API 格式；OpenAI 兼容：使用 Chat Completions 格式。"
+            label={t("configCenter.protocolLabel")}
+            extra={t("configCenter.protocolExtra")}
           >
             <Select
               options={[
-                { value: "anthropic", label: "Anthropic" },
-                { value: "openai", label: "OpenAI 兼容" },
+                { value: "anthropic", label: t("configCenter.protocolAnthropic") },
+                { value: "openai", label: t("configCenter.protocolOpenai") },
               ]}
             />
           </Form.Item>
           <Form.Item
             name="api_key"
-            label="Key"
-            tooltip={modelMode === "edit" ? "留空表示不更新 Key" : undefined}
+            label={t("configCenter.modelKey")}
+            tooltip={modelMode === "edit" ? t("configCenter.keyTooltip") : undefined}
           >
             <Input.Password
-              placeholder={modelMode === "edit" && editingModel?.has_api_key ? "********（留空不修改）" : "输入后将加密保存"}
+              placeholder={modelMode === "edit" && editingModel?.has_api_key ? t("configCenter.keyEditPlaceholder") : t("configCenter.keyCreatePlaceholder")}
               autoComplete="new-password"
             />
           </Form.Item>
-          <Form.Item label="支持的模型列表">
+          <Form.Item label={t("configCenter.supportedModels")}>
             <Form.List name="supported_models">
               {(fields, { add, remove }) => (
                 <div className="space-y-2">
@@ -1078,18 +1078,18 @@ export default function ConfigCenter() {
                         {...restField}
                         name={[name, "label"]}
                         className="!mb-0"
-                        rules={[{ max: 128, message: "模型名称过长" }]}
+                        rules={[{ max: 128, message: t("configCenter.modelLabelTooLong") }]}
                       >
-                        <Input placeholder="模型名称（label）" className="w-48" />
+                        <Input placeholder={t("configCenter.modelLabelPlaceholder")} className="w-48" />
                       </Form.Item>
                       <Form.Item
                         {...restField}
                         name={[name, "value"]}
                         className="!mb-0"
-                        rules={[{ max: 128, message: "模型 ID 过长" }]}
+                        rules={[{ max: 128, message: t("configCenter.modelValueTooLong") }]}
                       >
                         <Input
-                          placeholder="模型 ID：ark-code-latest 或 Endpoint ID"
+                          placeholder={t("configCenter.modelValuePlaceholder")}
                           className="w-56"
                         />
                       </Form.Item>
@@ -1103,7 +1103,7 @@ export default function ConfigCenter() {
                     </Space>
                   ))}
                   <Button type="dashed" onClick={() => add({ label: "", value: "" })} block icon={<PlusOutlined />}>
-                    添加模型
+                    {t("configCenter.addModelButton")}
                   </Button>
                 </div>
               )}
@@ -1113,7 +1113,7 @@ export default function ConfigCenter() {
       </Modal>
 
       <Modal
-        title={`${activeTab === "prompts" ? "智能体" : "风格"}${textMode === "create" ? "新增" : "编辑"}`}
+        title={`${activeTab === "prompts" ? t("configCenter.prompts") : t("configCenter.styles")}${textMode === "create" ? t("action.add") : t("configCenter.editModel")}`}
         open={textOpen}
         onOk={submitText}
         onCancel={() => setTextOpen(false)}
@@ -1121,13 +1121,13 @@ export default function ConfigCenter() {
         destroyOnHidden
       >
         <Form form={textForm} layout="vertical">
-          <Form.Item name="title" label="名称" rules={[{ required: true, message: "请输入名称" }]}>
+          <Form.Item name="title" label={t("configCenter.modelName")} rules={[{ required: true, message: t("configCenter.nameRequired") }]}>
             <Input />
           </Form.Item>
           <Form.Item
             name="content"
-            label={activeTab === "prompts" ? "系统提示词规则(Prompt)" : "风格描述/附加提示词"}
-            rules={[{ required: true, message: "请输入内容" }]}
+            label={activeTab === "prompts" ? t("configCenter.promptContent") : t("configCenter.styleContent")}
+            rules={[{ required: true, message: t("configCenter.nameRequired") }]}
           >
             <Input.TextArea rows={8} />
           </Form.Item>

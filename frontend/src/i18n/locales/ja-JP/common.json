@@ -77,5 +77,23 @@
   "pagination": {
     "total": "全{{total}}件",
     "page": "{{current}} / {{total}} ページ"
+  },
+  "table": {
+    "emptyText": "データなし",
+    "filterConfirm": "確定",
+    "filterReset": "リセット",
+    "selectAll": "全選択",
+    "selectInvert": "反転選択"
+  },
+  "time": {
+    "justNow": "たった今",
+    "minutesAgo": "{{count}}分前",
+    "hoursAgo": "{{count}}時間前",
+    "daysAgo": "{{count}}日前"
+  },
+  "confirm": {
+    "delete": "削除確認？この操作は取り消せません",
+    "leavePage": "未保存の変更があります。ページを離れますか？",
+    "clearData": "クリア確認？この操作は取り消せません"
   }
 }

@@ -1,0 +1,48 @@
+{
+  "title": "热门趋势",
+  "desc": "发现 YouTube 上的热门趋势内容，把握创作方向。",
+  "form": {
+    "keyword": "关键词",
+    "keywordPlaceholder": "输入关键词搜索趋势",
+    "region": "地区",
+    "category": "分类",
+    "timeRange": "时间范围",
+    "search": "搜索趋势"
+  },
+  "option": {
+    "last7Days": "近 7 天",
+    "last30Days": "近 30 天",
+    "last90Days": "近 90 天",
+    "lastYear": "近 1 年"
+  },
+  "table": {
+    "keyword": "关键词",
+    "searchVolume": "搜索量",
+    "growth": "增长率",
+    "competition": "竞争度",
+    "trend": "趋势",
+    "relatedKeywords": "相关关键词"
+  },
+  "action": {
+    "search": "搜索",
+    "export": "导出报告",
+    "refresh": "刷新"
+  },
+  "message": {
+    "searchSuccess": "趋势搜索完成",
+    "searchFailed": "趋势搜索失败",
+    "noResults": "未找到相关趋势数据",
+    "exportSuccess": "导出成功",
+    "exportFailed": "导出失败",
+    "loadFailed": "加载趋势数据失败"
+  },
+  "card": {
+    "trendOverview": "趋势概览",
+    "hotKeywords": "热门关键词",
+    "risingTopics": "上升话题",
+    "topCharts": "热门榜单"
+  },
+  "empty": {
+    "noData": "暂无趋势数据，请搜索关键词"
+  }
+}

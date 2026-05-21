@@ -1,0 +1,45 @@
+{
+  "title": "キーワード研究",
+  "desc": "キーワードパフォーマンスを深く分析し、高ポテンシャル低競合のクリエイティブ機会を発見。",
+  "form": {
+    "keyword": "キーワード",
+    "keywordPlaceholder": "キーワードを入力して研究",
+    "region": "地域",
+    "language": "言語",
+    "search": "検索"
+  },
+  "action": {
+    "search": "検索",
+    "export": "エクスポート",
+    "addToMonitor": "モニター追加",
+    "removeFromMonitor": "モニター削除"
+  },
+  "message": {
+    "searchSuccess": "キーワード研究完了",
+    "searchFailed": "キーワード研究失敗",
+    "keywordRequired": "キーワードを入力してください",
+    "noResults": "キーワードデータが見つかりません",
+    "exportSuccess": "エクスポート成功",
+    "exportFailed": "エクスポート失敗",
+    "addMonitorSuccess": "モニターリストに追加しました",
+    "removeMonitorSuccess": "モニターリストから削除しました",
+    "loadFailed": "キーワードデータの読み込みに失敗しました"
+  },
+  "table": {
+    "keyword": "キーワード",
+    "searchVolume": "検索ボリューム",
+    "competition": "競合度",
+    "cpc": "CPC",
+    "trend": "トレンド",
+    "relatedKeywords": "関連キーワード",
+    "actions": "操作"
+  },
+  "card": {
+    "keywordOverview": "キーワード概要",
+    "relatedKeywords": "関連キーワード",
+    "keywordTrend": "キーワードトレンド"
+  },
+  "empty": {
+    "noData": "キーワードデータがありません。キーワードを検索してください"
+  }
+}

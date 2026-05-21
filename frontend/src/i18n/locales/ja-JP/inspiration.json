@@ -1,0 +1,57 @@
+{
+  "title": "インスピレーションセンター",
+  "desc": "クリエイティブなインスピレーションを収集・管理し、脚本やショットに素早く変換。",
+  "form": {
+    "searchPlaceholder": "インスピレーションタイトルまたは内容で検索",
+    "title": "タイトル",
+    "content": "内容",
+    "tag": "タグ",
+    "source": "ソース"
+  },
+  "action": {
+    "add": "インスピレーション追加",
+    "edit": "編集",
+    "delete": "削除",
+    "generatePlot": "プロット生成",
+    "toSop": "SOPワークフローへ",
+    "refresh": "更新"
+  },
+  "message": {
+    "addSuccess": "インスピレーションを追加しました",
+    "addFailed": "インスピレーションの追加に失敗しました",
+    "updateSuccess": "インスピレーションを更新しました",
+    "updateFailed": "インスピレーションの更新に失敗しました",
+    "deleteSuccess": "インスピレーションを削除しました",
+    "deleteFailed": "削除に失敗しました",
+    "loadFailed": "インスピレーションリストの読み込みに失敗しました",
+    "confirmDelete": "このインスピレーションを削除しますか？",
+    "generatePlotSuccess": "プロット生成タスクを送信しました",
+    "generatePlotFailed": "プロット生成に失敗しました"
+  },
+  "table": {
+    "title": "タイトル",
+    "content": "内容",
+    "tag": "タグ",
+    "source": "ソース",
+    "createdAt": "作成日時",
+    "actions": "操作"
+  },
+  "card": {
+    "inspirationList": "インスピレーションリスト",
+    "inspirationDetail": "インスピレーション詳細"
+  },
+  "modal": {
+    "addTitle": "インスピレーション追加",
+    "editTitle": "インスピレーション編集",
+    "confirm": "確定",
+    "cancel": "キャンセル"
+  },
+  "tag": {
+    "draft": "下書き",
+    "generated": "プロット生成済み",
+    "pending": "保留中"
+  },
+  "empty": {
+    "noData": "インスピレーションデータがありません。「インスピレーション追加」をクリックして作成を開始"
+  }
+}

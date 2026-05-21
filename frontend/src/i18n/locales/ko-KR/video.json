@@ -1,0 +1,57 @@
+{
+  "title": "전체 동영상",
+  "desc": "모든 동영상 리소스를 탐색하고 관리하세요. 검색, 필터, 상세 보기를 지원합니다.",
+  "form": {
+    "searchPlaceholder": "동영상 제목 또는 채널 검색",
+    "region": "지역",
+    "category": "카테고리",
+    "duration": "길이",
+    "sortBy": "정렬",
+    "dateRange": "날짜 범위"
+  },
+  "action": {
+    "search": "검색",
+    "viewDetail": "상세 보기",
+    "refresh": "새로고침",
+    "export": "내보내기"
+  },
+  "message": {
+    "loadFailed": "동영상 목록 로드 실패",
+    "searchSuccess": "검색 완료",
+    "searchFailed": "검색 실패",
+    "noResults": "일치하는 동영상을 찾을 수 없습니다",
+    "exportSuccess": "내보내기 성공",
+    "exportFailed": "내보내기 실패",
+    "detailLoadFailed": "동영상 상세 로드 실패"
+  },
+  "table": {
+    "title": "제목",
+    "channel": "채널",
+    "views": "조회수",
+    "likes": "좋아요",
+    "comments": "댓글",
+    "publishedAt": "게시일",
+    "duration": "길이",
+    "actions": "작업"
+  },
+  "card": {
+    "videoList": "동영상 목록",
+    "videoDetail": "동영상 상세",
+    "videoStats": "동영상 통계"
+  },
+  "modal": {
+    "videoDetail": "동영상 상세"
+  },
+  "option": {
+    "anyDuration": "기간 제한 없음",
+    "shortVideo": "숏비디오",
+    "mediumVideo": "중간",
+    "longVideo": "롱비디오",
+    "mostViewed": "조회수순",
+    "mostRecent": "최신순",
+    "mostLiked": "좋아요순"
+  },
+  "empty": {
+    "noData": "동영상 데이터가 없습니다"
+  }
+}

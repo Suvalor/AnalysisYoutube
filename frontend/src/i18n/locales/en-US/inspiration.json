@@ -1,0 +1,57 @@
+{
+  "title": "Inspiration Center",
+  "desc": "Collect and manage creative inspirations, quickly transform into scripts and shots.",
+  "form": {
+    "searchPlaceholder": "Search inspiration title or content",
+    "title": "Title",
+    "content": "Content",
+    "tag": "Tag",
+    "source": "Source"
+  },
+  "action": {
+    "add": "Add Inspiration",
+    "edit": "Edit",
+    "delete": "Delete",
+    "generatePlot": "Generate Plot",
+    "toSop": "Enter SOP Workflow",
+    "refresh": "Refresh"
+  },
+  "message": {
+    "addSuccess": "Inspiration added successfully",
+    "addFailed": "Failed to add inspiration",
+    "updateSuccess": "Inspiration updated successfully",
+    "updateFailed": "Failed to update inspiration",
+    "deleteSuccess": "Inspiration deleted",
+    "deleteFailed": "Delete failed",
+    "loadFailed": "Failed to load inspiration list",
+    "confirmDelete": "Confirm delete this inspiration?",
+    "generatePlotSuccess": "Plot generation task submitted",
+    "generatePlotFailed": "Plot generation failed"
+  },
+  "table": {
+    "title": "Title",
+    "content": "Content",
+    "tag": "Tag",
+    "source": "Source",
+    "createdAt": "Created At",
+    "actions": "Actions"
+  },
+  "card": {
+    "inspirationList": "Inspiration List",
+    "inspirationDetail": "Inspiration Detail"
+  },
+  "modal": {
+    "addTitle": "Add Inspiration",
+    "editTitle": "Edit Inspiration",
+    "confirm": "Confirm",
+    "cancel": "Cancel"
+  },
+  "tag": {
+    "draft": "Draft",
+    "generated": "Plot Generated",
+    "pending": "Pending"
+  },
+  "empty": {
+    "noData": "No inspiration data. Click 'Add Inspiration' to start creating"
+  }
+}

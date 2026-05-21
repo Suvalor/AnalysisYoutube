@@ -1,0 +1,45 @@
+{
+  "title": "关键词研究",
+  "desc": "深度分析关键词表现，发现高潜力低竞争的创作机会。",
+  "form": {
+    "keyword": "关键词",
+    "keywordPlaceholder": "输入关键词进行研究",
+    "region": "地区",
+    "language": "语言",
+    "search": "搜索"
+  },
+  "action": {
+    "search": "搜索",
+    "export": "导出",
+    "addToMonitor": "添加监控",
+    "removeFromMonitor": "移除监控"
+  },
+  "message": {
+    "searchSuccess": "关键词研究完成",
+    "searchFailed": "关键词研究失败",
+    "keywordRequired": "请输入关键词",
+    "noResults": "未找到相关关键词数据",
+    "exportSuccess": "导出成功",
+    "exportFailed": "导出失败",
+    "addMonitorSuccess": "已添加到监控列表",
+    "removeMonitorSuccess": "已从监控列表移除",
+    "loadFailed": "加载关键词数据失败"
+  },
+  "table": {
+    "keyword": "关键词",
+    "searchVolume": "搜索量",
+    "competition": "竞争度",
+    "cpc": "CPC",
+    "trend": "趋势",
+    "relatedKeywords": "相关关键词",
+    "actions": "操作"
+  },
+  "card": {
+    "keywordOverview": "关键词概览",
+    "relatedKeywords": "相关关键词",
+    "keywordTrend": "关键词趋势"
+  },
+  "empty": {
+    "noData": "暂无关键词数据，请搜索关键词"
+  }
+}

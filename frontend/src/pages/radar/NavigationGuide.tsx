@@ -40,6 +40,7 @@ import {
   EyeOutlined,
 } from "@ant-design/icons";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   getYouTubeQuotaDashboardApi,
   navigationGuideApi,
@@ -66,69 +67,6 @@ import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "
 
 const { Title, Text, Paragraph } = Typography;
 
-// ── 常量选项 ──
-
-const LANGUAGE_OPTIONS = [
-  { value: "中文", label: "中文" },
-  { value: "英语", label: "英语" },
-  { value: "日语", label: "日语" },
-  { value: "韩语", label: "韩语" },
-  { value: "阿拉伯语", label: "阿拉伯语" },
-  { value: "西班牙语", label: "西班牙语" },
-  { value: "法语", label: "法语" },
-  { value: "德语", label: "德语" },
-  { value: "葡萄牙语", label: "葡萄牙语" },
-  { value: "印地语", label: "印地语" },
-];
-
-const FORMAT_OPTIONS = [
-  { value: "video", label: "长视频" },
-  { value: "short", label: "短视频" },
-  { value: "live", label: "直播" },
-];
-
-const BUDGET_OPTIONS = [
-  { value: "zero", label: "零预算（纯AI制作）" },
-  { value: "low", label: "低预算（个人/小团队）" },
-  { value: "medium", label: "中预算（工作室）" },
-  { value: "high", label: "高预算（公司级）" },
-];
-
-const MONETIZATION_OPTIONS = [
-  { value: "adsense", label: "YouTube AdSense 广告收入" },
-  { value: "course", label: "卖课 / 知识付费" },
-  { value: "affiliate", label: "带货 / 联盟营销" },
-  { value: "sponsor", label: "接商单 / 品牌合作" },
-];
-
-const REGION_OPTIONS = [
-  { value: "US", label: "🇺🇸 美国" },
-  { value: "GB", label: "🇬🇧 英国" },
-  { value: "CA", label: "🇨🇦 加拿大" },
-  { value: "AU", label: "🇦🇺 澳大利亚" },
-  { value: "SG", label: "🇸🇬 新加坡" },
-  { value: "MY", label: "🇲🇾 马来西亚" },
-  { value: "PH", label: "🇵🇭 菲律宾" },
-  { value: "VN", label: "🇻🇳 越南" },
-  { value: "ID", label: "🇮🇩 印尼" },
-  { value: "TH", label: "🇹🇭 泰国" },
-  { value: "AE", label: "🇦🇪 阿联酋" },
-  { value: "SA", label: "🇸🇦 沙特" },
-  { value: "JP", label: "🇯🇵 日本" },
-  { value: "KR", label: "🇰🇷 韩国" },
-  { value: "DE", label: "🇩🇪 德国" },
-  { value: "FR", label: "🇫🇷 法国" },
-  { value: "BR", label: "🇧🇷 巴西" },
-  { value: "IN", label: "🇮🇳 印度" },
-];
-
-const WEEKLY_HOURS_OPTIONS = [
-  { value: "<5h", label: "< 5小时（兼职尝试）" },
-  { value: "5-10h", label: "5-10小时（认真投入）" },
-  { value: "10-20h", label: "10-20小时（半职投入）" },
-  { value: "20h+", label: "20小时+（全职投入）" },
-];
-
 // ── 工具函数 ──
 
 function matchScoreColor(score: number): string {
@@ -139,6 +77,7 @@ function matchScoreColor(score: number): string {
 
 /** 配额仪表盘 */
 function QuotaDashboardCard({ quotaCheck }: { quotaCheck: QuotaCheckInfo | null }) {
+  const { t } = useTranslation("navigation");
   const [quotaData, setQuotaData] = useState<{
     today_total: number; today_used: number; today_remaining: number;
   } | null>(null);
@@ -159,31 +98,33 @@ function QuotaDashboardCard({ quotaCheck }: { quotaCheck: QuotaCheckInfo | null 
   const isLow = remaining < total * 0.2;
 
   return (
-    <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm" title="API 配额仪表盘" size="small">
+    <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm" title={t("quota.title")} size="small">
       <div className="grid grid-cols-3 gap-4 mb-3">
-        <Statistic title="今日总量" value={total.toLocaleString()} />
-        <Statistic title="已用" value={used.toLocaleString()} />
-        <Statistic title="剩余" value={remaining.toLocaleString()} valueStyle={{ color: isLow ? "var(--color-danger)" : "var(--color-success)" }} />
+        <Statistic title={t("quota.todayTotal")} value={total.toLocaleString()} />
+        <Statistic title={t("quota.used")} value={used.toLocaleString()} />
+        <Statistic title={t("quota.remaining")} value={remaining.toLocaleString()} valueStyle={{ color: isLow ? "var(--color-danger)" : "var(--color-success)" }} />
       </div>
       <Progress percent={pct} status={isLow ? "exception" : "normal"} format={(p) => `${p}%`} />
-      {isLow && <Text type="danger" className="block mt-2"><WarningOutlined /> 配额不足 20%</Text>}
+      {isLow && <Text type="danger" className="block mt-2"><WarningOutlined /> {t("quota.lowWarning")}</Text>}
     </Card>
   );
 }
 
 /** 配额消耗明细 */
 function QuotaBreakdown({ usage }: { usage: NavigationQuotaUsage }) {
+  const { t } = useTranslation("navigation");
   return (
     <div className="text-sm text-yc-text-secondary space-y-1">
-      <div>search.list × {usage.search_calls} (100点/次) = {usage.search_calls * 100} 点</div>
-      <div>channels.list × {usage.channels_calls} (1点/次) = {usage.channels_calls} 点</div>
-      <div className="font-medium border-t pt-1 mt-1">本次合计：{usage.total_points} 点</div>
+      <div>{t("breakdown.searchLine", { count: usage.search_calls, points: usage.search_calls * 100 })}</div>
+      <div>{t("breakdown.channelsLine", { count: usage.channels_calls, points: usage.channels_calls })}</div>
+      <div className="font-medium border-t pt-1 mt-1">{t("breakdown.totalLine", { points: usage.total_points })}</div>
     </div>
   );
 }
 
 /** 推荐品类卡片 — 现代SaaS极简风 */
 function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecommendation; index: number; isExpanded: boolean; onToggleExpand: () => void }) {
+  const { t } = useTranslation("navigation");
   const isHighGrowth = index === 2; // 第3个是高增长潜力品类
 
   return (
@@ -197,7 +138,7 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
           <div className="flex items-center gap-2 mb-1">
             {isHighGrowth && (
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yc-warning-bg text-yc-warning">
-                <RocketOutlined className="mr-1" />高增长潜力
+                <RocketOutlined className="mr-1" />{t("card.highGrowth")}
               </span>
             )}
             <Title level={4} style={{ margin: 0, color: "var(--color-text-primary)" }}>{rec.niche_title}</Title>
@@ -211,42 +152,42 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
             strokeColor={matchScoreColor(rec.match_score)}
             format={(p) => <span className="text-sm font-semibold">{p}</span>}
           />
-          <div className="text-center text-xs text-yc-text-tertiary mt-1">匹配度</div>
+          <div className="text-center text-xs text-yc-text-tertiary mt-1">{t("card.matchScore")}</div>
         </div>
       </div>
 
       {/* 指标区：左右两栏 */}
       <div className="grid grid-cols-2 gap-x-8 gap-y-4 mb-5">
         <div>
-          <Text type="secondary" className="text-xs uppercase tracking-wider">市场热度</Text>
+          <Text type="secondary" className="text-xs uppercase tracking-wider">{t("card.marketHeat")}</Text>
           <div className="flex items-center gap-2 mt-1">
             <Rate disabled value={rec.market_heat_stars} className="!text-sm" />
             <span className="text-sm text-yc-text-secondary">{rec.market_heat_desc}</span>
           </div>
         </div>
         <div>
-          <Text type="secondary" className="text-xs uppercase tracking-wider">竞争强度</Text>
+          <Text type="secondary" className="text-xs uppercase tracking-wider">{t("card.competition")}</Text>
           <div className="flex items-center gap-2 mt-1">
             <Rate disabled value={rec.competition_stars} className="!text-sm" />
             <span className="text-sm text-yc-text-secondary">{rec.competition_desc}</span>
           </div>
         </div>
         <div>
-          <Text type="secondary" className="text-xs uppercase tracking-wider">内容缺口</Text>
+          <Text type="secondary" className="text-xs uppercase tracking-wider">{t("card.contentGap")}</Text>
           <div className="text-sm text-yc-text-primary mt-1">{rec.content_gap}</div>
         </div>
         <div>
-          <Text type="secondary" className="text-xs uppercase tracking-wider">预估冷启动期</Text>
+          <Text type="secondary" className="text-xs uppercase tracking-wider">{t("card.coldStart")}</Text>
           <div className="text-sm text-yc-text-primary mt-1">{rec.cold_start_period}</div>
         </div>
         <div>
-          <Text type="secondary" className="text-xs uppercase tracking-wider">对标频道</Text>
+          <Text type="secondary" className="text-xs uppercase tracking-wider">{t("card.targetChannel")}</Text>
           <div className="text-sm text-yc-text-primary mt-1">{rec.target_channel_example}</div>
         </div>
         {rec.estimated_monthly_income && (
           <div>
             <Text type="secondary" className="text-xs uppercase tracking-wider">
-              <DollarOutlined className="mr-1" />预估月收入
+              <DollarOutlined className="mr-1" />{t("card.estimatedIncome")}
             </Text>
             <div className="text-base font-semibold text-yc-success mt-1">{rec.estimated_monthly_income}</div>
           </div>
@@ -257,7 +198,7 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
       {rec.action_roadmap && rec.action_roadmap.length > 0 && (
         <div className="mb-5">
           <Text type="secondary" className="text-xs uppercase tracking-wider block mb-2">
-            <RocketOutlined className="mr-1" />30天行动路线图
+            <RocketOutlined className="mr-1" />{t("card.roadmap")}
           </Text>
           <Timeline
             items={rec.action_roadmap.map((step: RoadmapStep) => ({
@@ -267,7 +208,7 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
                   <div className="text-sm font-medium text-yc-text-primary">
                     Day {step.day_range}：{step.task}
                   </div>
-                  <div className="text-xs text-yc-text-tertiary mt-0.5">预期：{step.expected_result}</div>
+                  <div className="text-xs text-yc-text-tertiary mt-0.5">{t("card.expectedResult", { result: step.expected_result })}</div>
                 </div>
               ),
             }))}
@@ -277,7 +218,7 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
 
       {/* 执行建议 */}
       <div className="bg-yc-bg-inset rounded-lg p-4 mb-5">
-        <Text type="secondary" className="text-xs uppercase tracking-wider block mb-1">执行建议</Text>
+        <Text type="secondary" className="text-xs uppercase tracking-wider block mb-1">{t("card.actionAdvice")}</Text>
         <Paragraph className="!mb-0 text-sm text-yc-text-primary leading-relaxed">{rec.action_advice}</Paragraph>
       </div>
 
@@ -288,7 +229,7 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
         onClick={onToggleExpand}
         className="!rounded-lg"
       >
-        {isExpanded ? "收起蓝海雷达分析" : "一键将此品类导入蓝海雷达"}
+        {isExpanded ? t("card.collapseRadar") : t("card.importRadar")}
       </Button>
     </Card>
   );
@@ -296,13 +237,14 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
 
 /** 避坑卡片 — 精致警告色调 */
 function AvoidNicheCard({ avoid }: { avoid: AvoidNiche }) {
+  const { t } = useTranslation("navigation");
   return (
     <Card className="!border-yc-danger !bg-yc-danger-bg/30 !shadow-sm" bodyStyle={{ padding: 20 }}>
       <div className="flex items-center gap-2 mb-3">
         <div className="w-8 h-8 rounded-full bg-yc-danger-bg flex items-center justify-center">
           <WarningOutlined style={{ color: "var(--color-danger)", fontSize: 16 }} />
         </div>
-        <Title level={5} style={{ margin: 0, color: "var(--color-danger)" }}>避坑提示</Title>
+        <Title level={5} style={{ margin: 0, color: "var(--color-danger)" }}>{t("avoid.title")}</Title>
       </div>
       <div className="text-base font-medium text-yc-danger mb-1">{avoid.niche_title}</div>
       <div className="text-sm text-yc-danger/80">{avoid.reason}</div>
@@ -322,6 +264,7 @@ function ChatArea({
   llmModelName?: string | null;
   agentId?: number | null;
 }) {
+  const { t } = useTranslation("navigation");
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -343,7 +286,7 @@ function ChatArea({
       });
       setMessages((prev) => [...prev, { role: "assistant", content: res.assistant_message }]);
     } catch {
-      message.error("追问失败，请重试");
+      message.error(t("message.chatFailed"));
     } finally {
       setSending(false);
       // 滚动到底部
@@ -358,10 +301,10 @@ function ChatArea({
   return (
     <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm" bodyStyle={{ padding: 20 }}>
       <Title level={5} style={{ color: "var(--color-text-primary)", marginBottom: 12 }}>
-        <RobotOutlined className="mr-2" />追问 AI 分析师
+        <RobotOutlined className="mr-2" />{t("chat.title")}
       </Title>
       <Text type="secondary" className="text-xs block mb-3">
-        对推荐结果有疑问？继续追问获取更深入的分析
+        {t("chat.desc")}
       </Text>
 
       {/* 对话历史 */}
@@ -392,7 +335,7 @@ function ChatArea({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onPressEnter={() => void onSend()}
-          placeholder="如：为什么推荐这个品类？有没有更保守的选择？"
+          placeholder={t("chat.placeholder")}
           disabled={sending}
           className="!rounded-lg"
         />
@@ -403,7 +346,7 @@ function ChatArea({
           onClick={() => void onSend()}
           className="!rounded-lg"
         >
-          追问
+          {t("chat.send")}
         </Button>
       </div>
     </Card>
@@ -420,6 +363,7 @@ function RadarInlinePanel({
   region: string;
   onClose: () => void;
 }) {
+  const { t } = useTranslation("navigation");
   const [scanItems, setScanItems] = useState<BlueOceanChannelItem[]>([]);
   const [scanLoading, setScanLoading] = useState(false);
   const [catOppResult, setCatOppResult] = useState<CategoryOpportunityResponse | null>(null);
@@ -453,7 +397,7 @@ function RadarInlinePanel({
         });
         setScanItems(scanData.items);
       } catch {
-        message.error("蓝海雷达扫描失败");
+        message.error(t("radar.scanFailed"));
       } finally {
         setScanLoading(false);
       }
@@ -464,7 +408,7 @@ function RadarInlinePanel({
         const catData = await categoryOpportunityApi({ keyword, region });
         setCatOppResult(catData);
       } catch {
-        message.error("品类机会分析失败");
+        message.error(t("radar.categoryFailed"));
       } finally {
         setCatOppLoading(false);
       }
@@ -479,7 +423,7 @@ function RadarInlinePanel({
         });
         setCrossResult(crossData);
       } catch {
-        message.error("跨地区对比失败");
+        message.error(t("radar.crossFailed"));
       } finally {
         setCrossLoading(false);
       }
@@ -489,12 +433,12 @@ function RadarInlinePanel({
   }, [keyword, region]);
 
   const scanColumns: ColumnsType<BlueOceanChannelItem> = [
-    { title: "频道", dataIndex: "title", key: "title", width: 200, render: (v: string) => <span className="font-medium">{v}</span> },
-    { title: "订阅", dataIndex: "subscriber_count", key: "sub", render: (v: number) => v.toLocaleString() },
-    { title: "总播放", dataIndex: "total_views", key: "views", render: (v: number) => v.toLocaleString() },
-    { title: "爆款播放", dataIndex: "viral_view_count", key: "viral", render: (v: number) => v.toLocaleString() },
+    { title: t("radar.table.channel"), dataIndex: "title", key: "title", width: 200, render: (v: string) => <span className="font-medium">{v}</span> },
+    { title: t("radar.table.subscribers"), dataIndex: "subscriber_count", key: "sub", render: (v: number) => v.toLocaleString() },
+    { title: t("radar.table.totalViews"), dataIndex: "total_views", key: "views", render: (v: number) => v.toLocaleString() },
+    { title: t("radar.table.viralViews"), dataIndex: "viral_view_count", key: "viral", render: (v: number) => v.toLocaleString() },
     {
-      title: "爆款系数", dataIndex: "outlier_score", key: "score", defaultSortOrder: "descend",
+      title: t("radar.table.outlierScore"), dataIndex: "outlier_score", key: "score", defaultSortOrder: "descend",
       render: (v: number) => <Tag color={v >= 30 ? "magenta" : v >= 15 ? "orange" : "blue"}>{v}</Tag>,
     },
   ];
@@ -508,7 +452,7 @@ function RadarInlinePanel({
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-2">
             <RadarChartOutlined style={{ color: "var(--color-primary)" }} />
-            <span>蓝海雷达深度分析：{keyword}</span>
+            <span>{t("radar.panelTitle", { keyword })}</span>
             {anyLoading && <Spin size="small" />}
           </span>
           <Button type="text" icon={<CloseOutlined />} onClick={onClose} size="small" />
@@ -521,9 +465,9 @@ function RadarInlinePanel({
         items={[
           {
             key: "scan",
-            label: <span><RadarChartOutlined className="mr-1" />深度扫描</span>,
+            label: <span><RadarChartOutlined className="mr-1" />{t("radar.deepScan")}</span>,
             children: scanLoading ? (
-              <div className="flex justify-center py-8"><Spin tip="扫描中…" /></div>
+              <div className="flex justify-center py-8"><Spin tip={t("radar.scanning")} /></div>
             ) : scanItems.length > 0 ? (
               <Table<BlueOceanChannelItem>
                 rowKey="yt_channel_id"
@@ -533,26 +477,26 @@ function RadarInlinePanel({
                 pagination={{ pageSize: 5, showSizeChanger: true }}
               />
             ) : (
-              <Text type="secondary">暂无扫描结果</Text>
+              <Text type="secondary">{t("radar.noScanResults")}</Text>
             ),
           },
           {
             key: "category",
-            label: <span><BarChartOutlined className="mr-1" />品类机会</span>,
+            label: <span><BarChartOutlined className="mr-1" />{t("radar.categoryOpp")}</span>,
             children: catOppLoading ? (
-              <div className="flex justify-center py-8"><Spin tip="分析中…" /></div>
+              <div className="flex justify-center py-8"><Spin tip={t("radar.scanning")} /></div>
             ) : catOppResult ? (
               <div className="space-y-4">
                 <Row gutter={16}>
                   <Col span={8}>
-                    <Statistic title="新频道数" value={catOppResult.newcomer_stats.total_new_channels} />
+                    <Statistic title={t("radar.table.newChannels")} value={catOppResult.newcomer_stats.total_new_channels} />
                   </Col>
                   <Col span={8}>
-                    <Statistic title="成功频道" value={catOppResult.newcomer_stats.successful_channels} />
+                    <Statistic title={t("radar.table.successfulChannels")} value={catOppResult.newcomer_stats.successful_channels} />
                   </Col>
                   <Col span={8}>
                     <Statistic
-                      title="成功率"
+                      title={t("radar.table.successRate")}
                       value={(catOppResult.newcomer_stats.success_rate * 100).toFixed(1)}
                       suffix="%"
                       valueStyle={{ color: catOppResult.newcomer_stats.success_rate > 0.2 ? "var(--color-success)" : "var(--color-danger)" }}
@@ -560,47 +504,47 @@ function RadarInlinePanel({
                   </Col>
                 </Row>
                 {catOppResult.top_channels_growth.length > 0 && (
-                  <Card size="small" title="头部频道增速" className="!border-yc-border">
+                  <Card size="small" title={t("radar.table.topGrowth")} className="!border-yc-border">
                     <Table
                       dataSource={catOppResult.top_channels_growth}
                       rowKey="channel_id"
                       size="small"
                       pagination={false}
                       columns={[
-                        { title: "频道", dataIndex: "title", key: "title" },
-                        { title: "订阅", dataIndex: "subscriber_count", key: "sub", render: (v: number) => v.toLocaleString() },
-                        { title: "月增速%", dataIndex: "monthly_growth_rate", key: "rate", render: (v: number) => v.toFixed(1) },
-                        { title: "趋势", dataIndex: "trend", key: "trend", render: (v: string) => <Tag color={v === "rising" ? "green" : v === "stable" ? "blue" : "red"}>{v}</Tag> },
+                        { title: t("radar.table.channel"), dataIndex: "title", key: "title" },
+                        { title: t("radar.table.subscribers"), dataIndex: "subscriber_count", key: "sub", render: (v: number) => v.toLocaleString() },
+                        { title: t("radar.table.monthlyGrowth"), dataIndex: "monthly_growth_rate", key: "rate", render: (v: number) => v.toFixed(1) },
+                        { title: t("radar.table.trend"), dataIndex: "trend", key: "trend", render: (v: string) => <Tag color={v === "rising" ? "green" : v === "stable" ? "blue" : "red"}>{v}</Tag> },
                       ]}
                     />
                   </Card>
                 )}
                 {catOppResult.content_gaps.length > 0 && (
-                  <Card size="small" title="内容缺口" className="!border-yc-border">
+                  <Card size="small" title={t("card.contentGap")} className="!border-yc-border">
                     <Table
                       dataSource={catOppResult.content_gaps}
                       rowKey="duration_bucket"
                       size="small"
                       pagination={false}
                       columns={[
-                        { title: "时长", dataIndex: "duration_bucket", key: "dur" },
-                        { title: "供给占比", dataIndex: "supply_ratio", key: "ratio", render: (v: number) => `${(v * 100).toFixed(1)}%` },
-                        { title: "平均播放", dataIndex: "avg_views", key: "views", render: (v: number) => v.toLocaleString() },
-                        { title: "机会分", dataIndex: "opportunity_score", key: "score", render: (v: number) => v.toFixed(1) },
+                        { title: t("radar.table.duration"), dataIndex: "duration_bucket", key: "dur" },
+                        { title: t("radar.table.supplyRatio"), dataIndex: "supply_ratio", key: "ratio", render: (v: number) => `${(v * 100).toFixed(1)}%` },
+                        { title: t("radar.table.avgViews"), dataIndex: "avg_views", key: "views", render: (v: number) => v.toLocaleString() },
+                        { title: t("radar.table.opportunityScore"), dataIndex: "opportunity_score", key: "score", render: (v: number) => v.toFixed(1) },
                       ]}
                     />
                   </Card>
                 )}
               </div>
             ) : (
-              <Text type="secondary">暂无品类机会数据</Text>
+              <Text type="secondary">{t("radar.noScanResults")}</Text>
             ),
           },
           {
             key: "cross-region",
-            label: <span><GlobalOutlined className="mr-1" />跨地区对比</span>,
+            label: <span><GlobalOutlined className="mr-1" />{t("radar.crossRegion")}</span>,
             children: crossLoading ? (
-              <div className="flex justify-center py-8"><Spin tip="对比中…" /></div>
+              <div className="flex justify-center py-8"><Spin tip={t("radar.comparing")} /></div>
             ) : crossResult ? (
               <div className="space-y-4">
                 <Table
@@ -609,22 +553,22 @@ function RadarInlinePanel({
                   size="small"
                   pagination={false}
                   columns={[
-                    { title: "地区", dataIndex: "region_name", key: "name" },
-                    { title: "频道数", dataIndex: "channel_count", key: "count" },
-                    { title: "平均播放", dataIndex: "avg_views", key: "views", render: (v: number) => v.toLocaleString() },
-                    { title: "爆款中位数", dataIndex: "median_outlier_score", key: "score", render: (v: number) => v.toFixed(1) },
-                    { title: "Top频道", dataIndex: "top_channel_title", key: "top" },
-                    { title: "Top订阅", dataIndex: "top_channel_subscribers", key: "top_sub", render: (v: number) => v.toLocaleString() },
+                    { title: t("radar.table.region"), dataIndex: "region_name", key: "name" },
+                    { title: t("radar.table.channelCount"), dataIndex: "channel_count", key: "count" },
+                    { title: t("radar.table.avgViews"), dataIndex: "avg_views", key: "views", render: (v: number) => v.toLocaleString() },
+                    { title: t("radar.table.medianScore"), dataIndex: "median_outlier_score", key: "score", render: (v: number) => v.toFixed(1) },
+                    { title: t("radar.table.topChannel"), dataIndex: "top_channel_title", key: "top" },
+                    { title: t("radar.table.topSubscribers"), dataIndex: "top_channel_subscribers", key: "top_sub", render: (v: number) => v.toLocaleString() },
                   ]}
                 />
                 {crossResult.ai_recommendation && (
-                  <Card size="small" title="AI 推荐" className="!border-yc-border">
+                  <Card size="small" title={t("radar.table.aiRecommendation")} className="!border-yc-border">
                     <Text>{crossResult.ai_recommendation}</Text>
                   </Card>
                 )}
               </div>
             ) : (
-              <Text type="secondary">暂无跨地区对比数据</Text>
+              <Text type="secondary">{t("radar.noCrossResults")}</Text>
             ),
           },
         ]}
@@ -636,6 +580,69 @@ function RadarInlinePanel({
 // ── 主页面 ──
 
 export default function NavigationGuide() {
+  const { t } = useTranslation("navigation");
+
+  // ── 国际化选项 ──
+  const LANGUAGE_OPTIONS = useMemo(() => [
+    { value: "中文", label: t("option.langChinese") },
+    { value: "英语", label: t("option.langEnglish") },
+    { value: "日语", label: t("option.langJapanese") },
+    { value: "韩语", label: t("option.langKorean") },
+    { value: "阿拉伯语", label: t("option.langArabic") },
+    { value: "西班牙语", label: t("option.langSpanish") },
+    { value: "法语", label: t("option.langFrench") },
+    { value: "德语", label: t("option.langGerman") },
+    { value: "葡萄牙语", label: t("option.langPortuguese") },
+    { value: "印地语", label: t("option.langHindi") },
+  ], [t]);
+
+  const FORMAT_OPTIONS = useMemo(() => [
+    { value: "video", label: t("option.formatVideo") },
+    { value: "short", label: t("option.formatShort") },
+    { value: "live", label: t("option.formatLive") },
+  ], [t]);
+
+  const BUDGET_OPTIONS = useMemo(() => [
+    { value: "zero", label: t("option.budgetZero") },
+    { value: "low", label: t("option.budgetLow") },
+    { value: "medium", label: t("option.budgetMedium") },
+    { value: "high", label: t("option.budgetHigh") },
+  ], [t]);
+
+  const MONETIZATION_OPTIONS = useMemo(() => [
+    { value: "adsense", label: t("option.monetizeAdsense") },
+    { value: "course", label: t("option.monetizeCourse") },
+    { value: "affiliate", label: t("option.monetizeAffiliate") },
+    { value: "sponsor", label: t("option.monetizeSponsor") },
+  ], [t]);
+
+  const REGION_OPTIONS = useMemo(() => [
+    { value: "US", label: `🇺🇸 ${t("region.US")}` },
+    { value: "GB", label: `🇬🇧 ${t("region.GB")}` },
+    { value: "CA", label: `🇨🇦 ${t("region.CA")}` },
+    { value: "AU", label: `🇦🇺 ${t("region.AU")}` },
+    { value: "SG", label: `🇸🇬 ${t("region.SG")}` },
+    { value: "MY", label: `🇲🇾 ${t("region.MY")}` },
+    { value: "PH", label: `🇵🇭 ${t("region.PH")}` },
+    { value: "VN", label: `🇻🇳 ${t("region.VN")}` },
+    { value: "ID", label: `🇮🇩 ${t("region.ID")}` },
+    { value: "TH", label: `🇹🇭 ${t("region.TH")}` },
+    { value: "AE", label: `🇦🇪 ${t("region.AE")}` },
+    { value: "SA", label: `🇸🇦 ${t("region.SA")}` },
+    { value: "JP", label: `🇯🇵 ${t("region.JP")}` },
+    { value: "KR", label: `🇰🇷 ${t("region.KR")}` },
+    { value: "DE", label: `🇩🇪 ${t("region.DE")}` },
+    { value: "FR", label: `🇫🇷 ${t("region.FR")}` },
+    { value: "BR", label: `🇧🇷 ${t("region.BR")}` },
+    { value: "IN", label: `🇮🇳 ${t("region.IN")}` },
+  ], [t]);
+
+  const WEEKLY_HOURS_OPTIONS = useMemo(() => [
+    { value: "<5h", label: t("option.hoursLt5") },
+    { value: "5-10h", label: t("option.hours5to10") },
+    { value: "10-20h", label: t("option.hours10to20") },
+    { value: "20h+", label: t("option.hoursGt20") },
+  ], [t]);
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<NicheRecommendation[]>([]);
@@ -712,7 +719,7 @@ export default function NavigationGuide() {
       setHistoryTotal(data.total);
       setHistoryPage(page);
     } catch {
-      message.error("加载历史记录失败");
+      message.error(t("message.loadHistoryFailed"));
     } finally {
       setHistoryLoading(false);
     }
@@ -730,7 +737,7 @@ export default function NavigationGuide() {
       const data = await getNavigationRecordApi(recordId);
       setHistoryDetail(data);
     } catch {
-      message.error("加载记录详情失败");
+      message.error(t("message.loadDetailFailed"));
     } finally {
       setHistoryDetailLoading(false);
     }
@@ -739,10 +746,10 @@ export default function NavigationGuide() {
   const deleteRecord = async (recordId: number) => {
     try {
       await deleteNavigationRecordApi(recordId);
-      message.success("已删除");
+      message.success(t("message.deleted"));
       void loadHistory(historyPage);
     } catch {
-      message.error("删除失败");
+      message.error(t("message.deleteFailed"));
     }
   };
 
@@ -778,9 +785,9 @@ export default function NavigationGuide() {
       setConversationId(data.conversation_id ?? null);
       setChannelInfo(data.channel_info ?? null);
       if (data.recommendations.length === 0) {
-        message.info("暂无推荐结果，请调整输入后重试");
+        message.info(t("message.noResults"));
       } else {
-        message.success(`找到 ${data.recommendations.length} 个推荐品类`);
+        message.success(t("message.foundCount", { count: data.recommendations.length }));
       }
     } catch (e: unknown) {
       const err = e as {
@@ -791,11 +798,11 @@ export default function NavigationGuide() {
       if (err?.response?.status === 429) {
         const detail = err.response?.data?.detail;
         const msg = typeof detail === "object" ? detail?.message : detail;
-        message.error({ content: msg ?? "API 配额不足，请稍后再试", duration: 5 });
+        message.error({ content: msg ?? t("message.quotaLow"), duration: 5 });
       } else {
         const detail = err?.response?.data?.detail;
         const msg = typeof detail === "object" ? JSON.stringify(detail) : detail;
-        message.error(msg ?? "导航推荐失败");
+        message.error(msg ?? t("message.navFailed"));
       }
     } finally {
       setLoading(false);
@@ -810,9 +817,9 @@ export default function NavigationGuide() {
         {/* 页面标题 */}
         <div className="mb-2 flex items-start justify-between">
           <div>
-            <Title level={3} style={{ color: "var(--color-text-primary)", marginBottom: 4 }}>出海导航</Title>
+            <Title level={3} style={{ color: "var(--color-text-primary)", marginBottom: 4 }}>{t("title")}</Title>
             <Text style={{ color: "var(--color-text-secondary)" }}>
-              输入你的完整资源画像，AI 为你推演最适合的 YouTube 细分品类组合，并给出避坑建议。
+              {t("desc")}
             </Text>
           </div>
           <Button
@@ -820,7 +827,7 @@ export default function NavigationGuide() {
             onClick={openHistory}
             className="!rounded-lg shrink-0"
           >
-            历史记录
+            {t("historyButton")}
           </Button>
         </div>
 
@@ -840,66 +847,66 @@ export default function NavigationGuide() {
           >
             {/* ── 基础画像 ── */}
             <div className="mb-2">
-              <Text strong className="text-sm text-yc-text-tertiary uppercase tracking-wider">基础画像</Text>
+              <Text strong className="text-sm text-yc-text-tertiary uppercase tracking-wider">{t("form.basicProfile")}</Text>
               <div className="h-px bg-yc-border-light mt-1 mb-4" />
             </div>
 
-            <Form.Item name="languages" label="语言能力" rules={[{ required: true, message: "请选择至少一种语言" }]}>
-              <Select mode="multiple" options={LANGUAGE_OPTIONS} placeholder="选择你会的语言" />
+            <Form.Item name="languages" label={t("form.languages")} rules={[{ required: true, message: t("form.languagesRequired") }]}>
+              <Select mode="multiple" options={LANGUAGE_OPTIONS} placeholder={t("form.languagesPlaceholder")} />
             </Form.Item>
-            <Form.Item name="content_format" label="内容形式" rules={[{ required: true, message: "请选择内容形式" }]}>
-              <Select mode="multiple" options={FORMAT_OPTIONS} placeholder="选择内容形式" />
+            <Form.Item name="content_format" label={t("form.contentFormat")} rules={[{ required: true, message: t("form.contentFormatRequired") }]}>
+              <Select mode="multiple" options={FORMAT_OPTIONS} placeholder={t("form.contentFormatPlaceholder")} />
             </Form.Item>
-            <Form.Item name="budget_level" label="预算水平" rules={[{ required: true }]}>
+            <Form.Item name="budget_level" label={t("form.budgetLevel")} rules={[{ required: true }]}>
               <Select options={BUDGET_OPTIONS} />
             </Form.Item>
 
             {/* ── 个性化画像 ── */}
             <div className="mb-2 mt-6">
-              <Text strong className="text-sm text-yc-text-tertiary uppercase tracking-wider">个性化画像</Text>
+              <Text strong className="text-sm text-yc-text-tertiary uppercase tracking-wider">{t("form.personalProfile")}</Text>
               <div className="h-px bg-yc-border-light mt-1 mb-4" />
             </div>
 
             <Form.Item
               name="core_skills"
-              label="核心技能 / 内容方向"
-              rules={[{ required: true, message: "请输入至少1个核心技能" }]}
-              extra="这是破除同质化的关键，如：编程、美妆、恐怖故事、宠物"
+              label={t("form.coreSkills")}
+              rules={[{ required: true, message: t("form.coreSkillsRequired") }]}
+              extra={t("form.coreSkillsExtra")}
             >
-              <Select mode="tags" maxCount={3} placeholder="输入技能后按回车添加" />
+              <Select mode="tags" maxCount={3} placeholder={t("form.coreSkillsPlaceholder")} />
             </Form.Item>
-            <Form.Item name="monetization_goal" label="变现目标">
-              <Select options={MONETIZATION_OPTIONS} placeholder="选择你的主要变现方式" allowClear />
+            <Form.Item name="monetization_goal" label={t("form.monetizationGoal")}>
+              <Select options={MONETIZATION_OPTIONS} placeholder={t("form.monetizationPlaceholder")} allowClear />
             </Form.Item>
-            <Form.Item name="target_regions" label="目标市场地区" extra="选择你希望进入的市场">
-              <Select mode="multiple" options={REGION_OPTIONS} placeholder="选择目标地区" />
+            <Form.Item name="target_regions" label={t("form.targetRegions")} extra={t("form.targetRegionsExtra")}>
+              <Select mode="multiple" options={REGION_OPTIONS} placeholder={t("form.targetRegionsPlaceholder")} />
             </Form.Item>
-            <Form.Item name="weekly_hours" label="每周可投入时间">
-              <Select options={WEEKLY_HOURS_OPTIONS} placeholder="选择投入时间" allowClear />
+            <Form.Item name="weekly_hours" label={t("form.weeklyHours")}>
+              <Select options={WEEKLY_HOURS_OPTIONS} placeholder={t("form.weeklyHoursPlaceholder")} allowClear />
             </Form.Item>
 
             {/* ── 已有频道 ── */}
             <div className="mb-2 mt-6">
-              <Text strong className="text-sm text-yc-text-tertiary uppercase tracking-wider">已有频道（可选）</Text>
+              <Text strong className="text-sm text-yc-text-tertiary uppercase tracking-wider">{t("form.existingChannel")}</Text>
               <div className="h-px bg-yc-border-light mt-1 mb-4" />
             </div>
 
             <Form.Item
               name="existing_channel_url"
-              label="YouTube 频道 URL"
-              extra="提供已有频道可让 AI 基于你现有内容给出更精准的推荐"
+              label={t("form.channelUrl")}
+              extra={t("form.channelUrlExtra")}
             >
-              <Input placeholder="https://www.youtube.com/@yourchannel" allowClear />
+              <Input placeholder={t("form.channelUrlPlaceholder")} allowClear />
             </Form.Item>
 
             {/* ── AI 配置 ── */}
             <div className="mb-2 mt-6">
-              <Text strong className="text-sm text-yc-text-tertiary uppercase tracking-wider">AI 配置</Text>
+              <Text strong className="text-sm text-yc-text-tertiary uppercase tracking-wider">{t("form.aiConfig")}</Text>
               <div className="h-px bg-yc-border-light mt-1 mb-4" />
             </div>
 
             <Space wrap className="w-full" size="large">
-              <Form.Item label="模型名" className="mb-0 min-w-[220px]">
+              <Form.Item label={t("form.modelName")} className="mb-0 min-w-[220px]">
                 <Select
                   showSearch
                   value={
@@ -913,7 +920,7 @@ export default function NavigationGuide() {
                     setNavModelName(v.slice(idx + 2));
                   }}
                   options={allModelNameOpts}
-                  placeholder="可选"
+                  placeholder={t("form.modelNamePlaceholder")}
                   allowClear
                   onClear={() => { setNavModelLibId(undefined); setNavModelName(""); }}
                   filterOption={(input, opt) =>
@@ -921,14 +928,14 @@ export default function NavigationGuide() {
                   }
                 />
               </Form.Item>
-              <Form.Item name="agent_id" label="AI 智能体" className="mb-0 min-w-[200px]">
-                <Select options={agentOptions.map((p) => ({ value: p.id, label: p.title }))} placeholder="可选" allowClear />
+              <Form.Item name="agent_id" label={t("form.agentName")} className="mb-0 min-w-[200px]">
+                <Select options={agentOptions.map((p) => ({ value: p.id, label: p.title }))} placeholder={t("form.agentNamePlaceholder")} allowClear />
               </Form.Item>
             </Space>
 
             <Form.Item className="mb-0 mt-6">
               <Button type="primary" size="large" loading={loading} onClick={() => void onSubmit()} className="!rounded-lg !px-8">
-                开始深度推荐
+                {t("form.submit")}
               </Button>
             </Form.Item>
           </Form>
@@ -937,7 +944,7 @@ export default function NavigationGuide() {
         {loading && (
           <div className="flex flex-col items-center justify-center py-16">
             <Spin size="large" />
-            <Text type="secondary" className="mt-4">AI 正在分析你的资源画像，推演最佳品类…</Text>
+            <Text type="secondary" className="mt-4">{t("message.loading")}</Text>
           </div>
         )}
 
@@ -945,10 +952,10 @@ export default function NavigationGuide() {
         {!loading && channelInfo && (
           <Card className="!bg-yc-primary-bg/50 !border-yc-primary-border !shadow-sm" size="small" bodyStyle={{ padding: 16 }}>
             <div className="flex items-center gap-2 mb-1">
-              <Text strong className="text-sm text-yc-primary">已识别频道</Text>
+              <Text strong className="text-sm text-yc-primary">{t("channel.recognized")}</Text>
             </div>
             <div className="text-sm text-yc-text-primary">
-              {String(channelInfo.title)} — {Number(channelInfo.subscriber_count).toLocaleString()} 订阅 · {Number(channelInfo.video_count)} 个视频
+              {String(channelInfo.title)} — {Number(channelInfo.subscriber_count).toLocaleString()} {t("channel.subscribers")} · {Number(channelInfo.video_count)} {t("channel.videos")}
             </div>
           </Card>
         )}
@@ -959,10 +966,10 @@ export default function NavigationGuide() {
           </Card>
         )}
 
-        {/* 推荐结果 */}
+        {/* 推荐结果默认 */}
         {!loading && recommendations.length > 0 && (
           <div className="space-y-5">
-            <Title level={4} style={{ color: "var(--color-text-primary)" }}>推荐品类</Title>
+            <Title level={4} style={{ color: "var(--color-text-primary)" }}>{t("card.niche")}</Title>
             {recommendations.map((rec, i) => {
               const isExpanded = expandedRadarIndex === i;
               // 从 niche_title 提取关键词和地区
@@ -1014,7 +1021,7 @@ export default function NavigationGuide() {
 
         {/* 配额消耗明细 */}
         {!loading && quotaUsage && (
-          <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm" title="本次 API 消耗明细" size="small">
+          <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm" title={t("breakdown.title")} size="small">
             <QuotaBreakdown usage={quotaUsage} />
           </Card>
         )}
@@ -1022,7 +1029,7 @@ export default function NavigationGuide() {
 
       {/* ── 历史记录抽屉 ── */}
       <Drawer
-        title={historyDetail ? "推荐详情" : "推荐历史记录"}
+        title={historyDetail ? t("history.detailTitle") : t("history.title")}
         open={historyOpen}
         onClose={() => {
           if (historyDetail) {
@@ -1041,12 +1048,12 @@ export default function NavigationGuide() {
           ) : (
             <div className="space-y-5">
               {/* 请求参数摘要 */}
-              <Card size="small" title="推荐参数" className="!border-yc-border">
+              <Card size="small" title={t("history.paramTitle")} className="!border-yc-border">
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div><Text type="secondary">语言：</Text>{(historyDetail.request_params.languages as string[])?.join("、") ?? "-"}</div>
-                  <div><Text type="secondary">预算：</Text>{(historyDetail.request_params.budget_level as string) ?? "-"}</div>
-                  <div><Text type="secondary">技能：</Text>{(historyDetail.request_params.core_skills as string[])?.join("、") ?? "-"}</div>
-                  <div><Text type="secondary">形式：</Text>{(historyDetail.request_params.content_format as string[])?.join("、") ?? "-"}</div>
+                  <div><Text type="secondary">{t("history.langLabel")}</Text>{(historyDetail.request_params.languages as string[])?.join("、") ?? "-"}</div>
+                  <div><Text type="secondary">{t("history.budgetLabel")}</Text>{(historyDetail.request_params.budget_level as string) ?? "-"}</div>
+                  <div><Text type="secondary">{t("history.skillLabel")}</Text>{(historyDetail.request_params.core_skills as string[])?.join("、") ?? "-"}</div>
+                  <div><Text type="secondary">{t("history.formatLabel")}</Text>{(historyDetail.request_params.content_format as string[])?.join("、") ?? "-"}</div>
                 </div>
                 <div className="text-xs text-yc-text-muted mt-2">
                   {new Date(historyDetail.created_at).toLocaleString("zh-CN")}
@@ -1083,7 +1090,7 @@ export default function NavigationGuide() {
             {historyLoading ? (
               <div className="flex justify-center py-12"><Spin /></div>
             ) : historyList.length === 0 ? (
-              <Empty description="暂无推荐记录" />
+              <Empty description={t("history.empty")} />
             ) : (
               <div className="space-y-3">
                 {historyList.map((item) => (
@@ -1095,14 +1102,14 @@ export default function NavigationGuide() {
                     <div className="flex items-start justify-between mb-1">
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-yc-text-primary truncate">
-                          {item.top_niche_title ?? "推荐结果"}
+                          {item.top_niche_title ?? t("history.resultDefault")}
                         </div>
                         <div className="text-xs text-yc-text-tertiary mt-0.5">
                           {(item.request_params.core_skills as string[])?.join("、")}
                           {item.top_match_score != null && (
-                            <Tag color="blue" className="ml-2">匹配度 {item.top_match_score}</Tag>
+                            <Tag color="blue" className="ml-2">{t("card.matchScore")} {item.top_match_score}</Tag>
                           )}
-                          <Tag className="ml-1">{item.recommendation_count} 个品类</Tag>
+                          <Tag className="ml-1">{item.recommendation_count} {t("history.categoryCount")}</Tag>
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0 ml-2">
@@ -1116,7 +1123,7 @@ export default function NavigationGuide() {
                           }}
                         />
                         <Popconfirm
-                          title="确认删除此记录？"
+                          title={t("history.confirmDelete")}
                           onConfirm={(e) => {
                             e?.stopPropagation();
                             void deleteRecord(item.id);

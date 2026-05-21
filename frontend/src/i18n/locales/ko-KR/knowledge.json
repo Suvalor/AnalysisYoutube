@@ -1,0 +1,52 @@
+{
+  "title": "지식 베이스 관리",
+  "desc": "스크립트 지식 베이스를 관리하세요. Markdown 편집과 버전 관리를 지원합니다.",
+  "form": {
+    "searchPlaceholder": "지식 제목 또는 내용 검색",
+    "title": "제목",
+    "content": "내용",
+    "category": "카테고리"
+  },
+  "action": {
+    "add": "지식 추가",
+    "edit": "편집",
+    "delete": "삭제",
+    "toSop": "SOP 워크플로우로 이동",
+    "refresh": "새로고침",
+    "upload": "업로드"
+  },
+  "message": {
+    "addSuccess": "지식이 추가되었습니다",
+    "addFailed": "지식 추가 실패",
+    "updateSuccess": "지식이 업데이트되었습니다",
+    "updateFailed": "지식 업데이트 실패",
+    "deleteSuccess": "지식이 삭제되었습니다",
+    "deleteFailed": "삭제 실패",
+    "loadFailed": "지식 목록 로드 실패",
+    "confirmDelete": "이 지식을 삭제하시겠습니까?",
+    "uploadSuccess": "업로드 성공",
+    "uploadFailed": "업로드 실패"
+  },
+  "table": {
+    "title": "제목",
+    "category": "카테고리",
+    "content": "내용",
+    "createdAt": "생성일",
+    "updatedAt": "업데이트일",
+    "actions": "작업"
+  },
+  "card": {
+    "knowledgeList": "지식 목록",
+    "knowledgeDetail": "지식 상세",
+    "assetLibrary": "에셋 라이브러리"
+  },
+  "modal": {
+    "addTitle": "지식 추가",
+    "editTitle": "지식 편집",
+    "confirm": "확인",
+    "cancel": "취소"
+  },
+  "empty": {
+    "noData": "지식 데이터가 없습니다. '지식 추가'를 클릭하여 시작하세요"
+  }
+}

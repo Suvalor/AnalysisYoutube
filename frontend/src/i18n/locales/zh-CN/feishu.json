@@ -1,0 +1,32 @@
+{
+  "title": "飞书云文档",
+  "desc": "浏览和管理飞书云文档，快速查看和编辑。",
+  "form": {
+    "searchPlaceholder": "搜索文档标题"
+  },
+  "action": {
+    "refresh": "刷新",
+    "openDoc": "打开文档",
+    "viewDoc": "查看文档",
+    "backToList": "返回列表"
+  },
+  "message": {
+    "loadFailed": "加载文档列表失败",
+    "loadDocFailed": "加载文档内容失败",
+    "noAuth": "未授权飞书，请先在设置中心配置"
+  },
+  "table": {
+    "title": "文档标题",
+    "owner": "所有者",
+    "updatedAt": "更新时间",
+    "actions": "操作"
+  },
+  "card": {
+    "docList": "文档列表",
+    "docViewer": "文档预览"
+  },
+  "empty": {
+    "noData": "暂无飞书文档数据",
+    "noDocs": "暂无文档"
+  }
+}

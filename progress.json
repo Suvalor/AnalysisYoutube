@@ -1,143 +1,117 @@
 {
-  "project": "YouTube Compass — 游客配额+数据隔离审计修复",
+  "project": "YouTube Compass — i18n 补全（未国际化内容补充）",
   "task_level": "L2",
-  "requirement": "实施 docs/20260520-guest-quota-and-isolation-audit.md：修复游客配额形同虚设（Cookie绕过）、配额先扣后失败、状态码语义错误、keyword-history缺失、feishu_docs越权删除、jimeng模型库横向回退",
-  "source_task_document": "docs/20260520-guest-quota-and-isolation-audit.md",
-  "task_document_status": "completed",
-  "current_phase": 7,
-  "created_at": "2026-05-20T21:00:00Z",
-  "updated_at": "2026-05-20T22:30:00Z",
+  "requirement": "项目已有 i18n 基础设施（react-i18next），需要扫描前端所有页面/组件中未国际化的硬编码中文文本，提取为 i18n key 并补充到翻译文件中",
+  "source_task_document": null,
+  "task_document_status": null,
+  "current_phase": 4,
+  "created_at": "2026-05-20T23:00:00Z",
+  "updated_at": "2026-05-21T02:30:00Z",
   "phases": {
     "1": {
       "name": "PM需求沟通+定级",
       "agent": "pm",
       "status": "completed",
-      "deliverables": ["docs/requirements-guest-quota-audit.md"],
-      "started_at": "2026-05-20T21:00:00Z",
-      "completed_at": "2026-05-20T21:05:00Z",
-      "notes": "L2定级确认：跨6个缺陷、7个后端文件，跨安全/配额/隔离三维度"
+      "deliverables": [],
+      "started_at": "2026-05-20T23:00:00Z",
+      "completed_at": "2026-05-20T23:30:00Z",
+      "notes": "74文件约2605处中文匹配，实际UI文本约1500-1800处；仅4/74文件使用useTranslation；定级L2；4种语言同步补充"
     },
     "1.5": {
       "name": "价值审查",
       "agent": "gemini-thinking-protocol",
       "status": "completed",
       "verdict": "PASS",
-      "deliverables": ["docs/cognition/value-review-guest-quota-audit.md"],
-      "started_at": "2026-05-20T21:05:00Z",
-      "completed_at": "2026-05-20T21:10:00Z",
-      "notes": "VERDICT: PASS — 安全漏洞+数据隔离是硬需求，修复代价低收益高"
+      "deliverables": ["docs/cognition/value-review-i18n.md"],
+      "started_at": "2026-05-20T23:30:00Z",
+      "completed_at": "2026-05-20T23:45:00Z",
+      "notes": "PASS；关键风险：namespace设计必须编码前确定；CI强制规则需同步添加"
     },
     "2": {
-      "name": "设计+架构",
-      "agent": "product-designer + architect",
+      "name": "架构设计",
+      "agent": "architect",
       "status": "completed",
-      "deliverables": ["docs/design/design-spec-guest-quota-audit.md", "docs/architecture/architecture-spec-guest-quota-audit.md"],
-      "started_at": "2026-05-20T21:10:00Z",
-      "completed_at": "2026-05-20T21:30:00Z",
-      "notes": "并行完成；3个ADR；3个Sprint规划；前端零改动确认"
+      "deliverables": ["docs/architecture/architecture-spec-i18n.md"],
+      "started_at": "2026-05-20T23:45:00Z",
+      "completed_at": "2026-05-21T00:30:00Z",
+      "notes": "12个新增namespace；key命名二级嵌套为主；3 Sprint规划；CI规则eslint-plugin-i18next"
     },
     "3": {
-      "name": "Sprint迭代编码",
+      "name": "Sprint1编码",
       "agent": "developer",
       "status": "completed",
       "deliverables": [
-        "backend/app/models/guest_session.py",
-        "backend/app/crud/guest_session_crud.py",
-        "backend/app/services/guest_service.py",
-        "backend/app/api/v1/seo.py",
-        "backend/app/api/v1/keyword.py",
-        "backend/app/models/keyword_history.py",
-        "backend/app/schemas/keyword_history.py",
-        "backend/app/crud/keyword_history.py",
-        "backend/app/db/base.py",
-        "backend/app/models/feishu_doc.py",
-        "backend/app/schemas/feishu_doc.py",
-        "backend/app/crud/feishu_doc.py",
-        "backend/app/api/v1/feishu_docs.py",
-        "backend/app/api/v1/jimeng.py",
-        "backend/app/core/config.py",
-        "backend/alembic/versions/20260520_000003_add_ip_address_index_to_guest_sessions.py",
-        "backend/alembic/versions/20260520_000004_create_keyword_history_table.py",
-        "backend/alembic/versions/20260520_000005_add_user_id_to_feishu_docs.py",
-        "backend/alembic/versions/20260520_000006_add_user_id_index_to_keyword_history.py"
+        "src/i18n/index.ts",
+        "src/i18n/locales/*/common.json (4文件，新增table/time/confirm)",
+        "src/i18n/locales/*/navigation.json (4文件)",
+        "src/i18n/locales/*/youtube.json (4文件，107个key)",
+        "src/i18n/locales/*/radar.json (4文件)",
+        "src/i18n/locales/*/settings.json (4文件，7个新key)",
+        "src/App.tsx (antd ConfigProvider locale映射)",
+        "src/pages/radar/NavigationGuide.tsx",
+        "src/pages/settings/ConfigCenter.tsx",
+        "src/pages/youtube/ChannelList.tsx",
+        "src/pages/radar/BlueOceanRadar.tsx"
       ],
-      "started_at": "2026-05-20T21:30:00Z",
-      "completed_at": "2026-05-20T22:00:00Z",
-      "notes": "Sprint1: P0游客配额Cookie绕过+配额先扣后失败; Sprint2: P1状态码+keyword-history; Sprint3: P2 feishu_docs越权+jimeng回退+seo_scoring遗留"
-    },
-    "4": {
-      "name": "代码审查",
-      "agent": "code-reviewer",
-      "status": "completed",
-      "deliverables": [],
-      "started_at": "2026-05-20T22:00:00Z",
-      "completed_at": "2026-05-20T22:10:00Z",
-      "notes": "1 P0(X-Forwarded-For注入)+2 P1→全部修复; P2: 3个记入技术债"
-    },
-    "5": {
-      "name": "业务验收",
-      "agent": "business-tester",
-      "status": "completed",
-      "deliverables": ["backend/tests/test_guest_quota_audit.py"],
-      "started_at": "2026-05-20T22:10:00Z",
-      "completed_at": "2026-05-20T22:30:00Z",
-      "notes": "APPROVED — 17/17验收标准通过, 33/33测试用例通过"
+      "started_at": "2026-05-21T00:30:00Z",
+      "completed_at": "2026-05-21T02:30:00Z",
+      "notes": "Sprint1完成：基础设施扩展+4个高密度页面i18n化；TYPECHECK_PASSED"
     }
   },
   "sprints": [
     {
       "id": 1,
       "status": "completed",
-      "scope": "P0：游客配额Cookie绕过+配额先扣后失败",
+      "scope": "基础设施+高密度页面(NavigationGuide/ConfigCenter/ChannelList/BlueOceanRadar)",
       "tasks": {
         "completed": [
-          "guest_session_crud.py: get_by_ip_address + SELECT FOR UPDATE",
-          "guest_service.py: identify_guest IP优先 + reserve/consume两阶段配额",
-          "seo.py: trending路由reserve→API→consume",
-          "keyword.py: keyword_research路由reserve→API→consume",
-          "Alembic迁移: ip_address索引"
+          "扩展i18n/index.ts新增12个namespace",
+          "创建48个空JSON文件(12ns x 4locale)",
+          "扩展common.json(table/time/confirm)",
+          "App.tsx添加antd ConfigProvider+locale映射",
+          "NavigationGuide.tsx i18n化",
+          "ConfigCenter.tsx补全i18n",
+          "ChannelList.tsx i18n化",
+          "BlueOceanRadar.tsx i18n化"
         ],
         "failed": [],
         "pending": []
       },
-      "review_status": "passed_with_p0_p1_fixes",
-      "test_status": "passed"
+      "review_status": null,
+      "test_status": null
     },
     {
       "id": 2,
-      "status": "completed",
-      "scope": "P1：状态码修复+keyword-history路由",
+      "status": "pending",
+      "scope": "中等密度页面+共享组件",
       "tasks": {
-        "completed": [
-          "seo.py/keyword.py: 配额不足400→503+消息优化",
-          "KeywordHistory模型+schema+CRUD",
-          "keyword.py: GET /keyword-history路由",
-          "keyword.py: keyword_research写入历史",
-          "Alembic迁移: keyword_history表"
-        ],
+        "completed": [],
         "failed": [],
-        "pending": []
+        "pending": [
+          "ScriptWorkflowSOP/AssetLibrary/SeoScoring/InspirationPool/TrendDiscovery",
+          "GlobalVideoList/ChannelDetail/KeywordResearch/KnowledgeBase/DownloadList",
+          "AICreator/FeishuDocList+Viewer/共享组件"
+        ]
       },
-      "review_status": "passed_with_p1_fixes",
-      "test_status": "passed"
+      "review_status": null,
+      "test_status": null
     },
     {
       "id": 3,
-      "status": "completed",
-      "scope": "P2：feishu_docs越权+jimeng回退+seo_scoring遗留",
+      "status": "pending",
+      "scope": "低密度文件+遗留清理+CI规则",
       "tasks": {
-        "completed": [
-          "FeishuDoc模型: 新增user_id nullable列",
-          "feishu_docs.py: 删除/归档user_id校验",
-          "jimeng.py: 删除org级回退逻辑+状态码500→400",
-          "seo.py: seo_scoring_endpoint配额两阶段修复",
-          "Alembic迁移: feishu_docs加user_id + keyword_history加索引"
-        ],
+        "completed": [],
         "failed": [],
-        "pending": []
+        "pending": [
+          "Dashboard/CompetitorAnalysis/VideoBoard/YouTubeQuotaDashboard等小文件",
+          "删除src/locales/遗留目录",
+          "配置eslint-plugin-i18next",
+          "全量回归验证"
+        ]
       },
-      "review_status": "passed_with_p0_p1_fixes",
-      "test_status": "passed"
+      "review_status": null,
+      "test_status": null
     }
   ],
   "skipped_commands": [],

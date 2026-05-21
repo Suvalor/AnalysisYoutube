@@ -1,0 +1,44 @@
+{
+  "title": "AIスクリプトスタジオ",
+  "desc": "AIを活用して動画スクリプトをインテリジェントに生成・最適化し、クリエイティブ効率を向上。",
+  "form": {
+    "topic": "テーマ",
+    "topicPlaceholder": "動画テーマまたはキーワードを入力",
+    "style": "スタイル",
+    "stylePlaceholder": "スクリプトスタイルを選択または入力",
+    "length": "長さ",
+    "model": "モデル",
+    "agent": "エージェント",
+    "generate": "スクリプト生成"
+  },
+  "action": {
+    "generate": "生成",
+    "regenerate": "再生成",
+    "edit": "編集",
+    "save": "保存",
+    "toSop": "SOPワークフローへ",
+    "copy": "コピー"
+  },
+  "message": {
+    "generateSuccess": "スクリプト生成成功",
+    "generateFailed": "スクリプト生成失敗",
+    "saveSuccess": "スクリプト保存成功",
+    "saveFailed": "スクリプト保存失敗",
+    "topicRequired": "動画テーマを入力してください",
+    "loadFailed": "AI設定の読み込みに失敗しました",
+    "copySuccess": "クリップボードにコピーしました"
+  },
+  "card": {
+    "scriptEditor": "スクリプトエディタ",
+    "aiAssistant": "AIアシスタント",
+    "scriptPreview": "スクリプトプレビュー"
+  },
+  "option": {
+    "short": "短い（1-3分）",
+    "medium": "中程度（3-10分）",
+    "long": "長い（10分以上）"
+  },
+  "empty": {
+    "noData": "スクリプトがありません。テーマを入力して生成を開始してください"
+  }
+}

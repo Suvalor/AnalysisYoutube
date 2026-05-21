@@ -77,5 +77,23 @@
   "pagination": {
     "total": "Total {{total}} items",
     "page": "Page {{current}} / {{total}}"
+  },
+  "table": {
+    "emptyText": "No data",
+    "filterConfirm": "OK",
+    "filterReset": "Reset",
+    "selectAll": "Select current page",
+    "selectInvert": "Invert current page"
+  },
+  "time": {
+    "justNow": "Just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}} hr ago",
+    "daysAgo": "{{count}} days ago"
+  },
+  "confirm": {
+    "delete": "Confirm delete? This action cannot be undone",
+    "leavePage": "Unsaved changes. Confirm leaving?",
+    "clearData": "Confirm clear? This action cannot be undone"
   }
 }

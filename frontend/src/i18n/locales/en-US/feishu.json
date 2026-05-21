@@ -1,0 +1,32 @@
+{
+  "title": "Feishu Docs",
+  "desc": "Browse and manage Feishu cloud documents, quick view and edit.",
+  "form": {
+    "searchPlaceholder": "Search document title"
+  },
+  "action": {
+    "refresh": "Refresh",
+    "openDoc": "Open Document",
+    "viewDoc": "View Document",
+    "backToList": "Back to List"
+  },
+  "message": {
+    "loadFailed": "Failed to load document list",
+    "loadDocFailed": "Failed to load document content",
+    "noAuth": "Feishu not authorized, please configure in Settings Center"
+  },
+  "table": {
+    "title": "Document Title",
+    "owner": "Owner",
+    "updatedAt": "Updated At",
+    "actions": "Actions"
+  },
+  "card": {
+    "docList": "Document List",
+    "docViewer": "Document Viewer"
+  },
+  "empty": {
+    "noData": "No Feishu document data",
+    "noDocs": "No documents"
+  }
+}

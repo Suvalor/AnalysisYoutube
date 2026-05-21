@@ -1,0 +1,47 @@
+{
+  "title": "SEO 评分",
+  "desc": "分析视频 SEO 表现，优化标题、描述和标签以提升搜索排名。",
+  "form": {
+    "videoUrl": "视频 URL",
+    "videoUrlPlaceholder": "输入 YouTube 视频 URL",
+    "keyword": "目标关键词",
+    "keywordPlaceholder": "输入目标关键词",
+    "analyze": "开始分析"
+  },
+  "action": {
+    "analyze": "分析",
+    "reanalyze": "重新分析",
+    "export": "导出报告"
+  },
+  "message": {
+    "analyzeSuccess": "SEO 分析完成",
+    "analyzeFailed": "SEO 分析失败",
+    "urlRequired": "请输入视频 URL",
+    "invalidUrl": "无效的 YouTube 视频 URL",
+    "loadFailed": "加载 SEO 数据失败",
+    "exportSuccess": "导出成功",
+    "exportFailed": "导出失败"
+  },
+  "table": {
+    "item": "评分项",
+    "score": "得分",
+    "maxScore": "满分",
+    "suggestion": "优化建议"
+  },
+  "card": {
+    "overallScore": "综合评分",
+    "titleScore": "标题评分",
+    "descriptionScore": "描述评分",
+    "tagScore": "标签评分",
+    "suggestions": "优化建议"
+  },
+  "stat": {
+    "overall": "综合",
+    "title": "标题",
+    "description": "描述",
+    "tags": "标签"
+  },
+  "empty": {
+    "noData": "暂无 SEO 数据，请输入视频 URL 开始分析"
+  }
+}

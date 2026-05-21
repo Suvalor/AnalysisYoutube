@@ -1,0 +1,45 @@
+{
+  "title": "키워드 연구",
+  "desc": "키워드 성능을 심층 분석하고, 고잠재력 저경쟁 창작 기회를 발견하세요.",
+  "form": {
+    "keyword": "키워드",
+    "keywordPlaceholder": "키워드를 입력하여 연구",
+    "region": "지역",
+    "language": "언어",
+    "search": "검색"
+  },
+  "action": {
+    "search": "검색",
+    "export": "내보내기",
+    "addToMonitor": "모니터 추가",
+    "removeFromMonitor": "모니터 제거"
+  },
+  "message": {
+    "searchSuccess": "키워드 연구 완료",
+    "searchFailed": "키워드 연구 실패",
+    "keywordRequired": "키워드를 입력하세요",
+    "noResults": "키워드 데이터를 찾을 수 없습니다",
+    "exportSuccess": "내보내기 성공",
+    "exportFailed": "내보내기 실패",
+    "addMonitorSuccess": "모니터 목록에 추가되었습니다",
+    "removeMonitorSuccess": "모니터 목록에서 제거되었습니다",
+    "loadFailed": "키워드 데이터 로드 실패"
+  },
+  "table": {
+    "keyword": "키워드",
+    "searchVolume": "검색량",
+    "competition": "경쟁도",
+    "cpc": "CPC",
+    "trend": "트렌드",
+    "relatedKeywords": "관련 키워드",
+    "actions": "작업"
+  },
+  "card": {
+    "keywordOverview": "키워드 개요",
+    "relatedKeywords": "관련 키워드",
+    "keywordTrend": "키워드 트렌드"
+  },
+  "empty": {
+    "noData": "키워드 데이터가 없습니다. 키워드를 검색하세요"
+  }
+}

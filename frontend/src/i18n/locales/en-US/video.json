@@ -1,0 +1,57 @@
+{
+  "title": "Global Videos",
+  "desc": "Browse and manage all video resources with search, filter and detail view.",
+  "form": {
+    "searchPlaceholder": "Search video title or channel",
+    "region": "Region",
+    "category": "Category",
+    "duration": "Duration",
+    "sortBy": "Sort By",
+    "dateRange": "Date Range"
+  },
+  "action": {
+    "search": "Search",
+    "viewDetail": "View Detail",
+    "refresh": "Refresh",
+    "export": "Export"
+  },
+  "message": {
+    "loadFailed": "Failed to load video list",
+    "searchSuccess": "Search complete",
+    "searchFailed": "Search failed",
+    "noResults": "No matching videos found",
+    "exportSuccess": "Export successful",
+    "exportFailed": "Export failed",
+    "detailLoadFailed": "Failed to load video details"
+  },
+  "table": {
+    "title": "Title",
+    "channel": "Channel",
+    "views": "Views",
+    "likes": "Likes",
+    "comments": "Comments",
+    "publishedAt": "Published At",
+    "duration": "Duration",
+    "actions": "Actions"
+  },
+  "card": {
+    "videoList": "Video List",
+    "videoDetail": "Video Detail",
+    "videoStats": "Video Stats"
+  },
+  "modal": {
+    "videoDetail": "Video Detail"
+  },
+  "option": {
+    "anyDuration": "Any duration",
+    "shortVideo": "Short video",
+    "mediumVideo": "Medium",
+    "longVideo": "Long video",
+    "mostViewed": "Most viewed",
+    "mostRecent": "Most recent",
+    "mostLiked": "Most liked"
+  },
+  "empty": {
+    "noData": "No video data"
+  }
+}

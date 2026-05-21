@@ -1,0 +1,32 @@
+{
+  "title": "Feishu 문서",
+  "desc": "Feishu 클라우드 문서를 탐색하고 관리하며, 빠르게 보고 편집하세요.",
+  "form": {
+    "searchPlaceholder": "문서 제목 검색"
+  },
+  "action": {
+    "refresh": "새로고침",
+    "openDoc": "문서 열기",
+    "viewDoc": "문서 보기",
+    "backToList": "목록으로 돌아가기"
+  },
+  "message": {
+    "loadFailed": "문서 목록 로드 실패",
+    "loadDocFailed": "문서 내용 로드 실패",
+    "noAuth": "Feishu 인증되지 않음, 설정 센터에서 구성해주세요"
+  },
+  "table": {
+    "title": "문서 제목",
+    "owner": "소유자",
+    "updatedAt": "업데이트일",
+    "actions": "작업"
+  },
+  "card": {
+    "docList": "문서 목록",
+    "docViewer": "문서 미리보기"
+  },
+  "empty": {
+    "noData": "Feishu 문서 데이터가 없습니다",
+    "noDocs": "문서 없음"
+  }
+}

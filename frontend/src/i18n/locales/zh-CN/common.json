@@ -77,5 +77,23 @@
   "pagination": {
     "total": "共 {{total}} 条",
     "page": "第 {{current}} / {{total}} 页"
+  },
+  "table": {
+    "emptyText": "暂无数据",
+    "filterConfirm": "确定",
+    "filterReset": "重置",
+    "selectAll": "全选当前页",
+    "selectInvert": "反选当前页"
+  },
+  "time": {
+    "justNow": "刚刚",
+    "minutesAgo": "{{count}} 分钟前",
+    "hoursAgo": "{{count}} 小时前",
+    "daysAgo": "{{count}} 天前"
+  },
+  "confirm": {
+    "delete": "确认删除？此操作不可撤销",
+    "leavePage": "有未保存的更改，确认离开？",
+    "clearData": "确认清除？此操作不可撤销"
   }
 }

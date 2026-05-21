@@ -1,0 +1,57 @@
+{
+  "title": "灵感中心",
+  "desc": "收集和管理创作灵感，快速转化为剧本和分镜。",
+  "form": {
+    "searchPlaceholder": "搜索灵感标题或内容",
+    "title": "标题",
+    "content": "内容",
+    "tag": "标签",
+    "source": "来源"
+  },
+  "action": {
+    "add": "新增灵感",
+    "edit": "编辑",
+    "delete": "删除",
+    "generatePlot": "生成剧情",
+    "toSop": "进入 SOP 工作流",
+    "refresh": "刷新"
+  },
+  "message": {
+    "addSuccess": "灵感添加成功",
+    "addFailed": "灵感添加失败",
+    "updateSuccess": "灵感更新成功",
+    "updateFailed": "灵感更新失败",
+    "deleteSuccess": "灵感已删除",
+    "deleteFailed": "删除失败",
+    "loadFailed": "加载灵感列表失败",
+    "confirmDelete": "确认删除此灵感？",
+    "generatePlotSuccess": "剧情生成任务已提交",
+    "generatePlotFailed": "剧情生成失败"
+  },
+  "table": {
+    "title": "标题",
+    "content": "内容",
+    "tag": "标签",
+    "source": "来源",
+    "createdAt": "创建时间",
+    "actions": "操作"
+  },
+  "card": {
+    "inspirationList": "灵感列表",
+    "inspirationDetail": "灵感详情"
+  },
+  "modal": {
+    "addTitle": "新增灵感",
+    "editTitle": "编辑灵感",
+    "confirm": "确认",
+    "cancel": "取消"
+  },
+  "tag": {
+    "draft": "草稿",
+    "generated": "已生成剧情",
+    "pending": "待处理"
+  },
+  "empty": {
+    "noData": "暂无灵感数据，点击「新增灵感」开始创作"
+  }
+}

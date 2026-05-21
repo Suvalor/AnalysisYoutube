@@ -1,0 +1,57 @@
+{
+  "title": "全局视频",
+  "desc": "浏览和管理所有视频资源，支持搜索、筛选和详情查看。",
+  "form": {
+    "searchPlaceholder": "搜索视频标题或频道",
+    "region": "地区",
+    "category": "分类",
+    "duration": "时长",
+    "sortBy": "排序",
+    "dateRange": "日期范围"
+  },
+  "action": {
+    "search": "搜索",
+    "viewDetail": "查看详情",
+    "refresh": "刷新",
+    "export": "导出"
+  },
+  "message": {
+    "loadFailed": "加载视频列表失败",
+    "searchSuccess": "搜索完成",
+    "searchFailed": "搜索失败",
+    "noResults": "未找到匹配的视频",
+    "exportSuccess": "导出成功",
+    "exportFailed": "导出失败",
+    "detailLoadFailed": "加载视频详情失败"
+  },
+  "table": {
+    "title": "标题",
+    "channel": "频道",
+    "views": "播放量",
+    "likes": "点赞",
+    "comments": "评论",
+    "publishedAt": "发布时间",
+    "duration": "时长",
+    "actions": "操作"
+  },
+  "card": {
+    "videoList": "视频列表",
+    "videoDetail": "视频详情",
+    "videoStats": "视频统计"
+  },
+  "modal": {
+    "videoDetail": "视频详情"
+  },
+  "option": {
+    "anyDuration": "不限时长",
+    "shortVideo": "短视频",
+    "mediumVideo": "中等",
+    "longVideo": "长视频",
+    "mostViewed": "最多播放",
+    "mostRecent": "最近发布",
+    "mostLiked": "最多点赞"
+  },
+  "empty": {
+    "noData": "暂无视频数据"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "title": "SEO Scoring",
+  "desc": "Analyze video SEO performance, optimize titles, descriptions and tags to improve search rankings.",
+  "form": {
+    "videoUrl": "Video URL",
+    "videoUrlPlaceholder": "Enter YouTube video URL",
+    "keyword": "Target Keyword",
+    "keywordPlaceholder": "Enter target keyword",
+    "analyze": "Start Analysis"
+  },
+  "action": {
+    "analyze": "Analyze",
+    "reanalyze": "Re-analyze",
+    "export": "Export Report"
+  },
+  "message": {
+    "analyzeSuccess": "SEO analysis complete",
+    "analyzeFailed": "SEO analysis failed",
+    "urlRequired": "Please enter a video URL",
+    "invalidUrl": "Invalid YouTube video URL",
+    "loadFailed": "Failed to load SEO data",
+    "exportSuccess": "Export successful",
+    "exportFailed": "Export failed"
+  },
+  "table": {
+    "item": "Item",
+    "score": "Score",
+    "maxScore": "Max Score",
+    "suggestion": "Suggestion"
+  },
+  "card": {
+    "overallScore": "Overall Score",
+    "titleScore": "Title Score",
+    "descriptionScore": "Description Score",
+    "tagScore": "Tag Score",
+    "suggestions": "Optimization Suggestions"
+  },
+  "stat": {
+    "overall": "Overall",
+    "title": "Title",
+    "description": "Description",
+    "tags": "Tags"
+  },
+  "empty": {
+    "noData": "No SEO data. Enter a video URL to start analysis"
+  }
+}

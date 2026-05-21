@@ -7,6 +7,7 @@ import { verifyInviteCodeApi, adminRegisterApi } from "@/services/authApi";
 import { useAuth } from "@/store/authStore";
 import { UserRole } from "@/types/auth";
 import { sendEmailCodeApi } from "@/services/authApi";
+import { useTranslation } from "react-i18next";
 
 const { Title, Text } = Typography;
 
@@ -22,6 +23,7 @@ type FormValues = {
  * 从 URL 参数读取邀请码，验证有效性后允许注册为管理员。
  */
 export default function AdminRegister() {
+  const { t } = useTranslation("auth");
   const [form] = Form.useForm<FormValues>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -48,11 +50,11 @@ export default function AdminRegister() {
           setCodeVerified(true);
           form.setFieldValue("invite_code", inviteCode);
         } else {
-          setError("邀请码无效或已过期");
+          setError(t("adminRegister.inviteCodeInvalid"));
         }
       })
       .catch(() => {
-        setError("邀请码验证失败，请稍后再试");
+        setError(t("adminRegister.inviteVerifyFailed"));
       })
       .finally(() => {
         setCodeVerifying(false);
@@ -70,7 +72,7 @@ export default function AdminRegister() {
   const handleSendEmailCode = async () => {
     const email = form.getFieldValue("email");
     if (!email) {
-      setError("请先输入邮箱");
+      setError(t("adminRegister.emailRequired"));
       return;
     }
     setEmailCodeSending(true);
@@ -89,7 +91,7 @@ export default function AdminRegister() {
         });
       }, 1000);
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "发送验证码失败";
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t("adminRegister.sendCodeFailed");
       setError(msg);
     } finally {
       setEmailCodeSending(false);
@@ -111,7 +113,7 @@ export default function AdminRegister() {
       setRole(UserRole.ADMIN);
       navigate("/blue-ocean-radar");
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "注册失败，请稍后再试";
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t("adminRegister.registerFailed");
       setError(msg);
     } finally {
       setLoading(false);
@@ -121,18 +123,18 @@ export default function AdminRegister() {
   /* 无邀请码时提示 */
   if (!inviteCode) {
     return (
-      <AuthLayout title="管理员注册" subtitle="需要邀请链接">
+      <AuthLayout title={t("adminRegister.pageTitle")} subtitle={t("adminRegister.noInviteSubtitle")}>
         <div className="text-center py-8">
           <SafetyCertificateOutlined style={{ fontSize: 48, color: "#faad14" }} />
-          <Title level={4} className="mt-4">缺少邀请码</Title>
-          <Text type="secondary">管理员注册需要有效的邀请链接，请联系现有管理员获取。</Text>
+          <Title level={4} className="mt-4">{t("adminRegister.noInviteTitle")}</Title>
+          <Text type="secondary">{t("adminRegister.noInviteDesc")}</Text>
         </div>
       </AuthLayout>
     );
   }
 
   return (
-    <AuthLayout title="管理员注册" subtitle="通过邀请码注册为管理员">
+    <AuthLayout title={t("adminRegister.pageTitle")} subtitle={t("adminRegister.subtitle")}>
       <Form layout="vertical" onFinish={onFinish} requiredMark={false} form={form}>
         {error && (
           <div className="mb-4">
@@ -141,45 +143,45 @@ export default function AdminRegister() {
         )}
         {codeVerifying && (
           <div className="mb-4 text-center">
-            <Text type="secondary">正在验证邀请码...</Text>
+            <Text type="secondary">{t("adminRegister.verifying")}</Text>
           </div>
         )}
         {codeVerified && (
           <>
-            <Form.Item label="邀请码" name="invite_code" rules={[{ required: true }]}>
+            <Form.Item label={t("adminRegister.inviteCodeLabel")} name="invite_code" rules={[{ required: true }]}>
               <Input size="large" disabled />
             </Form.Item>
             <Form.Item
-              label="邮箱"
+              label={t("adminRegister.emailLabel")}
               name="email"
               rules={[
-                { required: true, message: "请输入邮箱" },
-                { type: "email", message: "邮箱格式不正确" },
+                { required: true, message: t("adminRegister.emailRuleRequired") },
+                { type: "email", message: t("adminRegister.emailRuleFormat") },
               ]}
             >
               <Input placeholder="admin@example.com" size="large" autoComplete="email" />
             </Form.Item>
-            <Form.Item label="邮箱验证码" name="email_code" rules={[{ required: true, message: "请输入验证码" }]}>
+            <Form.Item label={t("adminRegister.codeLabel")} name="email_code" rules={[{ required: true, message: t("adminRegister.codeRuleRequired") }]}>
               <Space>
-                <Input placeholder="6位验证码" size="large" maxLength={6} style={{ width: 160 }} autoComplete="one-time-code" />
+                <Input placeholder={t("adminRegister.codePlaceholder")} size="large" maxLength={6} style={{ width: 160 }} autoComplete="one-time-code" />
                 <Button size="large" onClick={handleSendEmailCode} loading={emailCodeSending} disabled={countdown > 0}>
-                  {countdown > 0 ? `${countdown}s` : emailCodeSent ? "重新发送" : "发送验证码"}
+                  {countdown > 0 ? `${countdown}s` : emailCodeSent ? t("adminRegister.resend") : t("adminRegister.sendCode")}
                 </Button>
               </Space>
             </Form.Item>
             <Form.Item
-              label="密码"
+              label={t("adminRegister.passwordLabel")}
               name="password"
               rules={[
-                { required: true, message: "请输入密码" },
-                { min: 12, message: "密码至少12位" },
+                { required: true, message: t("adminRegister.passwordRuleRequired") },
+                { min: 12, message: t("adminRegister.passwordRuleMin") },
               ]}
             >
-              <Input.Password placeholder="至少12位，包含字母和数字" size="large" autoComplete="new-password" />
+              <Input.Password placeholder={t("adminRegister.passwordPlaceholder")} size="large" autoComplete="new-password" />
             </Form.Item>
             <Form.Item className="mt-6 mb-2">
               <Button type="primary" htmlType="submit" size="large" className="w-full" loading={loading}>
-                注册为管理员
+                {t("adminRegister.submit")}
               </Button>
             </Form.Item>
           </>

@@ -1,0 +1,52 @@
+{
+  "title": "Knowledge Base",
+  "desc": "Manage script knowledge base with Markdown editing and version control.",
+  "form": {
+    "searchPlaceholder": "Search knowledge title or content",
+    "title": "Title",
+    "content": "Content",
+    "category": "Category"
+  },
+  "action": {
+    "add": "Add Knowledge",
+    "edit": "Edit",
+    "delete": "Delete",
+    "toSop": "Enter SOP Workflow",
+    "refresh": "Refresh",
+    "upload": "Upload"
+  },
+  "message": {
+    "addSuccess": "Knowledge added successfully",
+    "addFailed": "Failed to add knowledge",
+    "updateSuccess": "Knowledge updated successfully",
+    "updateFailed": "Failed to update knowledge",
+    "deleteSuccess": "Knowledge deleted",
+    "deleteFailed": "Delete failed",
+    "loadFailed": "Failed to load knowledge list",
+    "confirmDelete": "Confirm delete this knowledge?",
+    "uploadSuccess": "Upload successful",
+    "uploadFailed": "Upload failed"
+  },
+  "table": {
+    "title": "Title",
+    "category": "Category",
+    "content": "Content",
+    "createdAt": "Created At",
+    "updatedAt": "Updated At",
+    "actions": "Actions"
+  },
+  "card": {
+    "knowledgeList": "Knowledge List",
+    "knowledgeDetail": "Knowledge Detail",
+    "assetLibrary": "Asset Library"
+  },
+  "modal": {
+    "addTitle": "Add Knowledge",
+    "editTitle": "Edit Knowledge",
+    "confirm": "Confirm",
+    "cancel": "Cancel"
+  },
+  "empty": {
+    "noData": "No knowledge data. Click 'Add Knowledge' to start"
+  }
+}

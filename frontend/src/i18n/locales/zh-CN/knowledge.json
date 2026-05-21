@@ -1,0 +1,52 @@
+{
+  "title": "知识库管理",
+  "desc": "管理剧本知识库，支持 Markdown 编辑和版本控制。",
+  "form": {
+    "searchPlaceholder": "搜索知识库标题或内容",
+    "title": "标题",
+    "content": "内容",
+    "category": "分类"
+  },
+  "action": {
+    "add": "新增知识",
+    "edit": "编辑",
+    "delete": "删除",
+    "toSop": "进入 SOP 工作流",
+    "refresh": "刷新",
+    "upload": "上传"
+  },
+  "message": {
+    "addSuccess": "知识添加成功",
+    "addFailed": "知识添加失败",
+    "updateSuccess": "知识更新成功",
+    "updateFailed": "知识更新失败",
+    "deleteSuccess": "知识已删除",
+    "deleteFailed": "删除失败",
+    "loadFailed": "加载知识库列表失败",
+    "confirmDelete": "确认删除此知识？",
+    "uploadSuccess": "上传成功",
+    "uploadFailed": "上传失败"
+  },
+  "table": {
+    "title": "标题",
+    "category": "分类",
+    "content": "内容",
+    "createdAt": "创建时间",
+    "updatedAt": "更新时间",
+    "actions": "操作"
+  },
+  "card": {
+    "knowledgeList": "知识库列表",
+    "knowledgeDetail": "知识详情",
+    "assetLibrary": "素材库"
+  },
+  "modal": {
+    "addTitle": "新增知识",
+    "editTitle": "编辑知识",
+    "confirm": "确认",
+    "cancel": "取消"
+  },
+  "empty": {
+    "noData": "暂无知识数据，点击「新增知识」开始"
+  }
+}

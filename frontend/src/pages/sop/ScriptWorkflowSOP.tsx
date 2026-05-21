@@ -14,6 +14,7 @@ import { Button, Card, Drawer, Input, Modal, Select, Spin, Steps, Table, Typogra
 import type { UploadFile } from "antd/es/upload/interface";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { getScriptApi, listPromptsApi, type PromptItem } from "@/services/libraryApi";
 import { uploadAssetWithProcessApi } from "@/services/libraryApi";
 import { getScriptModelsApi, type ScriptModelOption } from "@/services/scriptsApi";
@@ -62,6 +63,7 @@ type SourceScript = {
 };
 
 export default function ScriptWorkflowSOP() {
+  const { t } = useTranslation("sop");
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -129,13 +131,13 @@ export default function ScriptWorkflowSOP() {
     (async () => {
       const rawId = localStorage.getItem("sop_current_script_id");
       if (!rawId) {
-        message.warning("未选择剧本，请先从知识库进入");
+        message.warning(t("message.noScriptSelected"));
         if (mounted) setLoading(false);
         return;
       }
       const scriptIdNum = Number(rawId);
       if (!Number.isFinite(scriptIdNum) || scriptIdNum <= 0) {
-        message.warning("剧本 ID 无效，请从知识库重新进入");
+        message.warning(t("message.invalidScriptId"));
         if (mounted) setLoading(false);
         return;
       }
@@ -182,7 +184,7 @@ export default function ScriptWorkflowSOP() {
         lastLoadedKnowledgeScriptIdRef.current = scriptIdNum;
       } catch (e: any) {
         if (mounted) {
-          message.error(e?.response?.data?.detail ?? e?.message ?? "加载剧本失败");
+          message.error(e?.response?.data?.detail ?? e?.message ?? t("message.loadScriptFailed"));
         }
         lastLoadedKnowledgeScriptIdRef.current = null;
       } finally {
@@ -207,7 +209,7 @@ export default function ScriptWorkflowSOP() {
         if (agents.length > 0) setSelectedAgentId((prev) => prev ?? agents[0].id);
       } catch (e: any) {
         if (!mounted) return;
-        message.warning(e?.response?.data?.detail ?? e?.message ?? "加载模型/智能体配置失败");
+        message.warning(e?.response?.data?.detail ?? e?.message ?? t("message.loadModelFailed"));
       }
     })();
     return () => {
@@ -217,16 +219,16 @@ export default function ScriptWorkflowSOP() {
 
   const steps = useMemo(
     () => [
-      { title: "剧本设定" },
-      { title: "剧情拆解" },
-      { title: "分镜与资产创作" },
-      { title: "合成与发布" },
+      { title: t("step.scriptSetup") },
+      { title: t("step.plotSplit") },
+      { title: t("step.shotAsset") },
+      { title: t("step.composePublish") },
     ],
     []
   );
 
   const ensureSopScript = async () => {
-    if (!sourceScript) throw new Error("缺少剧本数据");
+    if (!sourceScript) throw new Error(t("message.missingScriptData"));
     if (sopScriptId) return sopScriptId;
     const created = await createSopScriptApi({
       title: sourceScript.title,
@@ -252,7 +254,7 @@ export default function ScriptWorkflowSOP() {
 
   const persistOutline = async () => {
     if (!outlineMarkdown.trim()) {
-      message.warning("剧本大纲为空，无法保存");
+      message.warning(t("message.outlineEmpty"));
       return;
     }
     setSavingOutline(true);
@@ -260,9 +262,9 @@ export default function ScriptWorkflowSOP() {
       const sid = await ensureSopScript();
       await updateSopScriptApi(sid, { outline: outlineMarkdown });
       setSourceScript((prev) => (prev ? { ...prev, content: outlineMarkdown } : prev));
-      message.success("剧本大纲已保存");
+      message.success(t("message.outlineSaved"));
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "保存大纲失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("message.saveOutlineFailed"));
     } finally {
       setSavingOutline(false);
     }
@@ -270,7 +272,7 @@ export default function ScriptWorkflowSOP() {
 
   const handleAiSplitSegments = async () => {
     if (!outlineMarkdown.trim()) {
-      message.warning("剧本大纲为空，无法拆解");
+      message.warning(t("message.outlineEmptySplit"));
       return;
     }
     setSplitting(true);
@@ -307,7 +309,7 @@ export default function ScriptWorkflowSOP() {
               }
               if (t === "done") return;
               if (t === "error") {
-                throw new Error(String(event.message || "AI 拆解失败"));
+                throw new Error(String(event.message || t("message.aiSplitFailed")));
               }
             },
             splitAbortRef.current.signal
@@ -316,21 +318,21 @@ export default function ScriptWorkflowSOP() {
         } catch (err) {
           attempt += 1;
           if (attempt >= maxRetries) throw err;
-          message.warning(`流式连接中断，正在重试（${attempt}/${maxRetries - 1}）`);
+          message.warning(t("message.streamRetry", { attempt, max: maxRetries - 1 }));
           await new Promise((r) => setTimeout(r, 1000 * attempt));
         }
       }
       const finalMarkdown = splitTextRef.current.trim();
       if (!finalMarkdown) {
-        throw new Error("AI 未返回可保存的拆解内容");
+        throw new Error(t("message.aiNoContent"));
       }
-      const saved = await saveSegmentsFromMarkdown(finalMarkdown, "AI 拆解结果已覆盖保存");
+      const saved = await saveSegmentsFromMarkdown(finalMarkdown, t("message.aiSplitOverwritten"));
       if (saved) {
         setStep(1);
-        message.success("AI 拆解完成，结果已同步覆盖到前后端");
+        message.success(t("message.aiSplitSuccess"));
       }
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "AI 拆解失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("message.aiSplitFailed"));
     } finally {
       setSplitting(false);
     }
@@ -347,16 +349,16 @@ export default function ScriptWorkflowSOP() {
     return blocks.map((block, idx) => {
       const lines = block.split("\n");
       const head = (lines[0] || "").replace(/^##\s*/, "").trim();
-      const title = head || `片段 ${idx + 1}`;
+      const title = head || t("label.segmentFallback", { no: idx + 1 });
       const content = lines.slice(1).join("\n").trim() || head;
       return { title, content };
     });
   };
 
-  const saveSegmentsFromMarkdown = async (rawMarkdown: string, successTip = "片段已保存到 segments") => {
+  const saveSegmentsFromMarkdown = async (rawMarkdown: string, successTip = t("message.segmentsSaved")) => {
     const parsed = parseSegmentsFromMarkdown(rawMarkdown);
     if (parsed.length === 0) {
-      message.warning("没有可保存的片段内容，请先执行 AI 拆解或手动补充");
+      message.warning(t("message.noSegmentsToSave"));
       return false;
     }
     setSavingSegments(true);
@@ -402,20 +404,20 @@ export default function ScriptWorkflowSOP() {
       if (inspirationLinkId) {
         try {
           await linkInspirationPlotApi(inspirationLinkId, { plot_id: sid });
-          message.success("灵感中心已标记为「已生成剧情」并关联剧情 ID");
+          message.success(t("message.inspirationLinked"));
         } catch (e: unknown) {
           const msg =
             e && typeof e === "object" && "response" in e
               ? (e as { response?: { data?: { detail?: string } } }).response?.data?.detail
               : undefined;
           message.warning(
-            typeof msg === "string" ? msg : "关联灵感中心失败，可在灵感中心查看或重试保存片段"
+            typeof msg === "string" ? msg : t("message.inspirationLinkFailed")
           );
         }
       }
       return true;
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "保存片段失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("message.saveSegmentsFailed"));
       return false;
     } finally {
       setSavingSegments(false);
@@ -448,7 +450,7 @@ export default function ScriptWorkflowSOP() {
         setAssets(allAssets);
       } catch (e: any) {
         if (!mounted) return;
-        message.error(e?.response?.data?.detail ?? e?.message ?? "加载分镜/资产失败");
+        message.error(e?.response?.data?.detail ?? e?.message ?? t("message.loadShotsFailed"));
       }
     })();
     return () => {
@@ -468,7 +470,7 @@ export default function ScriptWorkflowSOP() {
       });
       setShots((prev) => prev.map((s) => (s.id === shot.id ? updated : s)));
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "分镜保存失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("message.shotSaveFailed"));
     } finally {
       setSavingShotIds((prev) => ({ ...prev, [shot.id]: false }));
     }
@@ -503,7 +505,7 @@ export default function ScriptWorkflowSOP() {
         setSegments(sorted);
         setSelectedSegmentId((prev) => prev ?? sorted[0]?.id ?? null);
         const hydrated = sorted
-          .map((s) => `## 片段 ${s.segment_no}：${s.title}\n${s.content}`)
+          .map((s) => `## ${t("label.segmentNo", { no: s.segment_no, title: s.title })}\n${s.content}`)
           .join("\n\n");
         if (hydrated.trim()) setAiSegmentsMarkdown(hydrated);
       } catch {
@@ -534,9 +536,9 @@ export default function ScriptWorkflowSOP() {
         status: "draft",
       });
       setAssets((prev) => [...prev, created]);
-      message.success("素材上传并绑定成功");
+      message.success(t("message.assetUploadSuccess"));
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "素材上传失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("message.assetUploadFailed"));
     }
   };
 
@@ -547,7 +549,7 @@ export default function ScriptWorkflowSOP() {
 
   const generateShotsFromSegments = async () => {
     if (!sopScriptId || segments.length === 0) {
-      message.warning("请先完成剧情拆解再生成分镜");
+      message.warning(t("message.needSplitFirst"));
       return;
     }
     setGeneratingShots(true);
@@ -560,9 +562,9 @@ export default function ScriptWorkflowSOP() {
       }
       setShots(allShots.sort((a, b) => a.segment_id - b.segment_id || a.shot_no - b.shot_no));
       setStep((prev) => Math.max(prev, 2));
-      message.success("分镜草案已生成");
+      message.success(t("message.shotsGenerated"));
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "生成分镜失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("message.generateShotsFailed"));
     } finally {
       setGeneratingShots(false);
     }
@@ -609,9 +611,9 @@ export default function ScriptWorkflowSOP() {
       });
       const latestForShot = await listSopAssetsApi(shotId);
       setAssets((prev) => [...prev.filter((x) => x.shot_id !== shotId), ...latestForShot]);
-      message.success("拖拽绑定成功");
+      message.success(t("message.dragBindSuccess"));
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "拖拽绑定失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("message.dragBindFailed"));
     }
   };
 
@@ -656,11 +658,11 @@ export default function ScriptWorkflowSOP() {
         });
         if (mounted) {
           await loadOAuthStatus();
-          message.success("YouTube 授权成功");
+          message.success(t("message.oauthSuccess"));
           navigate("/sop-workflow", { replace: true });
         }
       } catch (e: any) {
-        if (mounted) message.error(e?.response?.data?.detail ?? e?.message ?? "OAuth 回调处理失败");
+        if (mounted) message.error(e?.response?.data?.detail ?? e?.message ?? t("message.oauthFailed"));
       } finally {
         if (mounted) setOauthLoading(false);
       }
@@ -683,7 +685,7 @@ export default function ScriptWorkflowSOP() {
       const data = await getYouTubeOAuthUrlApi();
       window.location.href = data.auth_url;
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "获取授权地址失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("message.oauthUrlFailed"));
     } finally {
       setOauthLoading(false);
     }
@@ -693,11 +695,11 @@ export default function ScriptWorkflowSOP() {
     const targetMedia = mediaRows.find((x) => x.id === publishMediaId) ?? null;
     const publishUrl = targetMedia ? sopFileDisplayUrl(targetMedia) : "";
     if (!publishUrl) {
-      message.warning("暂无可发布视频");
+      message.warning(t("message.noPublishableVideo"));
       return;
     }
     if (!publishTitle.trim()) {
-      message.warning("缺少剧本标题");
+      message.warning(t("message.missingTitle"));
       return;
     }
     setPublishing(true);
@@ -708,10 +710,10 @@ export default function ScriptWorkflowSOP() {
         description: publishDescription.trim().slice(0, 5000),
         privacy_status: publishPrivacy,
       });
-      message.success(res.message || "发布请求已提交");
+      message.success(res.message || t("message.publishSubmitted"));
       setPublishModalOpen(false);
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "发布失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("message.publishFailed"));
     } finally {
       setPublishing(false);
     }
@@ -743,10 +745,10 @@ export default function ScriptWorkflowSOP() {
 
         <Card className="!border-yc-border !shadow-none">
           <Title level={4} className="!mb-3">
-            步骤 1：剧本设定
+            {t("card.step1Title")}
           </Title>
           <div className="mb-2 text-yc-text-primary">
-            <Text strong>标题：</Text>
+            <Text strong>{t("card.titleLabel")}</Text>
             {sourceScript?.title ?? "-"}
           </div>
           <MarkdownEditorToggle
@@ -754,23 +756,23 @@ export default function ScriptWorkflowSOP() {
             onChange={setOutlineMarkdown}
             onBlur={() => void persistOutline()}
             minRows={10}
-            placeholder="请输入剧本大纲（Markdown）"
+            placeholder={t("form.outlinePlaceholder")}
           />
           <div className="mt-3">
             <Button type="default" onClick={persistOutline} loading={savingOutline}>
-              保存大纲
+              {t("action.saveOutline")}
             </Button>
           </div>
         </Card>
 
         <Card className="!border-yc-border !shadow-none">
           <Title level={4} className="!mb-3">
-            步骤 2：剧情拆解
+            {t("card.step2Title")}
           </Title>
           <div className="mb-3 flex gap-2">
             <Select
               size="middle"
-              placeholder="选择模型"
+              placeholder={t("form.selectModel")}
               value={selectedModelId ?? undefined}
               onChange={(v) => setSelectedModelId(v)}
               options={modelOptions.map((m) => ({ value: m.value, label: m.label }))}
@@ -778,45 +780,45 @@ export default function ScriptWorkflowSOP() {
             />
             <Select
               size="middle"
-              placeholder="选择智能体/提示词"
+              placeholder={t("form.selectAgent")}
               value={selectedAgentId ?? undefined}
               onChange={(v) => setSelectedAgentId(v)}
               options={agentOptions.map((a) => ({ value: a.id, label: a.title }))}
               className="w-56"
             />
             <Button type="primary" onClick={handleAiSplitSegments} loading={splitting}>
-              AI 智能拆解分镜
+              {t("action.aiSplit")}
             </Button>
             <Button onClick={handleSaveSegmentsFromMarkdown} loading={savingSegments}>
-              保存片段
+              {t("action.saveSegments")}
             </Button>
           </div>
           <MarkdownEditorToggle
             value={aiSegmentsMarkdown}
             onChange={setAiSegmentsMarkdown}
             minRows={12}
-            placeholder="点击“AI 智能拆解分镜”后，将在这里展示可编辑的 Markdown 结果"
+            placeholder={t("label.aiResultPlaceholder")}
           />
           {segments.length > 0 && (
             <div className="mt-2 text-xs text-yc-text-secondary">
-              已保存片段数：{segments.length}（可继续在上方 Markdown 中人工调优后再次保存）
+              {t("card.segmentCount", { count: segments.length })}
             </div>
           )}
         </Card>
 
         <Card className="!border-yc-border !shadow-none">
           <Title level={4} className="!mb-2">
-            步骤 3：分镜与资产创作
+            {t("card.step3Title")}
           </Title>
           <div className="mb-3 flex flex-col md:flex-row gap-2 md:items-center">
             <Button loading={generatingShots} onClick={generateShotsFromSegments} type="primary">
-              生成分镜草案
+              {t("action.generateShots")}
             </Button>
             <Select
-              placeholder="选择片段"
+              placeholder={t("form.selectSegment")}
               value={selectedSegmentId ?? undefined}
               onChange={(v) => setSelectedSegmentId(v)}
-              options={segments.map((s) => ({ value: s.id, label: `片段 ${s.segment_no}：${s.title}` }))}
+              options={segments.map((s) => ({ value: s.id, label: t("label.segmentNo", { no: s.segment_no, title: s.title }) }))}
               className="md:w-[420px]"
             />
             <Button
@@ -825,7 +827,7 @@ export default function ScriptWorkflowSOP() {
                 setAssetDrawerOpen(true);
               }}
             >
-              打开公共资产库
+              {t("action.openPublicAssets")}
             </Button>
           </div>
           <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveDragAsset(null)}>
@@ -845,26 +847,26 @@ export default function ScriptWorkflowSOP() {
               ))}
               {shots.length === 0 && (
                 <div className="rounded-lg border border-yc-border bg-yc-bg-secondary p-4 text-yc-text-secondary">
-                  当前片段暂无分镜，请先点击“生成分镜草案”。
+                  {t("card.noShots")}
                 </div>
               )}
             </div>
-            <Drawer title="公共资产库" open={assetDrawerOpen} onClose={() => setAssetDrawerOpen(false)} width={360}>
+            <Drawer title={t("action.openPublicAssets")} open={assetDrawerOpen} onClose={() => setAssetDrawerOpen(false)} width={360}>
               <div className="space-y-2">
                 {publicAssets.map((asset) => (
                   <DraggablePublicAsset key={asset.id} asset={asset} />
                 ))}
                 {publicAssets.length === 0 && (
-                  <div className="text-xs text-yc-text-secondary border border-dashed border-yc-border rounded p-3 text-center">暂无公共资产</div>
+                  <div className="text-xs text-yc-text-secondary border border-dashed border-yc-border rounded p-3 text-center">{t("card.noPublicAssets")}</div>
                 )}
               </div>
-              <div className="mt-3 text-xs text-yc-text-secondary">拖拽右侧资产到左侧卡片“资产与媒体”区域，即可复制并关联到目标分镜。</div>
+              <div className="mt-3 text-xs text-yc-text-secondary">{t("card.dragHint")}</div>
             </Drawer>
             <DragOverlay>
               {activeDragAsset ? (
                 <div className="w-56 rounded-lg border border-blue-300 bg-yc-bg-card p-2 shadow-sm">
                   <div className="text-sm font-medium text-yc-text-primary truncate">{activeDragAsset.name}</div>
-                  <div className="text-xs text-yc-text-secondary">拖拽中...</div>
+                  <div className="text-xs text-yc-text-secondary">{t("card.dragging")}</div>
                 </div>
               ) : null}
             </DragOverlay>
@@ -873,16 +875,16 @@ export default function ScriptWorkflowSOP() {
 
         <Card className="!border-yc-border !shadow-none">
           <Title level={4} className="!mb-2">
-            步骤 4：合成与发布
+            {t("card.step4Title")}
           </Title>
           <div className="space-y-3">
             <div className="flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
               <div className="text-sm text-yc-text-secondary">
-                OAuth 状态：{oauthStatus?.connected ? `已连接（频道 ${oauthStatus.channel_id || "-"})` : "未连接"}
+                {t("card.oauthStatus")}{oauthStatus?.connected ? t("card.oauthConnected", { channelId: oauthStatus.channel_id || "-" }) : t("card.oauthDisconnected")}
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleConnectYouTube} loading={oauthLoading}>
-                  连接 YouTube
+                  {t("action.connectYouTube")}
                 </Button>
                 <Button
                   type="primary"
@@ -890,7 +892,7 @@ export default function ScriptWorkflowSOP() {
                   loading={publishing}
                   onClick={openPublishModal}
                 >
-                  发布到 YouTube
+                  {t("action.publishYouTube")}
                 </Button>
               </div>
             </div>
@@ -900,18 +902,18 @@ export default function ScriptWorkflowSOP() {
               pagination={{ pageSize: 6 }}
               dataSource={mediaRows}
               columns={[
-                { title: "媒体ID", dataIndex: "id", width: 90 },
-                { title: "分镜ID", dataIndex: "shot_id", width: 90 },
-                { title: "类型", dataIndex: "media_type", width: 90 },
-                { title: "状态", dataIndex: "status", width: 120 },
+                { title: t("table.mediaId"), dataIndex: "id", width: 90 },
+                { title: t("table.shotId"), dataIndex: "shot_id", width: 90 },
+                { title: t("table.mediaType"), dataIndex: "media_type", width: 90 },
+                { title: t("table.status"), dataIndex: "status", width: 120 },
                 {
-                  title: "文件地址",
+                  title: t("table.fileUrl"),
                   key: "play_url",
                   render: (_: unknown, row: SopMedia) => {
                     const href = sopFileDisplayUrl(row);
                     return href ? (
                       <a href={href} target="_blank" rel="noreferrer">
-                        查看
+                        {t("table.view")}
                       </a>
                     ) : (
                       "-"
@@ -922,40 +924,40 @@ export default function ScriptWorkflowSOP() {
             />
             {!allMediaDone && (
               <div className="text-xs text-yc-text-secondary">
-                仅当全部媒体状态为 success/completed/done/ready 时，“发布到 YouTube”按钮可用。
+                {t("card.publishOnlyWhenReady")}
               </div>
             )}
           </div>
         </Card>
       </div>
       <Modal
-        title="发布前校验"
+        title={t("modal.publishTitle")}
         open={publishModalOpen}
         onCancel={() => setPublishModalOpen(false)}
         onOk={handlePublishYouTube}
-        okText="确认发布"
-        cancelText="取消"
+        okText={t("action.confirmPublish")}
+        cancelText={t("action.cancel", { ns: "common" })}
         confirmLoading={publishing}
       >
         <div className="space-y-3">
           <div>
-            <div className="text-xs text-yc-text-secondary mb-1">选择媒体</div>
+            <div className="text-xs text-yc-text-secondary mb-1">{t("modal.selectMedia")}</div>
             <Select
               value={publishMediaId ?? undefined}
               onChange={(v) => setPublishMediaId(v)}
               options={mediaRows
                 .filter((x) => Boolean(sopFileDisplayUrl(x)))
-                .map((x) => ({ value: x.id, label: `媒体 ${x.id} | 分镜 ${x.shot_id} | ${x.status}` }))}
+                .map((x) => ({ value: x.id, label: t("modal.mediaLabel", { id: x.id, shotId: x.shot_id, status: x.status }) }))}
               className="w-full"
-              placeholder="请选择要发布的媒体"
+              placeholder={t("form.selectMedia")}
             />
           </div>
           <div>
-            <div className="text-xs text-yc-text-secondary mb-1">标题</div>
+            <div className="text-xs text-yc-text-secondary mb-1">{t("form.publishTitle")}</div>
             <Input value={publishTitle} onChange={(e) => setPublishTitle(e.target.value)} maxLength={100} />
           </div>
           <div>
-            <div className="text-xs text-yc-text-secondary mb-1">描述</div>
+            <div className="text-xs text-yc-text-secondary mb-1">{t("form.publishDesc")}</div>
             <TextArea
               rows={4}
               value={publishDescription}
@@ -964,14 +966,14 @@ export default function ScriptWorkflowSOP() {
             />
           </div>
           <div>
-            <div className="text-xs text-yc-text-secondary mb-1">隐私级别</div>
+            <div className="text-xs text-yc-text-secondary mb-1">{t("form.privacyLevel")}</div>
             <Select
               value={publishPrivacy}
               onChange={(v) => setPublishPrivacy(v)}
               options={[
-                { value: "private", label: "private（私有）" },
-                { value: "unlisted", label: "unlisted（不公开）" },
-                { value: "public", label: "public（公开）" },
+                { value: "private", label: t("option.private") },
+                { value: "unlisted", label: t("option.unlisted") },
+                { value: "public", label: t("option.public") },
               ]}
               className="w-full"
             />
@@ -995,6 +997,7 @@ function ShotEditableCard({
   onChange: (shotId: number, patch: Partial<SopShot>) => void;
   onUpload: (shotId: number, file: File) => Promise<void>;
 }) {
+  const { t } = useTranslation("sop");
   const fileList: UploadFile[] = [];
   const { isOver, setNodeRef } = useDroppable({ id: `shot-drop-${shot.id}` });
 
@@ -1011,7 +1014,7 @@ function ShotEditableCard({
     if (url) {
       return <img src={url} alt={asset.name} className="w-full h-24 object-cover rounded border border-yc-border" />;
     }
-    return <div className="w-full h-24 rounded border border-yc-border bg-yc-bg-secondary flex items-center justify-center text-xs text-yc-text-secondary">无预览</div>;
+    return <div className="w-full h-24 rounded border border-yc-border bg-yc-bg-secondary flex items-center justify-center text-xs text-yc-text-secondary">{t("card.noPreview")}</div>;
   };
 
   return (
@@ -1020,16 +1023,16 @@ function ShotEditableCard({
         <div className="xl:col-span-3 flex flex-col min-h-[260px]">
           <div className="mb-2 flex items-center justify-between">
             <div className="inline-flex items-center rounded-md border border-yc-border bg-yc-bg-secondary px-2 py-1 text-sm font-semibold text-yc-text-primary">
-              镜头 #{String(shot.shot_no).padStart(2, "0")}
+              {t("card.shotNo", { no: String(shot.shot_no).padStart(2, "0") })}
             </div>
-            {saving && <span className="text-xs text-yc-text-secondary">保存中...</span>}
+            {saving && <span className="text-xs text-yc-text-secondary">{t("card.saving")}</span>}
           </div>
           <MarkdownEditorToggle
             className="flex-1"
             value={shot.visual_prompt || ""}
             onChange={(v) => onChange(shot.id, { visual_prompt: v })}
             minRows={12}
-            placeholder="输入画面提示词（支持 Markdown）"
+            placeholder={t("label.visualPromptPlaceholder")}
           />
         </div>
 
@@ -1040,7 +1043,7 @@ function ShotEditableCard({
           }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <div className="font-medium text-yc-text-primary">资产与媒体</div>
+            <div className="font-medium text-yc-text-primary">{t("card.assetAndMedia")}</div>
             <div className="flex gap-2">
               <Upload
                 fileList={fileList}
@@ -1050,10 +1053,10 @@ function ShotEditableCard({
                   return false;
                 }}
               >
-                <Button size="small">上传素材</Button>
+                <Button size="small">{t("action.uploadAsset")}</Button>
               </Upload>
-              <Button size="small" onClick={() => message.info("重新生成画面功能将在下一阶段接入真实生成接口")}>
-                重新生成画面
+              <Button size="small" onClick={() => message.info(t("message.regenerateComingSoon"))}>
+                {t("action.regenerateImage")}
               </Button>
             </div>
           </div>
@@ -1066,7 +1069,7 @@ function ShotEditableCard({
             ))}
             {assets.length === 0 && (
               <div className="col-span-2 text-xs text-yc-text-secondary border border-dashed border-yc-border rounded p-3 text-center">
-                暂无素材，点击“上传素材”
+                {t("card.noAssets")}
               </div>
             )}
           </div>
@@ -1077,6 +1080,7 @@ function ShotEditableCard({
 }
 
 function DraggablePublicAsset({ asset }: { asset: SopAsset }) {
+  const { t } = useTranslation("sop");
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `public-asset-${asset.id}`,
   });
@@ -1093,9 +1097,8 @@ function DraggablePublicAsset({ asset }: { asset: SopAsset }) {
       className="rounded-lg border border-yc-border bg-yc-bg-card p-2 cursor-grab active:cursor-grabbing"
     >
       <div className="text-sm text-yc-text-primary font-medium truncate">{asset.name}</div>
-      <div className="text-xs text-yc-text-secondary mt-1">类型：{asset.asset_type}</div>
-      <div className="text-xs text-yc-text-secondary">来源资产ID：{asset.id}</div>
+      <div className="text-xs text-yc-text-secondary mt-1">{t("label.assetType")}{asset.asset_type}</div>
+      <div className="text-xs text-yc-text-secondary">{t("label.sourceAssetId")}{asset.id}</div>
     </div>
   );
 }
-

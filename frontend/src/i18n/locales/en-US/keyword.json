@@ -1,0 +1,45 @@
+{
+  "title": "Keyword Research",
+  "desc": "Deep analysis of keyword performance, discover high-potential low-competition creative opportunities.",
+  "form": {
+    "keyword": "Keyword",
+    "keywordPlaceholder": "Enter keyword to research",
+    "region": "Region",
+    "language": "Language",
+    "search": "Search"
+  },
+  "action": {
+    "search": "Search",
+    "export": "Export",
+    "addToMonitor": "Add to Monitor",
+    "removeFromMonitor": "Remove from Monitor"
+  },
+  "message": {
+    "searchSuccess": "Keyword research complete",
+    "searchFailed": "Keyword research failed",
+    "keywordRequired": "Please enter a keyword",
+    "noResults": "No keyword data found",
+    "exportSuccess": "Export successful",
+    "exportFailed": "Export failed",
+    "addMonitorSuccess": "Added to monitor list",
+    "removeMonitorSuccess": "Removed from monitor list",
+    "loadFailed": "Failed to load keyword data"
+  },
+  "table": {
+    "keyword": "Keyword",
+    "searchVolume": "Search Volume",
+    "competition": "Competition",
+    "cpc": "CPC",
+    "trend": "Trend",
+    "relatedKeywords": "Related Keywords",
+    "actions": "Actions"
+  },
+  "card": {
+    "keywordOverview": "Keyword Overview",
+    "relatedKeywords": "Related Keywords",
+    "keywordTrend": "Keyword Trend"
+  },
+  "empty": {
+    "noData": "No keyword data. Please search keywords"
+  }
+}

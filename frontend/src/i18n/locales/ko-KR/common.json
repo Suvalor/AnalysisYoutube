@@ -77,5 +77,23 @@
   "pagination": {
     "total": "총 {{total}}건",
     "page": "{{current}} / {{total}} 페이지"
+  },
+  "table": {
+    "emptyText": "데이터 없음",
+    "filterConfirm": "확인",
+    "filterReset": "재설정",
+    "selectAll": "전체 선택",
+    "selectInvert": "선택 반전"
+  },
+  "time": {
+    "justNow": "방금",
+    "minutesAgo": "{{count}}분 전",
+    "hoursAgo": "{{count}}시간 전",
+    "daysAgo": "{{count}}일 전"
+  },
+  "confirm": {
+    "delete": "삭제 확인? 이 작업은 취소할 수 없습니다",
+    "leavePage": "저장하지 않은 변경이 있습니다. 페이지를 떠나시겠습니까?",
+    "clearData": "초기화 확인? 이 작업은 취소할 수 없습니다"
   }
 }

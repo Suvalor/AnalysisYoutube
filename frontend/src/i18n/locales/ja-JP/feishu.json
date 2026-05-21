@@ -1,0 +1,32 @@
+{
+  "title": "Feishuドキュメント",
+  "desc": "Feishuクラウドドキュメントの閲覧と管理、素早い表示と編集。",
+  "form": {
+    "searchPlaceholder": "ドキュメントタイトルで検索"
+  },
+  "action": {
+    "refresh": "更新",
+    "openDoc": "ドキュメントを開く",
+    "viewDoc": "ドキュメント表示",
+    "backToList": "リストに戻る"
+  },
+  "message": {
+    "loadFailed": "ドキュメントリストの読み込みに失敗しました",
+    "loadDocFailed": "ドキュメント内容の読み込みに失敗しました",
+    "noAuth": "Feishuが認証されていません。設定センターで設定してください"
+  },
+  "table": {
+    "title": "ドキュメントタイトル",
+    "owner": "所有者",
+    "updatedAt": "更新日時",
+    "actions": "操作"
+  },
+  "card": {
+    "docList": "ドキュメントリスト",
+    "docViewer": "ドキュメントプレビュー"
+  },
+  "empty": {
+    "noData": "Feishuドキュメントデータがありません",
+    "noDocs": "ドキュメントなし"
+  }
+}

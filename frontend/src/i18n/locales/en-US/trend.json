@@ -1,0 +1,48 @@
+{
+  "title": "Trend Discovery",
+  "desc": "Discover trending content on YouTube and seize creative opportunities.",
+  "form": {
+    "keyword": "Keyword",
+    "keywordPlaceholder": "Enter keyword to search trends",
+    "region": "Region",
+    "category": "Category",
+    "timeRange": "Time Range",
+    "search": "Search Trends"
+  },
+  "option": {
+    "last7Days": "Last 7 days",
+    "last30Days": "Last 30 days",
+    "last90Days": "Last 90 days",
+    "lastYear": "Last year"
+  },
+  "table": {
+    "keyword": "Keyword",
+    "searchVolume": "Search Volume",
+    "growth": "Growth Rate",
+    "competition": "Competition",
+    "trend": "Trend",
+    "relatedKeywords": "Related Keywords"
+  },
+  "action": {
+    "search": "Search",
+    "export": "Export Report",
+    "refresh": "Refresh"
+  },
+  "message": {
+    "searchSuccess": "Trend search complete",
+    "searchFailed": "Trend search failed",
+    "noResults": "No trend data found",
+    "exportSuccess": "Export successful",
+    "exportFailed": "Export failed",
+    "loadFailed": "Failed to load trend data"
+  },
+  "card": {
+    "trendOverview": "Trend Overview",
+    "hotKeywords": "Hot Keywords",
+    "risingTopics": "Rising Topics",
+    "topCharts": "Top Charts"
+  },
+  "empty": {
+    "noData": "No trend data, please search keywords"
+  }
+}

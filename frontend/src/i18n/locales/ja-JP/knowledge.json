@@ -1,0 +1,52 @@
+{
+  "title": "ナレッジベース管理",
+  "desc": "脚本ナレッジベースを管理。Markdown編集とバージョン管理に対応。",
+  "form": {
+    "searchPlaceholder": "ナレッジタイトルまたは内容で検索",
+    "title": "タイトル",
+    "content": "内容",
+    "category": "カテゴリ"
+  },
+  "action": {
+    "add": "ナレッジ追加",
+    "edit": "編集",
+    "delete": "削除",
+    "toSop": "SOPワークフローへ",
+    "refresh": "更新",
+    "upload": "アップロード"
+  },
+  "message": {
+    "addSuccess": "ナレッジを追加しました",
+    "addFailed": "ナレッジの追加に失敗しました",
+    "updateSuccess": "ナレッジを更新しました",
+    "updateFailed": "ナレッジの更新に失敗しました",
+    "deleteSuccess": "ナレッジを削除しました",
+    "deleteFailed": "削除に失敗しました",
+    "loadFailed": "ナレッジリストの読み込みに失敗しました",
+    "confirmDelete": "このナレッジを削除しますか？",
+    "uploadSuccess": "アップロード成功",
+    "uploadFailed": "アップロード失敗"
+  },
+  "table": {
+    "title": "タイトル",
+    "category": "カテゴリ",
+    "content": "内容",
+    "createdAt": "作成日時",
+    "updatedAt": "更新日時",
+    "actions": "操作"
+  },
+  "card": {
+    "knowledgeList": "ナレッジリスト",
+    "knowledgeDetail": "ナレッジ詳細",
+    "assetLibrary": "アセットライブラリ"
+  },
+  "modal": {
+    "addTitle": "ナレッジ追加",
+    "editTitle": "ナレッジ編集",
+    "confirm": "確定",
+    "cancel": "キャンセル"
+  },
+  "empty": {
+    "noData": "ナレッジデータがありません。「ナレッジ追加」をクリックして開始"
+  }
+}

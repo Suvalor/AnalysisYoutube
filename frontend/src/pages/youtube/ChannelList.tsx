@@ -2,6 +2,7 @@ import { Alert, Button, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Pop
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import {
@@ -46,6 +47,7 @@ type BlueOceanFormValues = {
 };
 
 export default function ChannelList() {
+  const { t } = useTranslation("youtube");
   const PAGE_SIZE = 10;
   const navigate = useNavigate();
   const openTab = useTabStore((s) => s.openTab);
@@ -91,11 +93,11 @@ export default function ChannelList() {
       const data = await discoverChannelDetailApi(channelId);
       setChannelDetail(data);
     } catch {
-      setDetailError("获取频道详情失败，请稍后重试");
+      setDetailError(t("message.detailLoadFailed"));
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [t]);
 
   /** 关闭频道详情 Drawer */
   const handleCloseDetail = useCallback(() => {
@@ -139,12 +141,12 @@ export default function ChannelList() {
       }));
       setAllRows(mapped);
     } catch {
-      message.error("加载频道列表失败");
+      message.error(t("message.loadFailed"));
       setAllRows([]);
     } finally {
       setLoading(false);
     }
-  }, [sortBy]);
+  }, [t, sortBy]);
 
   useEffect(() => {
     void load();
@@ -184,7 +186,7 @@ export default function ChannelList() {
     const id = record.channel.id;
     openTab({
       id: `channel-detail-${id}`,
-      title: record.channel.title || "博主详情",
+      title: record.channel.title || t("title.bloggerDetail"),
       path: `/youtube/channel/${id}`,
       type: "channel-detail",
       channelId: id,
@@ -194,21 +196,21 @@ export default function ChannelList() {
 
   const onBatchAdd = async () => {
     if (!urls.trim()) {
-      message.warning("请输入 YouTube 频道链接");
+      message.warning(t("message.urlRequired"));
       return;
     }
     setAnalyzing(true);
-    message.loading({ content: "正在提交后台任务，请稍候…", key: "yt-add", duration: 0 });
+    message.loading({ content: t("message.submittingBackground"), key: "yt-add", duration: 0 });
     try {
       await analyzeYouTubeBatchApi({ urls: urls.trim() });
-      message.success({ content: "更新任务已提交后台，这可能需要几分钟，请稍后刷新列表查看。", key: "yt-add" });
+      message.success({ content: t("message.batchAddSuccess"), key: "yt-add" });
       setUrls("");
       setKeyword("");
       await load();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: unknown } } };
       message.error({
-        content: typeof err.response?.data?.detail === "string" ? err.response.data.detail : "添加失败",
+        content: typeof err.response?.data?.detail === "string" ? err.response.data.detail : t("message.addFailed"),
         key: "yt-add",
       });
     } finally {
@@ -241,12 +243,12 @@ export default function ChannelList() {
       setDiscoverItems(data.items);
       setDiscoverWarnings(data.warnings ?? []);
       if (!data.items.length) {
-        message.info("没有符合过滤条件的频道，可尝试放宽粉丝上限或延长发布时间范围");
+        message.info(t("message.noDiscoverResults"));
       }
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: unknown } } };
       message.error(
-        typeof err.response?.data?.detail === "string" ? err.response.data.detail : "挖掘请求失败"
+        typeof err.response?.data?.detail === "string" ? err.response.data.detail : t("message.discoverFailed")
       );
     } finally {
       setDiscoverLoading(false);
@@ -255,22 +257,22 @@ export default function ChannelList() {
 
   const onDiscoverAddFollow = async (row: DiscoverChannelItem) => {
     if (monitoredYtIds.has(row.yt_channel_id)) {
-      message.info("该频道已在关注列表中");
+      message.info(t("message.alreadyFollowed"));
       return;
     }
     setAddingDiscoverYtId(row.yt_channel_id);
-    message.loading({ content: "正在提交添加任务…", key: "disc-add", duration: 0 });
+    message.loading({ content: t("message.submittingAdd"), key: "disc-add", duration: 0 });
     try {
       await analyzeYouTubeBatchApi({ urls: row.channel_url });
       message.success({
-        content: "添加任务已提交后台，请稍后刷新列表查看。",
+        content: t("message.addTaskSubmitted"),
         key: "disc-add",
       });
       await load();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: unknown } } };
       message.error({
-        content: typeof err.response?.data?.detail === "string" ? err.response.data.detail : "添加失败",
+        content: typeof err.response?.data?.detail === "string" ? err.response.data.detail : t("message.addFailed"),
         key: "disc-add",
       });
     } finally {
@@ -306,12 +308,12 @@ export default function ChannelList() {
       setBlueOceanItems(data.items);
       setBlueOceanWarnings(data.warnings ?? []);
       if (!data.items.length) {
-        message.info("未发现符合条件的蓝海频道，可尝试放宽粉丝上限或降低爆款系数要求");
+        message.info(t("message.noBlueOceanResults"));
       }
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: unknown } } };
       message.error(
-        typeof err.response?.data?.detail === "string" ? err.response.data.detail : "蓝海雷达扫描失败"
+        typeof err.response?.data?.detail === "string" ? err.response.data.detail : t("message.blueOceanScanFailed")
       );
     } finally {
       setBlueOceanLoading(false);
@@ -320,20 +322,20 @@ export default function ChannelList() {
 
   const onBlueOceanAddFollow = async (row: BlueOceanChannelItem) => {
     if (monitoredYtIds.has(row.yt_channel_id) || followedBlueOceanIds.has(row.yt_channel_id)) {
-      message.info("该频道已在关注列表中");
+      message.info(t("message.alreadyFollowed"));
       return;
     }
     setAddingBlueOceanYtId(row.yt_channel_id);
-    message.loading({ content: "正在提交入库任务…", key: "bo-add", duration: 0 });
+    message.loading({ content: t("message.submittingImport"), key: "bo-add", duration: 0 });
     try {
       await analyzeYouTubeBatchApi({ urls: row.channel_url });
-      message.success({ content: "入库任务已提交后台，请稍后刷新列表查看。", key: "bo-add" });
+      message.success({ content: t("message.importTaskSubmitted"), key: "bo-add" });
       setFollowedBlueOceanIds((prev) => new Set(prev).add(row.yt_channel_id));
       await load();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: unknown } } };
       message.error({
-        content: typeof err.response?.data?.detail === "string" ? err.response.data.detail : "入库失败",
+        content: typeof err.response?.data?.detail === "string" ? err.response.data.detail : t("message.importFailed"),
         key: "bo-add",
       });
     } finally {
@@ -343,7 +345,7 @@ export default function ChannelList() {
 
   const blueOceanColumns: ColumnsType<BlueOceanChannelItem> = [
     {
-      title: "频道信息",
+      title: t("table.channelInfo"),
       key: "ch",
       width: 220,
       render: (_, r) => (
@@ -370,7 +372,7 @@ export default function ChannelList() {
             )}
             {r.channel_created_at && (
               <div className="text-xs text-yc-text-secondary mt-0.5">
-                {dayjs(r.channel_created_at).fromNow()} 创建
+                {t("table.createdAgo", { time: dayjs(r.channel_created_at).fromNow() })}
               </div>
             )}
           </div>
@@ -378,48 +380,48 @@ export default function ChannelList() {
       ),
     },
     {
-      title: "订阅数",
+      title: t("table.subscribers"),
       dataIndex: "subscriber_count",
       width: 100,
       sorter: (a, b) => a.subscriber_count - b.subscriber_count,
       render: (v: number) => formatNumber(v),
     },
     {
-      title: "频道总播放",
+      title: t("table.channelTotalViews"),
       dataIndex: "channel_total_views",
       width: 120,
       sorter: (a, b) => a.channel_total_views - b.channel_total_views,
       render: (v: number) => formatNumber(v),
     },
     {
-      title: "视频数",
+      title: t("table.videos"),
       dataIndex: "video_count",
       width: 90,
       sorter: (a, b) => (a.video_count ?? 0) - (b.video_count ?? 0),
       render: (v: number) => formatNumber(v ?? 0),
     },
     {
-      title: "均播放量",
+      title: t("table.avgViews"),
       dataIndex: "avg_views_per_video",
       width: 100,
       sorter: (a, b) => (a.avg_views_per_video ?? 0) - (b.avg_views_per_video ?? 0),
       render: (v: number) => formatNumber(Math.round(v ?? 0)),
     },
     {
-      title: "爆款视频",
+      title: t("table.viralVideo"),
       key: "vurl",
       width: 180,
       render: (_, r) => (
         <div className="flex flex-col leading-tight">
           <Typography.Link href={r.viral_video_url} target="_blank" rel="noreferrer">
-            打开视频
+            {t("action.openVideo")}
           </Typography.Link>
-          <span className="text-xs text-yc-text-secondary">播放：{formatNumber(r.trigger_video_views)}</span>
+          <span className="text-xs text-yc-text-secondary">{t("table.views")}{formatNumber(r.trigger_video_views)}</span>
         </div>
       ),
     },
     {
-      title: "爆款系数",
+      title: t("table.outlierScore"),
       dataIndex: "outlier_score",
       width: 110,
       defaultSortOrder: "descend" as const,
@@ -431,7 +433,7 @@ export default function ChannelList() {
       ),
     },
     {
-      title: "操作",
+      title: t("table.action"),
       key: "op",
       width: 110,
       render: (_, r) => {
@@ -444,7 +446,7 @@ export default function ChannelList() {
             loading={addingBlueOceanYtId === r.yt_channel_id}
             onClick={() => void onBlueOceanAddFollow(r)}
           >
-            {already ? "已关注" : "入库关注"}
+            {already ? t("action.followed") : t("action.importFollow")}
           </Button>
         );
       },
@@ -455,7 +457,7 @@ export default function ChannelList() {
   const discoverColumns: ColumnsType<DiscoverChannelItem> = useMemo(
     () => [
       {
-        title: "频道",
+        title: t("table.channel"),
         key: "ch",
         width: 280,
         render: (_, r) => (
@@ -482,7 +484,7 @@ export default function ChannelList() {
               )}
               {r.published_at && (
                 <div className="text-xs text-yc-text-secondary mt-0.5">
-                  {dayjs(r.published_at).fromNow()} 创建
+                  {t("table.createdAgo", { time: dayjs(r.published_at).fromNow() })}
                 </div>
               )}
             </div>
@@ -490,35 +492,35 @@ export default function ChannelList() {
         ),
       },
       {
-        title: "订阅数",
+        title: t("table.subscribers"),
         dataIndex: "subscriber_count",
         width: 100,
         sorter: (a, b) => a.subscriber_count - b.subscriber_count,
         render: (v: number) => formatNumber(v),
       },
       {
-        title: "视频数",
+        title: t("table.videos"),
         dataIndex: "video_count",
         width: 90,
         sorter: (a, b) => (a.video_count ?? 0) - (b.video_count ?? 0),
         render: (v: number) => formatNumber(v),
       },
       {
-        title: "总播放量",
+        title: t("table.totalViews"),
         dataIndex: "channel_total_views",
         width: 110,
         sorter: (a, b) => a.channel_total_views - b.channel_total_views,
         render: (v: number) => formatNumber(v),
       },
       {
-        title: "均播放量",
+        title: t("table.avgViews"),
         dataIndex: "avg_views_per_video",
         width: 100,
         sorter: (a, b) => (a.avg_views_per_video ?? 0) - (b.avg_views_per_video ?? 0),
         render: (v: number) => formatNumber(Math.round(v ?? 0)),
       },
       {
-        title: "爆款视频播放",
+        title: t("table.viralViews"),
         dataIndex: "trigger_video_views",
         width: 140,
         sorter: (a, b) => a.trigger_video_views - b.trigger_video_views,
@@ -536,22 +538,22 @@ export default function ChannelList() {
         ),
       },
       {
-        title: "链接",
+        title: t("table.links"),
         key: "links",
         width: 120,
         render: (_, r) => (
           <div className="flex flex-col gap-1">
             <Typography.Link href={r.channel_url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
-              频道
+              {t("action.channel")}
             </Typography.Link>
             <Typography.Link href={r.viral_video_url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
-              爆款视频
+              {t("table.viralVideo")}
             </Typography.Link>
           </div>
         ),
       },
       {
-        title: "操作",
+        title: t("table.action"),
         key: "op",
         width: 100,
         render: (_, r) => {
@@ -564,7 +566,7 @@ export default function ChannelList() {
               loading={addingDiscoverYtId === r.yt_channel_id}
               onClick={() => void onDiscoverAddFollow(r)}
             >
-              {already ? "已关注" : "添加关注"}
+              {already ? t("action.followed") : t("action.addFollow")}
             </Button>
           );
         },
@@ -578,24 +580,24 @@ export default function ChannelList() {
     const n = rows.length;
     const estimated = n === 0 ? 0 : Math.floor((n + 49) / 50) + 2 * n;
     Modal.confirm({
-      title: "确认一键更新",
-      content: `本次预计消耗 API 额度: ${estimated} 点，今日剩余额度: ${q.today_remaining} 点，是否继续？`,
-      okText: "继续",
-      cancelText: "取消",
+      title: t("modal.confirmBatchUpdate"),
+      content: t("modal.batchUpdateContent", { estimated, remaining: q.today_remaining }),
+      okText: t("action.continue"),
+      cancelText: t("modal.cancel"),
       onOk: async () => {
         setUpdating(true);
         message.loading({
-          content: "正在同步 YouTube 数据，并对缺少标签的频道执行 AI 补全，请稍候…",
+          content: t("message.syncingData"),
           key: "yt-batch",
           duration: 0,
         });
         try {
           await batchUpdateChannelsApi();
-          message.success({ content: "更新任务已提交后台，这可能需要几分钟，请稍后刷新列表查看。", key: "yt-batch" });
+          message.success({ content: t("message.updateTaskSubmitted"), key: "yt-batch" });
           await load();
         } catch (e: unknown) {
           const err = e as { response?: { data?: { detail?: string } } };
-          message.error({ content: err.response?.data?.detail ?? "更新失败", key: "yt-batch" });
+          message.error({ content: err.response?.data?.detail ?? t("message.updateFailed"), key: "yt-batch" });
         } finally {
           setUpdating(false);
         }
@@ -605,7 +607,7 @@ export default function ChannelList() {
 
   const columns: ColumnsType<Row> = [
     {
-      title: "博主",
+      title: t("table.blogger"),
       key: "title",
       render: (_, r) => (
         <div className="flex items-center gap-2">
@@ -614,7 +616,7 @@ export default function ChannelList() {
             <div className="font-medium text-yc-text-primary truncate">{r.channel.title}</div>
             {r.channel.description?.trim() ? (
               <Popover
-                title="频道简介"
+                title={t("popover.channelDesc")}
                 content={
                   <Typography.Paragraph className="!mb-0 max-w-sm whitespace-pre-wrap text-yc-text-secondary text-xs">
                     {r.channel.description}
@@ -627,18 +629,18 @@ export default function ChannelList() {
                   className="text-xs text-yc-info hover:text-yc-primary-hover truncate max-w-[200px] block text-left"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  简介预览
+                  {t("action.descPreview")}
                 </button>
               </Popover>
             ) : (
-              <span className="text-xs text-yc-text-tertiary">暂无简介</span>
+              <span className="text-xs text-yc-text-tertiary">{t("empty.noDesc")}</span>
             )}
           </div>
         </div>
       ),
     },
     {
-      title: "标签 / 擅长",
+      title: t("table.tagsExpertise"),
       key: "tags_expertise",
       width: 260,
       render: (_, r) => {
@@ -654,7 +656,7 @@ export default function ChannelList() {
                   </Tag>
                 ))
               ) : (
-                <span className="text-xs text-yc-text-tertiary">待 AI 分析</span>
+                <span className="text-xs text-yc-text-tertiary">{t("tag.pendingAi")}</span>
               )}
             </div>
             {exp ? <div className="text-xs text-yc-text-secondary line-clamp-2 leading-snug">{exp}</div> : null}
@@ -663,22 +665,22 @@ export default function ChannelList() {
       },
     },
     {
-      title: "订阅数",
+      title: t("table.subscribers"),
       dataIndex: ["channel", "subscriber_count"],
       render: (v: number) => formatNumber(v),
     },
     {
-      title: "总播放量",
+      title: t("table.totalViews"),
       dataIndex: ["channel", "total_views"],
       render: (v: number) => formatNumber(v),
     },
     {
-      title: "视频数",
+      title: t("table.videos"),
       dataIndex: ["channel", "video_count"],
       render: (v: number) => formatNumber(v),
     },
     {
-      title: "最后更新时间",
+      title: t("table.lastUpdated"),
       key: "updated_at",
       dataIndex: ["channel", "updated_at"],
       render: (v: string) => {
@@ -692,22 +694,22 @@ export default function ChannelList() {
       },
     },
     {
-      title: "操作",
+      title: t("table.action"),
       key: "op",
       render: (_, r) => (
         <Popconfirm
-          title="确认移除"
-          description="移除后需重新添加才能恢复，确认继续？"
+          title={t("modal.confirmRemove")}
+          description={t("modal.removeWarning")}
           onConfirm={async () => {
             await deleteYouTubeChannelApi(r.pool_id);
-            message.success("已移除");
+            message.success(t("message.removed"));
             await load();
           }}
-          okText="确认"
-          cancelText="取消"
+          okText={t("modal.confirm")}
+          cancelText={t("modal.cancel")}
         >
           <Button size="small" danger onClick={(e) => e.stopPropagation()}>
-            移除
+            {t("action.remove")}
           </Button>
         </Popconfirm>
       ),
@@ -717,30 +719,30 @@ export default function ChannelList() {
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="bg-yc-bg-card border border-yc-border rounded-lg p-4 shadow-sm space-y-2">
-        <div className="text-sm text-yc-text-secondary">批量录入（分号或换行分隔多个链接）</div>
+        <div className="text-sm text-yc-text-secondary">{t("desc.batchInput")}</div>
         <div className="flex flex-col md:flex-row gap-2 md:items-start">
           <Input.TextArea
             rows={3}
             className="max-w-xl"
-            placeholder="请输入 YouTube 频道主页链接，支持输入多个，请使用分号 (;) 或换行分隔。例如：https://youtube.com/@a; https://youtube.com/channel/b"
+            placeholder={t("form.urlPlaceholder")}
             value={urls}
             onChange={(e) => setUrls(e.target.value)}
           />
           <div className="flex flex-wrap gap-2">
             <Button type="primary" loading={analyzing} onClick={() => void onBatchAdd()}>
-              添加关注
+              {t("action.addFollow")}
             </Button>
             <Button type="primary" ghost onClick={openDiscoverModal}>
-              🔍 智能挖掘爆款小号
+              {t("action.smartDiscover")}
             </Button>
             <Button type="primary" onClick={openBlueOceanDrawer}>
-              🌊 蓝海雷达挖掘
+              {t("action.blueOceanDiscover")}
             </Button>
             <Button type="primary" loading={updating} onClick={() => void onBatchUpdate()}>
-              一键更新数据
+              {t("action.batchUpdate")}
             </Button>
             <Button loading={loading} onClick={() => void load()}>
-              刷新列表
+              {t("action.refreshList")}
             </Button>
           </div>
         </div>
@@ -752,24 +754,24 @@ export default function ChannelList() {
             <Input
               allowClear
               style={{ width: 320, maxWidth: "100%" }}
-              placeholder="搜索频道名 / 简介 / 标签 / 擅长内容"
+              placeholder={t("form.searchPlaceholder")}
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
             />
             <div className="flex items-center gap-2">
-              <span className="text-sm text-yc-text-secondary self-center">排序</span>
+              <span className="text-sm text-yc-text-secondary self-center">{t("form.sort")}</span>
               <Select
                 style={{ width: 220 }}
                 value={sortBy}
                 onChange={(v) => setSortBy(v)}
                 options={[
-                  { value: "added_desc", label: "最近添加" },
-                  { value: "subscriber_desc", label: "订阅数 ↓" },
-                  { value: "subscriber_asc", label: "订阅数 ↑" },
-                  { value: "total_views_desc", label: "总播放量 ↓" },
-                  { value: "total_views_asc", label: "总播放量 ↑" },
-                  { value: "video_count_desc", label: "视频数 ↓" },
-                  { value: "video_count_asc", label: "视频数 ↑" },
+                  { value: "added_desc", label: t("option.recentlyAdded") },
+                  { value: "subscriber_desc", label: `${t("table.subscribers")} ↓` },
+                  { value: "subscriber_asc", label: `${t("table.subscribers")} ↑` },
+                  { value: "total_views_desc", label: `${t("table.totalViews")} ↓` },
+                  { value: "total_views_asc", label: `${t("table.totalViews")} ↑` },
+                  { value: "video_count_desc", label: `${t("table.videos")} ↓` },
+                  { value: "video_count_asc", label: `${t("table.videos")} ↑` },
                 ]}
               />
             </div>
@@ -786,13 +788,13 @@ export default function ChannelList() {
             })}
           />
           <div ref={loadMoreRef} className="py-3 text-center text-sm text-yc-text-tertiary">
-            {loadingMore ? "加载中..." : hasMore ? "向下滚动加载更多" : "没有更多数据了"}
+            {loadingMore ? t("empty.loading") : hasMore ? t("empty.scrollMore") : t("empty.noMore")}
           </div>
         </div>
       </Spin>
 
       <Modal
-        title="潜力频道挖掘"
+        title={t("modal.discoverTitle")}
         open={discoverOpen}
         onCancel={() => setDiscoverOpen(false)}
         footer={null}
@@ -803,7 +805,7 @@ export default function ChannelList() {
           type="warning"
           showIcon
           className="mb-3"
-          message="每次挖掘会调用 YouTube search.list，约消耗 100 点 API 配额（另加 channels.list 分块费用）。请控制使用频率。"
+          message={t("desc.quotaWarning")}
         />
         <Spin spinning={discoverLoading}>
           <Form<DiscoverFormValues>
@@ -816,29 +818,29 @@ export default function ChannelList() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
               <Form.Item
                 name="keyword"
-                label="搜索关键词"
-                rules={[{ required: true, message: "请输入关键词" }]}
+                label={t("form.keyword")}
+                rules={[{ required: true, message: t("form.keywordRequired") }]}
               >
-                <Input allowClear placeholder="例如：健身教程、AI 工具评测" maxLength={200} />
+                <Input allowClear placeholder={t("form.keywordPlaceholder")} maxLength={200} />
               </Form.Item>
-              <Form.Item name="published_after" label="发布时间范围（自现在起）">
+              <Form.Item name="published_after" label={t("form.publishedAfter")}>
                 <Select
                   options={[
-                    { value: 7, label: "近 7 天" },
-                    { value: 14, label: "近 14 天" },
-                    { value: 30, label: "近 30 天" },
+                    { value: 7, label: t("option.last7Days") },
+                    { value: 14, label: t("option.last14Days") },
+                    { value: 30, label: t("option.last30Days") },
                   ]}
                 />
               </Form.Item>
-              <Form.Item name="max_subscribers" label="粉丝上限（保留订阅数小于该值的频道）">
+              <Form.Item name="max_subscribers" label={t("form.maxSubscribers")}>
                 <InputNumber min={0} max={999999999} className="w-full" />
               </Form.Item>
-              <Form.Item name="max_results" label="search 抓取条数（1–50）">
+              <Form.Item name="max_results" label={t("form.maxResults")}>
                 <InputNumber min={1} max={50} className="w-full" />
               </Form.Item>
             </div>
             <Button type="primary" htmlType="submit" loading={discoverLoading}>
-              开始挖掘
+              {t("action.startDiscover")}
             </Button>
           </Form>
 
@@ -847,7 +849,7 @@ export default function ChannelList() {
               type="info"
               showIcon
               className="mb-3"
-              message="部分条目已跳过"
+              message={t("message.partialSkipped")}
               description={
                 <ul className="list-disc pl-4 mb-0 text-sm">
                   {discoverWarnings.slice(0, 8).map((w, i) => (
@@ -858,20 +860,20 @@ export default function ChannelList() {
             />
           ) : null}
 
-          <div className="text-sm text-yc-text-secondary mb-2">挖掘结果（未写入数据库，点击「添加关注」后才会入库）</div>
+          <div className="text-sm text-yc-text-secondary mb-2">{t("desc.discoverResult")}</div>
           <Table<DiscoverChannelItem>
             rowKey="yt_channel_id"
             size="small"
             columns={discoverColumns}
             dataSource={discoverItems}
             pagination={false}
-            locale={{ emptyText: discoverLoading ? "加载中…" : "暂无数据，请先填写表单并点击「开始挖掘」" }}
+            locale={{ emptyText: discoverLoading ? t("empty.loading") : t("empty.discoverNoData") }}
           />
         </Spin>
       </Modal>
 
       <Drawer
-        title="🌊 蓝海雷达 — 低粉爆款频道挖掘"
+        title={t("modal.blueOceanTitle")}
         open={blueOceanOpen}
         onClose={() => setBlueOceanOpen(false)}
         width={980}
@@ -881,7 +883,7 @@ export default function ChannelList() {
           type="info"
           showIcon
           className="mb-4"
-          message="蓝海雷达会搜索粉丝量低但近期产出超级爆款的潜力频道。每次扫描约消耗 100+ 点 API 配额，请合理使用。"
+          message={t("desc.blueOceanInfo")}
         />
         <Spin spinning={blueOceanLoading}>
           <Form<BlueOceanFormValues>
@@ -899,39 +901,39 @@ export default function ChannelList() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
               <Form.Item
                 name="keyword"
-                label="搜索关键词"
-                rules={[{ required: true, message: "请输入关键词" }]}
+                label={t("form.keyword")}
+                rules={[{ required: true, message: t("form.keywordRequired") }]}
               >
-                <Input allowClear placeholder="例如：AI 教程、健身、科技评测" maxLength={200} />
+                <Input allowClear placeholder={t("form.blueOceanKeywordPlaceholder")} maxLength={200} />
               </Form.Item>
-              <Form.Item name="published_after" label="发布时间范围">
+              <Form.Item name="published_after" label={t("form.publishedAfter")}>
                 <Select
                   options={[
-                    { value: 30, label: "近 1 个月" },
-                    { value: 90, label: "近 3 个月" },
-                    { value: 180, label: "近半年" },
+                    { value: 30, label: t("option.last1Month") },
+                    { value: 90, label: t("option.last3Months") },
+                    { value: 180, label: t("option.lastHalfYear") },
                   ]}
                 />
               </Form.Item>
-              <Form.Item name="max_subscribers" label="最高粉丝限制">
+              <Form.Item name="max_subscribers" label={t("form.maxSubscribersLimit")}>
                 <InputNumber min={0} max={999999999} className="w-full" />
               </Form.Item>
-              <Form.Item name="outlier_multiplier" label="爆款系数要求（视频播放量 / 粉丝数）">
+              <Form.Item name="outlier_multiplier" label={t("form.outlierMultiplierDesc")}>
                 <InputNumber min={1} max={10000} step={1} className="w-full" />
               </Form.Item>
-              <Form.Item name="video_duration" label="视频时长">
+              <Form.Item name="video_duration" label={t("form.videoDuration")}>
                 <Select
                   options={[
-                    { value: "long", label: "长视频（> 20 分钟）" },
-                    { value: "medium", label: "中等（4-20 分钟）" },
-                    { value: "short", label: "短视频（< 4 分钟）" },
-                    { value: "any", label: "不限时长" },
+                    { value: "long", label: t("option.longVideo") },
+                    { value: "medium", label: t("option.mediumVideo") },
+                    { value: "short", label: t("option.shortVideo") },
+                    { value: "any", label: t("option.anyDuration") },
                   ]}
                 />
               </Form.Item>
             </div>
             <Button type="primary" htmlType="submit" loading={blueOceanLoading}>
-              开始深度雷达扫描
+              {t("action.startDeepScan")}
             </Button>
           </Form>
 
@@ -940,7 +942,7 @@ export default function ChannelList() {
               type="warning"
               showIcon
               className="mb-3"
-              message="部分条目已跳过"
+              message={t("message.partialSkipped")}
               description={
                 <ul className="list-disc pl-4 mb-0 text-sm">
                   {blueOceanWarnings.slice(0, 8).map((w, i) => (
@@ -952,9 +954,9 @@ export default function ChannelList() {
           )}
 
           <div className="text-sm text-slate-600 mb-2">
-            扫描结果（未写入数据库，点击「入库关注」后才会持久化）
+            {t("desc.blueOceanResult")}
             {blueOceanItems.length > 0 && (
-              <span className="ml-2 text-slate-400">共 {blueOceanItems.length} 个蓝海频道</span>
+              <span className="ml-2 text-slate-400">{t("desc.blueOceanCount", { count: blueOceanItems.length })}</span>
             )}
           </div>
           <Table<BlueOceanChannelItem>
@@ -964,7 +966,7 @@ export default function ChannelList() {
             dataSource={blueOceanItems}
             pagination={blueOceanItems.length > 10 ? { pageSize: 10 } : false}
             locale={{
-              emptyText: blueOceanLoading ? "雷达扫描中…" : "暂无数据，请填写参数并点击「开始深度雷达扫描」",
+              emptyText: blueOceanLoading ? t("empty.scanning") : t("empty.blueOceanNoData"),
             }}
           />
         </Spin>
@@ -972,7 +974,7 @@ export default function ChannelList() {
 
       {/* 频道详情 Drawer */}
       <Drawer
-        title="频道详情"
+        title={t("modal.channelDetail")}
         open={detailVisible}
         onClose={handleCloseDetail}
         width={480}
@@ -986,7 +988,7 @@ export default function ChannelList() {
           <Alert
             type="error"
             showIcon
-            message="加载失败"
+            message={t("message.loadFailed")}
             description={detailError}
             className="mb-4"
           />
@@ -1011,7 +1013,7 @@ export default function ChannelList() {
             </div>
             {channelDetail.description && (
               <div>
-                <div className="text-sm font-medium text-yc-text-secondary mb-1">频道简介</div>
+                <div className="text-sm font-medium text-yc-text-secondary mb-1">{t("label.channelDesc")}</div>
                 <Typography.Paragraph className="text-sm text-yc-text-primary whitespace-pre-wrap">
                   {channelDetail.description}
                 </Typography.Paragraph>
@@ -1019,19 +1021,19 @@ export default function ChannelList() {
             )}
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-yc-bg-inset rounded-lg p-3">
-                <div className="text-xs text-yc-text-secondary">订阅数</div>
+                <div className="text-xs text-yc-text-secondary">{t("table.subscribers")}</div>
                 <div className="font-semibold text-yc-text-primary">{formatNumber(channelDetail.subscriber_count)}</div>
               </div>
               <div className="bg-yc-bg-inset rounded-lg p-3">
-                <div className="text-xs text-yc-text-secondary">视频数</div>
+                <div className="text-xs text-yc-text-secondary">{t("table.videos")}</div>
                 <div className="font-semibold text-yc-text-primary">{formatNumber(channelDetail.video_count)}</div>
               </div>
               <div className="bg-yc-bg-inset rounded-lg p-3">
-                <div className="text-xs text-yc-text-secondary">总播放量</div>
+                <div className="text-xs text-yc-text-secondary">{t("table.totalViews")}</div>
                 <div className="font-semibold text-yc-text-primary">{formatNumber(channelDetail.view_count)}</div>
               </div>
               <div className="bg-yc-bg-inset rounded-lg p-3">
-                <div className="text-xs text-yc-text-secondary">创建时间</div>
+                <div className="text-xs text-yc-text-secondary">{t("table.createdAt")}</div>
                 <div className="font-semibold text-yc-text-primary">
                   {channelDetail.published_at ? dayjs(channelDetail.published_at).format("YYYY-MM-DD") : "-"}
                 </div>
@@ -1039,12 +1041,12 @@ export default function ChannelList() {
             </div>
             {channelDetail.country && (
               <div className="text-sm text-yc-text-secondary">
-                国家/地区：{channelDetail.country}
+                {t("label.countryRegion")}{channelDetail.country}
               </div>
             )}
           </div>
         ) : (
-          <div className="text-center text-yc-text-tertiary py-8">暂无数据</div>
+          <div className="text-center text-yc-text-tertiary py-8">{t("empty.noData")}</div>
         )}
       </Drawer>
     </div>

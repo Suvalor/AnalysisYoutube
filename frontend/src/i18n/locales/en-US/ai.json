@@ -1,0 +1,44 @@
+{
+  "title": "AI Script Studio",
+  "desc": "Use AI to intelligently generate and optimize video scripts, boosting creative efficiency.",
+  "form": {
+    "topic": "Topic",
+    "topicPlaceholder": "Enter video topic or keyword",
+    "style": "Style",
+    "stylePlaceholder": "Select or enter script style",
+    "length": "Length",
+    "model": "Model",
+    "agent": "Agent",
+    "generate": "Generate Script"
+  },
+  "action": {
+    "generate": "Generate",
+    "regenerate": "Regenerate",
+    "edit": "Edit",
+    "save": "Save",
+    "toSop": "Enter SOP Workflow",
+    "copy": "Copy"
+  },
+  "message": {
+    "generateSuccess": "Script generated successfully",
+    "generateFailed": "Script generation failed",
+    "saveSuccess": "Script saved successfully",
+    "saveFailed": "Script save failed",
+    "topicRequired": "Please enter a video topic",
+    "loadFailed": "Failed to load AI config",
+    "copySuccess": "Copied to clipboard"
+  },
+  "card": {
+    "scriptEditor": "Script Editor",
+    "aiAssistant": "AI Assistant",
+    "scriptPreview": "Script Preview"
+  },
+  "option": {
+    "short": "Short (1-3 min)",
+    "medium": "Medium (3-10 min)",
+    "long": "Long (10+ min)"
+  },
+  "empty": {
+    "noData": "No scripts yet. Enter a topic to start generating"
+  }
+}

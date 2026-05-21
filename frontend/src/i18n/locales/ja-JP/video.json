@@ -1,0 +1,57 @@
+{
+  "title": "グローバル動画",
+  "desc": "すべての動画リソースを閲覧・管理。検索、フィルター、詳細表示に対応。",
+  "form": {
+    "searchPlaceholder": "動画タイトルまたはチャンネルで検索",
+    "region": "地域",
+    "category": "カテゴリ",
+    "duration": "動画の長さ",
+    "sortBy": "並び替え",
+    "dateRange": "日付範囲"
+  },
+  "action": {
+    "search": "検索",
+    "viewDetail": "詳細表示",
+    "refresh": "更新",
+    "export": "エクスポート"
+  },
+  "message": {
+    "loadFailed": "動画リストの読み込みに失敗しました",
+    "searchSuccess": "検索完了",
+    "searchFailed": "検索失敗",
+    "noResults": "一致する動画が見つかりません",
+    "exportSuccess": "エクスポート成功",
+    "exportFailed": "エクスポート失敗",
+    "detailLoadFailed": "動画詳細の読み込みに失敗しました"
+  },
+  "table": {
+    "title": "タイトル",
+    "channel": "チャンネル",
+    "views": "再生数",
+    "likes": "高評価",
+    "comments": "コメント",
+    "publishedAt": "公開日",
+    "duration": "動画の長さ",
+    "actions": "操作"
+  },
+  "card": {
+    "videoList": "動画リスト",
+    "videoDetail": "動画詳細",
+    "videoStats": "動画統計"
+  },
+  "modal": {
+    "videoDetail": "動画詳細"
+  },
+  "option": {
+    "anyDuration": "期間制限なし",
+    "shortVideo": "ショート動画",
+    "mediumVideo": "中程度",
+    "longVideo": "長編動画",
+    "mostViewed": "再生数順",
+    "mostRecent": "最新順",
+    "mostLiked": "高評価順"
+  },
+  "empty": {
+    "noData": "動画データがありません"
+  }
+}

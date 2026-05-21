@@ -1,0 +1,47 @@
+{
+  "title": "SEOスコア",
+  "desc": "動画のSEOパフォーマンスを分析し、タイトル、説明、タグを最適化して検索順位を向上させましょう。",
+  "form": {
+    "videoUrl": "動画URL",
+    "videoUrlPlaceholder": "YouTube動画URLを入力",
+    "keyword": "ターゲットキーワード",
+    "keywordPlaceholder": "ターゲットキーワードを入力",
+    "analyze": "分析開始"
+  },
+  "action": {
+    "analyze": "分析",
+    "reanalyze": "再分析",
+    "export": "レポートエクスポート"
+  },
+  "message": {
+    "analyzeSuccess": "SEO分析完了",
+    "analyzeFailed": "SEO分析失敗",
+    "urlRequired": "動画URLを入力してください",
+    "invalidUrl": "無効なYouTube動画URL",
+    "loadFailed": "SEOデータの読み込みに失敗しました",
+    "exportSuccess": "エクスポート成功",
+    "exportFailed": "エクスポート失敗"
+  },
+  "table": {
+    "item": "評価項目",
+    "score": "スコア",
+    "maxScore": "満点",
+    "suggestion": "最適化提案"
+  },
+  "card": {
+    "overallScore": "総合スコア",
+    "titleScore": "タイトルスコア",
+    "descriptionScore": "説明スコア",
+    "tagScore": "タグスコア",
+    "suggestions": "最適化提案"
+  },
+  "stat": {
+    "overall": "総合",
+    "title": "タイトル",
+    "description": "説明",
+    "tags": "タグ"
+  },
+  "empty": {
+    "noData": "SEOデータがありません。動画URLを入力して分析を開始してください"
+  }
+}

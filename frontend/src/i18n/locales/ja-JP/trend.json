@@ -1,0 +1,48 @@
+{
+  "title": "トレンド発見",
+  "desc": "YouTubeのトレンドコンテンツを発見し、クリエイティブな方向性を掴みましょう。",
+  "form": {
+    "keyword": "キーワード",
+    "keywordPlaceholder": "キーワードを入力してトレンド検索",
+    "region": "地域",
+    "category": "カテゴリ",
+    "timeRange": "期間",
+    "search": "トレンド検索"
+  },
+  "option": {
+    "last7Days": "過去7日間",
+    "last30Days": "過去30日間",
+    "last90Days": "過去90日間",
+    "lastYear": "過去1年"
+  },
+  "table": {
+    "keyword": "キーワード",
+    "searchVolume": "検索ボリューム",
+    "growth": "成長率",
+    "competition": "競合度",
+    "trend": "トレンド",
+    "relatedKeywords": "関連キーワード"
+  },
+  "action": {
+    "search": "検索",
+    "export": "レポートエクスポート",
+    "refresh": "更新"
+  },
+  "message": {
+    "searchSuccess": "トレンド検索完了",
+    "searchFailed": "トレンド検索失敗",
+    "noResults": "トレンドデータが見つかりません",
+    "exportSuccess": "エクスポート成功",
+    "exportFailed": "エクスポート失敗",
+    "loadFailed": "トレンドデータの読み込みに失敗しました"
+  },
+  "card": {
+    "trendOverview": "トレンド概要",
+    "hotKeywords": "人気キーワード",
+    "risingTopics": "上昇トピック",
+    "topCharts": "トップチャート"
+  },
+  "empty": {
+    "noData": "トレンドデータがありません。キーワードを検索してください"
+  }
+}

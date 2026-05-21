@@ -1,0 +1,44 @@
+{
+  "title": "AI 스크립트 스튜디오",
+  "desc": "AI를 활용하여 동영상 스크립트를 지능적으로 생성하고 최적화하여 창작 효율을 높이세요.",
+  "form": {
+    "topic": "주제",
+    "topicPlaceholder": "동영상 주제 또는 키워드 입력",
+    "style": "스타일",
+    "stylePlaceholder": "스크립트 스타일 선택 또는 입력",
+    "length": "길이",
+    "model": "모델",
+    "agent": "에이전트",
+    "generate": "스크립트 생성"
+  },
+  "action": {
+    "generate": "생성",
+    "regenerate": "재생성",
+    "edit": "편집",
+    "save": "저장",
+    "toSop": "SOP 워크플로우로 이동",
+    "copy": "복사"
+  },
+  "message": {
+    "generateSuccess": "스크립트 생성 성공",
+    "generateFailed": "스크립트 생성 실패",
+    "saveSuccess": "스크립트 저장 성공",
+    "saveFailed": "스크립트 저장 실패",
+    "topicRequired": "동영상 주제를 입력하세요",
+    "loadFailed": "AI 설정 로드 실패",
+    "copySuccess": "클립보드에 복사됨"
+  },
+  "card": {
+    "scriptEditor": "스크립트 편집기",
+    "aiAssistant": "AI 어시스턴트",
+    "scriptPreview": "스크립트 미리보기"
+  },
+  "option": {
+    "short": "짧음 (1-3분)",
+    "medium": "중간 (3-10분)",
+    "long": "김 (10분 이상)"
+  },
+  "empty": {
+    "noData": "스크립트가 없습니다. 주제를 입력하여 생성을 시작하세요"
+  }
+}

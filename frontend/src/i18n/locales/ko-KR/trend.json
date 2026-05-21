@@ -1,0 +1,48 @@
+{
+  "title": "트렌드 발견",
+  "desc": "YouTube의 트렌드 콘텐츠를 발견하고 창작 방향을 잡으세요.",
+  "form": {
+    "keyword": "키워드",
+    "keywordPlaceholder": "키워드를 입력하여 트렌드 검색",
+    "region": "지역",
+    "category": "카테고리",
+    "timeRange": "기간",
+    "search": "트렌드 검색"
+  },
+  "option": {
+    "last7Days": "최근 7일",
+    "last30Days": "최근 30일",
+    "last90Days": "최근 90일",
+    "lastYear": "최근 1년"
+  },
+  "table": {
+    "keyword": "키워드",
+    "searchVolume": "검색량",
+    "growth": "성장률",
+    "competition": "경쟁도",
+    "trend": "트렌드",
+    "relatedKeywords": "관련 키워드"
+  },
+  "action": {
+    "search": "검색",
+    "export": "보고서 내보내기",
+    "refresh": "새로고침"
+  },
+  "message": {
+    "searchSuccess": "트렌드 검색 완료",
+    "searchFailed": "트렌드 검색 실패",
+    "noResults": "관련 트렌드 데이터를 찾을 수 없습니다",
+    "exportSuccess": "내보내기 성공",
+    "exportFailed": "내보내기 실패",
+    "loadFailed": "트렌드 데이터 로드 실패"
+  },
+  "card": {
+    "trendOverview": "트렌드 개요",
+    "hotKeywords": "인기 키워드",
+    "risingTopics": "상승 토픽",
+    "topCharts": "인기 차트"
+  },
+  "empty": {
+    "noData": "트렌드 데이터가 없습니다. 키워드를 검색하세요"
+  }
+}
