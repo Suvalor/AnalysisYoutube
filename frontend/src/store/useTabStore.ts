@@ -59,6 +59,8 @@ type TabState = {
   closeOtherTabs: (id: string) => void;
   /** 关闭所有非固定标签 */
   closeAllTabs: () => void;
+  /** 清空所有标签，用于登出或切换用户后隔离上一用户的工作区状态 */
+  resetTabs: () => void;
   /** 注册固定标签 ID（由 TabbedShell 初始化时调用） */
   registerPinnedIds: (ids: string[]) => void;
 };
@@ -164,5 +166,9 @@ export const useTabStore = create<TabState>((set, get) => ({
     const next = tabs.filter((t) => pinnedTabIds.has(t.id));
     const nextActive = next[0]?.id ?? null;
     set({ tabs: next, activeTabId: nextActive });
+  },
+
+  resetTabs: () => {
+    set({ tabs: [], activeTabId: null, _suppressNavigation: false });
   },
 }));

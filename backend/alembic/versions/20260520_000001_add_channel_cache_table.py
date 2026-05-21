@@ -20,7 +20,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("channel_id", sa.String(64), nullable=False),
         sa.Column("title", sa.String(255), nullable=False, server_default=""),
-        sa.Column("description", sa.Text(), nullable=False, server_default=""),
+        sa.Column("description", sa.Text(), nullable=False),
         sa.Column("avatar_url", sa.String(1024), nullable=True),
         sa.Column("subscriber_count", sa.BIGINT(), nullable=False, server_default="0"),
         sa.Column("video_count", sa.BIGINT(), nullable=False, server_default="0"),

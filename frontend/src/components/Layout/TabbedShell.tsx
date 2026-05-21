@@ -130,7 +130,36 @@ const TAB_MIN_ROLE: Partial<Record<TabType, UserRole>> = {
   // 动态标签页守卫：这些标签页不在 navDefs 中，需手动补充纵深防御
   "agent-edit": UserRole.USER,
   "personal-settings": UserRole.USER,
+  "channel-detail": UserRole.USER,
+  "feishu-viewer": UserRole.ADMIN,
 };
+
+function getDefaultPathForRole(role: UserRole): string {
+  return hasRole(role, UserRole.USER) ? "/blue-ocean-radar" : "/keyword-research";
+}
+
+function getDynamicPathMinRole(pathname: string): UserRole | null {
+  if (/^\/youtube\/channel\/\d+$/.test(pathname)) return UserRole.USER;
+  if (/^\/config\/agent\/edit\/\d+$/.test(pathname)) return UserRole.USER;
+  if (/^\/feishu\/view\/\d+$/.test(pathname)) return UserRole.ADMIN;
+  return null;
+}
+
+function getPathMinRole(pathname: string): UserRole | null {
+  const def = navDefs.find((n) => n.path === pathname);
+  if (def) return def.minRole ?? UserRole.GUEST;
+  return getDynamicPathMinRole(pathname);
+}
+
+function canAccessPath(pathname: string, role: UserRole): boolean {
+  const minRole = getPathMinRole(pathname);
+  return minRole != null && hasRole(role, minRole);
+}
+
+function canAccessTab(tab: TabItem, role: UserRole): boolean {
+  const minRole = TAB_MIN_ROLE[tab.type] ?? getPathMinRole(tab.path.split("?")[0]) ?? UserRole.GUEST;
+  return hasRole(role, minRole);
+}
 
 /** 根据标签页类型渲染对应的页面组件 */
 function renderTabPanel(tab: TabItem) {
@@ -209,6 +238,7 @@ export default function TabbedShell() {
     closeRightTabs,
     closeOtherTabs,
     closeAllTabs,
+    resetTabs,
     registerPinnedIds,
   } = useTabStore();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -289,16 +319,13 @@ export default function TabbedShell() {
     if (prevRoleRef.current === role) return;
     prevRoleRef.current = role;
     const { tabs: currentTabs } = useTabStore.getState();
-    const unauthorizedTabs = currentTabs.filter((tab) => {
-      const minRole = TAB_MIN_ROLE[tab.type];
-      return minRole && !hasRole(role, minRole);
-    });
+    const unauthorizedTabs = currentTabs.filter((tab) => !canAccessTab(tab, role));
     unauthorizedTabs.forEach((tab) => {
       useTabStore.getState().closeTab(tab.id);
     });
     // 若所有标签都被关闭，导航到当前角色的默认安全页
     if (unauthorizedTabs.length > 0 && unauthorizedTabs.length === currentTabs.length) {
-      const defaultPath = hasRole(role, UserRole.USER) ? "/blue-ocean-radar" : "/keyword-research";
+      const defaultPath = getDefaultPathForRole(role);
       navigate(defaultPath, { replace: true });
     }
   }, [role, navigate]);
@@ -310,13 +337,9 @@ export default function TabbedShell() {
   useEffect(() => {
     if (tabs.length === 0) {
       // 检查当前 URL 是否是用户有权限访问的已知路由
-      const currentDef = navDefs.find((n) => n.path === location.pathname);
-      const isDynamicRoute = /^\/youtube\/channel\/\d+$/.test(location.pathname)
-        || /^\/config\/agent\/edit\/\d+$/.test(location.pathname)
-        || /^\/feishu\/view\/\d+$/.test(location.pathname);
-      const hasCurrentPageAccess = (currentDef && hasRole(role, currentDef.minRole ?? UserRole.GUEST)) || isDynamicRoute;
+      const hasCurrentPageAccess = canAccessPath(location.pathname, role);
       if (!hasCurrentPageAccess) {
-        const defaultPath = hasRole(role, UserRole.USER) ? "/blue-ocean-radar" : "/keyword-research";
+        const defaultPath = getDefaultPathForRole(role);
         navigate(defaultPath, { replace: true });
       }
     }
@@ -333,14 +356,20 @@ export default function TabbedShell() {
       return;
     }
     const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (activeTab && !canAccessTab(activeTab, role)) {
+      if (!canAccessPath(location.pathname, role)) {
+        navigate(getDefaultPathForRole(role), { replace: true });
+      }
+      return;
+    }
     // 只比较 pathname 部分，忽略 search params（tab.path 可能含 ?tab=xxx）
     if (activeTab && location.pathname !== activeTab.path.split("?")[0]) {
       // 若当前 URL 对应一个用户无权限的 navDef，导航到角色默认安全页而非拉回活跃标签，
       // 避免与 RequireRole 的重定向形成环路（如游客访问 /downloads 时 RequireRole 重定向
       // 到安全页，TabSync 又拉回 /trend-discovery，RequireRole 再次触发...）
-      const currentDef = navDefs.find((n) => n.path === location.pathname);
-      if (currentDef && !hasRole(role, currentDef.minRole ?? UserRole.GUEST)) {
-        const safePath = hasRole(role, UserRole.USER) ? "/blue-ocean-radar" : "/keyword-research";
+      const currentPathMinRole = getPathMinRole(location.pathname);
+      if (currentPathMinRole && !hasRole(role, currentPathMinRole)) {
+        const safePath = getDefaultPathForRole(role);
         navigate(safePath, { replace: true });
         // 标记已重定向到安全页，防止 pathname useEffect 重复执行权限检查
         redirectedToSafeRef.current = true;
@@ -357,7 +386,7 @@ export default function TabbedShell() {
   useEffect(() => {
     if (location.pathname === "/" || location.pathname === "") {
       // 根据用户角色动态选择默认着陆页：已登录用户导航到蓝海雷达，游客导航到关键词研究
-      const defaultPath = hasRole(role, UserRole.USER) ? "/blue-ocean-radar" : "/keyword-research";
+      const defaultPath = getDefaultPathForRole(role);
       navigate(defaultPath, { replace: true });
       redirectedToSafeRef.current = true;
       return;
@@ -371,10 +400,10 @@ export default function TabbedShell() {
     // 当用户直接访问无权限的 URL（如游客访问 /downloads）时，重定向到角色默认安全页，
     // 避免停留在无权限页面触发 RequireRole 重定向与 TabSync 拉回形成环路。
     // 守卫条件：仅在路径有 minRole 定义、用户确实无权限、且非已重定向到安全页时执行。
-    const unauthorizedDef = navDefs.find((n) => n.path === location.pathname);
-    if (unauthorizedDef && !hasRole(role, unauthorizedDef.minRole ?? UserRole.GUEST)) {
+    const pathMinRole = getPathMinRole(location.pathname);
+    if (pathMinRole && !hasRole(role, pathMinRole)) {
       if (redirectedToSafeRef.current) return;
-      const safePath = hasRole(role, UserRole.USER) ? "/blue-ocean-radar" : "/keyword-research";
+      const safePath = getDefaultPathForRole(role);
       navigate(safePath, { replace: true });
       redirectedToSafeRef.current = true;
     } else {
@@ -391,7 +420,7 @@ export default function TabbedShell() {
       openTab({ id: def.tabId, title: t(def.labelKey), path: fullPath, type: def.type });
     }
     const m = path.match(/^\/youtube\/channel\/(\d+)$/);
-    if (m) {
+    if (m && canAccessPath(path, role)) {
       const cid = Number(m[1]);
       openTab({
         id: `channel-detail-${cid}`,
@@ -402,7 +431,7 @@ export default function TabbedShell() {
       });
     }
     const editPromptMatch = path.match(/^\/config\/agent\/edit\/(\d+)$/);
-    if (editPromptMatch) {
+    if (editPromptMatch && canAccessPath(path, role)) {
       const pid = Number(editPromptMatch[1]);
       openTab({
         id: `agent-edit-${pid}`,
@@ -413,7 +442,7 @@ export default function TabbedShell() {
       });
     }
     const feishuViewMatch = path.match(/^\/feishu\/view\/(\d+)$/);
-    if (feishuViewMatch) {
+    if (feishuViewMatch && canAccessPath(path, role)) {
       const did = Number(feishuViewMatch[1]);
       openTab({
         id: `feishu-view-${did}`,
@@ -423,7 +452,7 @@ export default function TabbedShell() {
         feishuDocId: did,
       });
     }
-  }, [location.pathname, location.search, openTab]);
+  }, [location.pathname, location.search, openTab, role, t]);
 
   const pageTitle = useMemo(() => {
     const tab = tabs.find((x) => x.id === activeTabId);
@@ -437,8 +466,9 @@ export default function TabbedShell() {
   };
 
   const logout = () => {
+    resetTabs();
     setToken(null);
-    navigate("/login");
+    navigate("/login", { replace: true });
   };
 
   const SidebarContent = (
