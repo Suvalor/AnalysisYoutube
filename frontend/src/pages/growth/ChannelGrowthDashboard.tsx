@@ -121,7 +121,7 @@ function scoreColor(score: number): string {
 }
 
 export default function ChannelGrowthDashboard() {
-  const { t } = useTranslation("nav");
+  const { t } = useTranslation(["nav", "common"]);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<GrowthResponse | null>(null);
@@ -218,7 +218,7 @@ export default function ChannelGrowthDashboard() {
       render: (v: string) => <TrendTag trend={v} />,
     },
     {
-      title: "操作",
+      title: t("common:table.action"),
       key: "action",
       width: 100,
       render: (_: unknown, record: ChannelMetrics) => (
@@ -228,7 +228,7 @@ export default function ChannelGrowthDashboard() {
           icon={<SearchOutlined />}
           onClick={() => navigate(`/keyword-research?keyword=${encodeURIComponent(record.title)}`)}
         >
-          关键词
+          {t("common:action.keyword")}
         </Button>
       ),
     },

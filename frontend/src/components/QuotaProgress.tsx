@@ -1,5 +1,6 @@
 import { Button, Space, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
 import Progress from "antd/es/progress";
 import type { QuotaUsage } from "@/types/auth";
 
@@ -30,6 +31,7 @@ interface QuotaProgressProps {
  * limit <= 0 时显示"无限制"而非 0% 进度条。
  */
 export default function QuotaProgress({ usage, onRefresh }: QuotaProgressProps) {
+  const { t } = useTranslation("common");
   const items: QuotaItem[] = [
     { label: "YouTube API", used: usage.youtube_api_used, limit: usage.youtube_api_limit },
     { label: "LLM API", used: usage.llm_api_used, limit: usage.llm_api_limit },
@@ -51,7 +53,7 @@ export default function QuotaProgress({ usage, onRefresh }: QuotaProgressProps) 
               </Text>
             </div>
             {isUnlimited ? (
-              <Text type="secondary" style={{ fontSize: 12 }}>无限制</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>{t("quotaProgress.unlimited")}</Text>
             ) : (
               <Progress
                 percent={Math.min(percent, 100)}
@@ -66,7 +68,7 @@ export default function QuotaProgress({ usage, onRefresh }: QuotaProgressProps) 
       {onRefresh && (
         <div className="text-right">
           <Button type="link" size="small" icon={<ReloadOutlined />} onClick={onRefresh}>
-            刷新配额
+            {t("quotaProgress.refresh")}
           </Button>
         </div>
       )}

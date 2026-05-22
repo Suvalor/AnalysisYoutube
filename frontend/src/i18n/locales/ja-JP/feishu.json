@@ -28,5 +28,89 @@
   "empty": {
     "noData": "Feishuドキュメントデータがありません",
     "noDocs": "ドキュメントなし"
+  },
+  "docList": {
+    "message": {
+      "loadFailed": "Feishuドキュメントリストの読み込み失敗",
+      "alreadyArchived": "このドキュメントは既にアーカイブ済みです",
+      "archiveSubmitted": "アーカイブタスクを送信しました。バックグラウンドでPDFを検証します。",
+      "archiving": "ドキュメントをアーカイブ中です",
+      "archiveFailed": "アーカイブ送信失敗",
+      "deleteSuccess": "削除しました",
+      "deleteFailed": "削除失敗",
+      "createSuccess": "ドキュメントを追加しました",
+      "createFailed": "追加失敗"
+    },
+    "label": {
+      "docId": "Feishuドキュメント #{{id}}",
+      "docName": "ドキュメント名",
+      "addTime": "追加日時",
+      "archiveStatus": "アーカイブステータス",
+      "statusSuccess": "成功",
+      "statusArchiving": "保存中",
+      "statusFailed": "保存失敗",
+      "statusUnarchived": "未アーカイブ"
+    },
+    "action": {
+      "view": "表示",
+      "archive": "オフライン保存",
+      "reArchive": "再保存",
+      "archiving": "アーカイブ中...",
+      "delete": "削除",
+      "confirmDelete": "このドキュメントを削除しますか？"
+    },
+    "title": "Feishuドキュメント管理",
+    "loadFailed": "Feishuドキュメントリストの読み込みに失敗しました",
+    "searchPlaceholder": "名前で検索",
+    "search": "検索",
+    "addDoc": "+ ドキュメント追加",
+    "docNameColumn": "ドキュメント名",
+    "addedAtColumn": "追加日時",
+    "archiveStatusColumn": "アーカイブ状態",
+    "actionColumn": "操作",
+    "view": "表示",
+    "archiving": "アーカイブ中...",
+    "resave": "再保存",
+    "offlineSave": "オフライン保存",
+    "confirmDelete": "このドキュメントを削除しますか？",
+    "delete": "削除",
+    "cancel": "キャンセル",
+    "deleteSuccess": "削除しました",
+    "alreadyArchived": "このドキュメントは既にアーカイブ済み",
+    "archiveSubmitted": "アーカイブタスクを送信しました。バックエンドでPDFを検証します。リスト状態をご確認ください。",
+    "archivingWarning": "ドキュメントはアーカイブ中です",
+    "archiveFailed": "アーカイブ送信に失敗しました",
+    "titleRequired": "ドキュメント名を入力してください",
+    "urlRequired": "Feishuリンクを入力してください",
+    "createSuccess": "ドキュメントを追加しました",
+    "createFailed": "追加に失敗しました",
+    "addTitle": "Feishuドキュメント追加",
+    "submit": "送信",
+    "docNameLabel": "ドキュメント名",
+    "docNamePlaceholder": "例：选题库 / スクリプトテンプレート库",
+    "urlLabel": "Feishuリンク（URL）",
+    "urlPlaceholder": "Feishu共有リンクを入力",
+    "feishuDocPrefix": "Feishuドキュメント #",
+    "success": "成功",
+    "saving": "保存中",
+    "saveFailed": "保存失敗",
+    "unarchived": "未アーカイブ"
+  },
+  "docViewer": {
+    "message": {
+      "invalidId": "無効なドキュメントID",
+      "loadFailed": "ドキュメントの読み込み失敗",
+      "emptyUrl": "ドキュメントURLが空です"
+    },
+    "label": {
+      "defaultTitle": "Feishuクラウドドキュメント",
+      "originalPreview": "元リンクプレビュー",
+      "archivePreview": "オフラインバックアッププレビュー",
+      "archiveIframe": "オフラインアーカイブプレビュー",
+      "originalIframe": "Feishu元リンクプレビュー"
+    },
+    "loadFailed": "ドキュメント内容の読み込みに失敗しました",
+    "backToList": "ドキュメントリストに戻る",
+    "docListTitle": "Feishuドキュメント管理"
   }
 }

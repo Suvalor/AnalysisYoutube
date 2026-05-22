@@ -290,7 +290,7 @@ export async function putFileToPresignedUrl(
   const res = await fetch(uploadUrl, { method: "PUT", body: file, headers });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`对象存储直传失败（HTTP ${res.status}）${text ? `：${text.slice(0, 240)}` : ""}`);
+    throw new Error(`Object storage direct upload failed (HTTP ${res.status})${text ? `: ${text.slice(0, 240)}` : ""}`);
   }
 }
 
@@ -414,7 +414,7 @@ export async function uploadAssetWithProcessApi(payload: {
     file_size: row.file_size ?? file.size,
     created_at: row.created_at,
     remove_watermark: false,
-    process_info: "未启用去水印",
+    process_info: "Watermark removal not enabled",
   };
 }
 

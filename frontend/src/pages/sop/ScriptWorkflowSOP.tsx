@@ -296,19 +296,19 @@ export default function ScriptWorkflowSOP() {
             },
             (event) => {
               if (currentSplitTaskRef.current !== reqId) return;
-              const t = String(event?.type || "");
-              if (t === "snapshot") {
+              const eventType = String(event?.type || "");
+              if (eventType === "snapshot") {
                 splitTextRef.current = String(event.content || "");
                 setAiSegmentsMarkdown(splitTextRef.current);
                 return;
               }
-              if (t === "delta") {
+              if (eventType === "delta") {
                 splitTextRef.current += String(event.text || event.content || "");
                 setAiSegmentsMarkdown(splitTextRef.current);
                 return;
               }
-              if (t === "done") return;
-              if (t === "error") {
+              if (eventType === "done") return;
+              if (eventType === "error") {
                 throw new Error(String(event.message || t("message.aiSplitFailed")));
               }
             },

@@ -601,9 +601,9 @@ export default function BlueOceanRadar() {
                       </Card>
                       <Card size="small" title={t("card.newcomerStats")} className="!border-yc-border">
                         <Space size="large">
-                          <Text>{t("card.newChannels")}：{catOppResult.newcomer_stats.total_new_channels}</Text>
-                          <Text>{t("card.successfulChannels")}：{catOppResult.newcomer_stats.successful_channels}</Text>
-                          <Text>{t("card.successRate")}：<Text strong>{(catOppResult.newcomer_stats.success_rate * 100).toFixed(1)}%</Text></Text>
+                          <Text>{t("card.newChannels")}{catOppResult.newcomer_stats.total_new_channels}</Text>
+                          <Text>{t("card.successfulChannels")}{catOppResult.newcomer_stats.successful_channels}</Text>
+                          <Text>{t("card.successRate")}<Text strong>{(catOppResult.newcomer_stats.success_rate * 100).toFixed(1)}%</Text></Text>
                         </Space>
                       </Card>
                       {catOppResult.ai_summary && (
@@ -720,15 +720,15 @@ export default function BlueOceanRadar() {
             <Card size="small" title={t("card.recommendedParams")} className="!border-yc-border">
               <div className="space-y-2">
                 <div>
-                  <Text type="secondary">{t("label.maxSubscribers")}：</Text>
+                  <Text type="secondary">{t("label.maxSubscribers")}</Text>
                   <Text strong>{formatNumber(aiResult.recommended_parameters.max_subscribers)}</Text>
                 </div>
                 <div>
-                  <Text type="secondary">{t("label.outlierMultiplier")}：</Text>
+                  <Text type="secondary">{t("label.outlierMultiplier")}</Text>
                   <Text strong>{aiResult.recommended_parameters.outlier_multiplier}</Text>
                 </div>
                 <div>
-                  <Text type="secondary">{t("label.suggestedAction")}：</Text>
+                  <Text type="secondary">{t("label.suggestedAction")}</Text>
                   <Text>{aiResult.next_step_action}</Text>
                 </div>
                 <div>

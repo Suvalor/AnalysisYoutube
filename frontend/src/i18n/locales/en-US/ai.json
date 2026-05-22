@@ -40,5 +40,43 @@
   },
   "empty": {
     "noData": "No scripts yet. Enter a topic to start generating"
+  },
+  "creator": {
+    "message": {
+      "loadConfigFailed": "Failed to load configuration",
+      "topicRequired": "Please fill in the creative topic/key points first",
+      "configIncomplete": "Please maintain available agents and styles in Settings Center first",
+      "generateFailed": "Generation request failed",
+      "generateError": "Generation error",
+      "generateFail": "Generation failed",
+      "unnamedScript": "Unnamed Script",
+      "savedToLibrary": "Saved to script library",
+      "saveFailed": "Save failed",
+      "noContent": "No content to save"
+    },
+    "label": {
+      "knowledgeBase": "Knowledge Base",
+      "scriptPreview": "Script Preview (Real-time Stream)"
+    },
+    "title": "AI Script Workshop",
+    "selectModel": "Select Model",
+    "selectPrompt": "Select Prompt",
+    "selectStyle": "Select Style",
+    "coreIdea": "Creative Theme / Core Material",
+    "coreIdeaPlaceholder": "e.g.: Write a 90-second short video script about 2026 AI Agent productivity tools",
+    "startGenerate": "Start Generating",
+    "loadModelPlaceholder": "Loading model list...",
+    "selectAgentPlaceholder": "Select agent",
+    "selectStylePlaceholder": "Select style",
+    "loadConfigFailed": "Failed to load configuration",
+    "topicRequired": "Please fill in creative theme / core material",
+    "configIncomplete": "Please maintain available agents and styles in Settings Center first",
+    "generateFailed": "Generation request failed",
+    "generateError": "Generation error",
+    "noContent": "No content to save",
+    "unnamedScript": "Unnamed Script",
+    "savedToLibrary": "Saved to script library",
+    "saveFailed": "Save failed",
+    "knowledgeBase": "Knowledge Base"
   }
 }

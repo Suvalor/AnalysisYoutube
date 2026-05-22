@@ -4,6 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   listDownloadTasks,
   requestPlayToken,
@@ -18,11 +19,12 @@ import { formatNumber } from "@/utils/format";
 
 dayjs.extend(relativeTime);
 
-const STATUS_CONFIG: Record<DownloadStatus, { color: string; label: string }> = {
-  PENDING: { color: "default", label: "等待中" },
-  DOWNLOADING: { color: "processing", label: "下载中" },
-  COMPLETED: { color: "success", label: "已完成" },
-  FAILED: { color: "error", label: "失败" },
+/** 下载状态颜色映射（标签由 t() 动态获取） */
+const STATUS_CONFIG: Record<DownloadStatus, { color: string; labelKey: string }> = {
+  PENDING: { color: "default", labelKey: "download.status.pending" },
+  DOWNLOADING: { color: "processing", labelKey: "download.status.downloading" },
+  COMPLETED: { color: "success", labelKey: "download.status.completed" },
+  FAILED: { color: "error", labelKey: "download.status.failed" },
 };
 
 function formatFileSize(bytes: number): string {
@@ -34,6 +36,7 @@ function formatFileSize(bytes: number): string {
 }
 
 export default function DownloadList() {
+  const { t } = useTranslation("video");
   const [tasks, setTasks] = useState<DownloadTask[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -60,7 +63,7 @@ export default function DownloadList() {
       setTasks(res.items);
       setTotal(res.total);
     } catch {
-      message.error("获取下载列表失败");
+      message.error(t("download.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -107,10 +110,10 @@ export default function DownloadList() {
     setRetryingIds((prev) => new Set(prev).add(taskId));
     try {
       await retryDownloadTaskApi(taskId);
-      message.success("已重新开始下载");
+      message.success(t("download.retrySuccess"));
       await fetchTasks();
     } catch {
-      message.error("重试失败");
+      message.error(t("download.retryFailed"));
     } finally {
       setRetryingIds((prev) => {
         const next = new Set(prev);
@@ -123,10 +126,10 @@ export default function DownloadList() {
   const handleDelete = async (taskId: number) => {
     try {
       await deleteDownloadTaskApi(taskId);
-      message.success("已删除");
+      message.success(t("download.deleteSuccess"));
       await fetchTasks();
     } catch {
-      message.error("删除失败");
+      message.error(t("download.deleteFailed"));
     }
   };
 
@@ -134,7 +137,7 @@ export default function DownloadList() {
     // M-02: guard against missing auth token
     const token = localStorage.getItem("access_token");
     if (!token) {
-      message.error("登录已过期，请重新登录");
+      message.error(t("download.message.tokenExpired"));
       return;
     }
 
@@ -146,7 +149,7 @@ export default function DownloadList() {
       setVideoUrl(url);
       setPlayingTaskId(taskId);
     } catch {
-      message.error("获取播放令牌失败");
+      message.error(t("download.loadFailed"));
     } finally {
       setLoadingPlayId(null);
     }
@@ -165,7 +168,7 @@ export default function DownloadList() {
         aspect_ratio: "9:16",
         use_highlights: true,
       });
-      message.success(res.message || "混剪任务已提交");
+      message.success(res.message || t("download.message.mixSubmitted", { defaultValue: "Mix task submitted" }));
       setMixModalOpen(false);
       setSelectedRowKeys(new Set());
     } catch (err: unknown) {
@@ -173,7 +176,7 @@ export default function DownloadList() {
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : undefined;
-      message.error(typeof d === "string" ? d : "混剪提交失败");
+      message.error(typeof d === "string" ? d : t("download.message.mixFailed", { defaultValue: "Mix submission failed" }));
     } finally {
       setMixSubmitting(false);
     }
@@ -185,7 +188,7 @@ export default function DownloadList() {
 
   const columns: ColumnsType<DownloadTask> = [
     {
-      title: "视频",
+      title: t("download.title"),
       key: "video",
       width: 280,
       render: (_: unknown, record: DownloadTask) => (
@@ -198,7 +201,7 @@ export default function DownloadList() {
             />
           ) : (
             <div className="w-24 h-14 bg-yc-bg-secondary rounded shrink-0 flex items-center justify-center text-yc-text-tertiary text-xs">
-              无缩略图
+              {t("download.noThumbnail", { defaultValue: "No thumbnail" })}
             </div>
           )}
           <div className="min-w-0 flex-1">
@@ -213,45 +216,45 @@ export default function DownloadList() {
       ),
     },
     {
-      title: "发布时间",
+      title: t("table.publishedAt"),
       dataIndex: "video_published_at",
       key: "video_published_at",
       width: 110,
       render: (t: string | null) => t ? dayjs(t).format("YYYY-MM-DD") : "--",
     },
     {
-      title: "播放量",
+      title: t("table.views"),
       dataIndex: "video_view_count",
       key: "video_view_count",
       width: 80,
       render: (v: number | null) => v != null ? formatNumber(v) : "--",
     },
     {
-      title: "点赞",
+      title: t("table.likes"),
       dataIndex: "video_like_count",
       key: "video_like_count",
       width: 70,
       render: (v: number | null) => v != null ? formatNumber(v) : "--",
     },
     {
-      title: "评论",
+      title: t("table.comments"),
       dataIndex: "video_comment_count",
       key: "video_comment_count",
       width: 70,
       render: (v: number | null) => v != null ? formatNumber(v) : "--",
     },
     {
-      title: "状态",
+      title: t("download.status"),
       dataIndex: "status",
       key: "status",
       width: 90,
       render: (status: DownloadStatus) => {
         const cfg = STATUS_CONFIG[status];
-        return <Tag color={cfg.color}>{cfg.label}</Tag>;
+        return <Tag color={cfg.color}>{t(cfg.labelKey)}</Tag>;
       },
     },
     {
-      title: "进度",
+      title: t("download.progress", { defaultValue: "Progress" }),
       dataIndex: "progress",
       key: "progress",
       width: 120,
@@ -263,27 +266,27 @@ export default function DownloadList() {
       },
     },
     {
-      title: "文件大小",
+      title: t("download.label.fileSize"),
       dataIndex: "file_size",
       key: "file_size",
       width: 90,
       render: (size: number) => formatFileSize(size),
     },
     {
-      title: "下载时间",
+      title: t("download.createdAt"),
       dataIndex: "created_at",
       key: "created_at",
       width: 100,
       render: (t: string) => dayjs(t).fromNow(),
     },
     {
-      title: "操作",
+      title: t("download.action"),
       key: "actions",
       width: 120,
       render: (_: unknown, record: DownloadTask) => (
         <Space size="small">
           {record.status === "COMPLETED" && record.has_file && (
-            <Tooltip title="播放视频">
+            <Tooltip title={t("download.playVideo", { defaultValue: "Play Video" })}>
               <Button
                 type="text"
                 size="small"
@@ -296,7 +299,7 @@ export default function DownloadList() {
           )}
           {record.status === "FAILED" && (
             <>
-              <Tooltip title="重试下载">
+              <Tooltip title={t("download.retryDownload", { defaultValue: "Retry Download" })}>
                 <Button
                   type="text"
                   size="small"
@@ -306,12 +309,12 @@ export default function DownloadList() {
                 />
               </Tooltip>
               <Popconfirm
-                title="确定删除该失败任务？"
+                title={t("download.confirmDeleteFailed", { defaultValue: "Confirm delete this failed task?" })}
                 onConfirm={() => void handleDelete(record.id)}
-                okText="删除"
-                cancelText="取消"
+                okText={t("download.delete")}
+                cancelText={t("download.cancel", { defaultValue: "Cancel" })}
               >
-                <Tooltip title="删除任务">
+                <Tooltip title={t("download.deleteTask", { defaultValue: "Delete Task" })}>
                   <Button
                     type="text"
                     size="small"
@@ -321,7 +324,7 @@ export default function DownloadList() {
               </Popconfirm>
               <Tooltip title={record.error_message}>
                 <Tag color="error" style={{ cursor: "help", maxWidth: 120 }} className="truncate">
-                  错误
+                  {t("download.error", { defaultValue: "Error" })}
                 </Tag>
               </Tooltip>
             </>
@@ -339,7 +342,7 @@ export default function DownloadList() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>
           <CloudDownloadOutlined className="mr-2" />
-          下载管理
+          {t("download.title")}
         </h2>
         <Space>
           <Select<DownloadStatus | undefined>
@@ -349,17 +352,17 @@ export default function DownloadList() {
               setPage(1);
             }}
             allowClear
-            placeholder="筛选状态"
+            placeholder={t("download.status")}
             style={{ width: 140 }}
             options={[
-              { value: "PENDING", label: "等待中" },
-              { value: "DOWNLOADING", label: "下载中" },
-              { value: "COMPLETED", label: "已完成" },
-              { value: "FAILED", label: "失败" },
+              { value: "PENDING", label: t("download.status.pending") },
+              { value: "DOWNLOADING", label: t("download.status.downloading") },
+              { value: "COMPLETED", label: t("download.status.completed") },
+              { value: "FAILED", label: t("download.status.failed") },
             ]}
           />
           <Button icon={<ReloadOutlined />} onClick={() => void fetchTasks()}>
-            刷新
+            {t("action.refresh")}
           </Button>
         </Space>
       </div>
@@ -367,20 +370,20 @@ export default function DownloadList() {
       {/* Batch action bar for selected tasks */}
       {selectedRowKeys.size > 0 && (
         <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
-          <span className="text-sm text-blue-600">已选 {selectedRowKeys.size} 个已完成视频</span>
+          <span className="text-sm text-blue-600">{t("download.selectedCompleted", { count: selectedRowKeys.size, defaultValue: `${selectedRowKeys.size} completed videos selected` })}</span>
           <Button
             type="primary"
             size="small"
             icon={<MergeOutlined />}
             onClick={() => setMixModalOpen(true)}
           >
-            AI 混剪
+            {t("download.aiMix", { defaultValue: "AI Mix" })}
           </Button>
           <Button
             size="small"
             onClick={() => setSelectedRowKeys(new Set())}
           >
-            清除选择
+            {t("download.clearSelection", { defaultValue: "Clear Selection" })}
           </Button>
         </div>
       )}
@@ -405,7 +408,7 @@ export default function DownloadList() {
             pageSize,
             total,
             showSizeChanger: true,
-            showTotal: (t) => `共 ${t} 条`,
+            showTotal: (total) => t("download.totalRecords", { total }),
             onChange: (p, ps) => {
               setPage(p);
               setPageSize(ps);
@@ -418,7 +421,7 @@ export default function DownloadList() {
       {/* Video Player Modal */}
       <Modal
         open={playingTaskId !== null}
-        title={playingTask ? `播放视频 - ${playingTask.video_title ?? playingTask.video_id}` : "播放视频"}
+        title={playingTask ? t("download.playVideoTitle", { title: playingTask.video_title ?? playingTask.video_id, defaultValue: `Play Video - ${playingTask.video_title ?? playingTask.video_id}` }) : t("download.playVideo", { defaultValue: "Play Video" })}
         onCancel={handleClosePlayer}
         footer={null}
         width={800}
@@ -436,19 +439,19 @@ export default function DownloadList() {
 
       {/* Mix confirmation modal */}
       <Modal
-        title="AI 混剪"
+        title={t("download.aiMix")}
         open={mixModalOpen}
         onCancel={() => setMixModalOpen(false)}
         onOk={() => void handleMixSubmit()}
-        okText="提交混剪"
+        okText={t("download.submitMix", { defaultValue: "Submit Mix" })}
         confirmLoading={mixSubmitting}
       >
         <div className="space-y-3">
           <p className="text-sm text-yc-text-secondary">
-            将对选中的 {selectedRowKeys.size} 个已完成视频执行 AI 混剪，优先使用已提取的精彩片段。
+            {t("download.mixSelectedCount", { count: selectedRowKeys.size, defaultValue: `AI mix will be performed on ${selectedRowKeys.size} selected completed videos, using extracted highlights when available.` })}
           </p>
           <p className="text-xs text-yc-text-tertiary">
-            混剪为后台任务，提交后可在素材库查看进度与结果。
+            {t("download.mixBackgroundHint", { defaultValue: "Mix is a background task. Check progress in Assets after submission." })}
           </p>
         </div>
       </Modal>

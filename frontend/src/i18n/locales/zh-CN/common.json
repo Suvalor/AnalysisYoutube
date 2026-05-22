@@ -34,7 +34,11 @@
     "expand": "展开",
     "collapse": "收起",
     "selectAll": "全选",
-    "deselectAll": "取消全选"
+    "deselectAll": "取消全选",
+    "ariaOpenSidebar": "打开侧边栏",
+    "ariaUserMenu": "用户菜单",
+    "ariaCloseTab": "关闭标签",
+    "keyword": "关键词"
   },
   "status": {
     "success": "操作成功",
@@ -83,7 +87,8 @@
     "filterConfirm": "确定",
     "filterReset": "重置",
     "selectAll": "全选当前页",
-    "selectInvert": "反选当前页"
+    "selectInvert": "反选当前页",
+    "action": "操作"
   },
   "time": {
     "justNow": "刚刚",
@@ -95,5 +100,53 @@
     "delete": "确认删除？此操作不可撤销",
     "leavePage": "有未保存的更改，确认离开？",
     "clearData": "确认清除？此操作不可撤销"
+  },
+  "mixConfig": {
+    "title": "AI 混编配置",
+    "cancel": "取消",
+    "submit": "提交混编",
+    "selectedAssets": "已选素材",
+    "audioSource": "配音来源",
+    "audioText": "输入文案 (TTS)",
+    "audioFile": "上传配音文件",
+    "narrationText": "配音文案",
+    "narrationPlaceholder": "输入文案内容，系统将自动生成 TTS 配音...",
+    "selectAudioFile": "选择配音文件",
+    "audioFormatHint": "支持 MP3、WAV 等音频格式",
+    "aspectRatio": "画面比例",
+    "vertical": "竖屏 9:16",
+    "horizontal": "横屏 16:9",
+    "highlightsPriority": "精彩片段优先",
+    "backgroundTaskHint": "混编为后台任务，提交后可在任务中心查看进度与结果。",
+    "message": {
+      "noVideo": "所选素材中没有视频，无法混编",
+      "narrationRequired": "请输入配音文案",
+      "audioFileRequired": "请上传配音文件",
+      "audioUploadFailed": "配音文件上传失败",
+      "submitted": "混编任务已提交，可在任务中心查看进度",
+      "submitFailed": "混编提交失败"
+    }
+  },
+  "guestLimit": {
+    "title": "今日配额已用完",
+    "description": "游客每日配额有限，注册后可获得更多使用额度。",
+    "register": "注册获取更多配额",
+    "later": "稍后再说"
+  },
+  "markdownEditor": {
+    "edit": "编辑",
+    "preview": "预览",
+    "split": "分栏"
+  },
+  "quotaProgress": {
+    "unlimited": "无限制",
+    "refresh": "刷新配额"
+  },
+  "scriptPreview": {
+    "title": "剧本预览",
+    "sourceCode": "Markdown 源码",
+    "preview": "Markdown 预览",
+    "saveToLibrary": "保存到剧本库",
+    "emptyHint": "点击「开始生成」后，这里会实时展示剧本内容。"
   }
 }

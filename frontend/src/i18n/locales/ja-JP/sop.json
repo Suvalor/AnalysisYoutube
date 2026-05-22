@@ -111,5 +111,12 @@
     "sourceAssetId": "ソースアセットID：",
     "visualPromptPlaceholder": "ビジュアルプロンプトを入力（Markdown対応）",
     "aiResultPlaceholder": "「AIスマート分割」をクリック後、編集可能なMarkdown結果がここに表示されます"
+  },
+  "scriptPreview": {
+    "title": "スクリプトプレビュー",
+    "sourceCode": "Markdownソース",
+    "preview": "Markdownプレビュー",
+    "saveToLibrary": "スクリプトライブラリに保存",
+    "emptyHint": "「生成開始」をクリックすると、スクリプト内容がリアルタイムで表示されます"
   }
 }

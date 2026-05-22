@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.api.deps import CurrentUserDep, DBSessionDep, GuestInfoDep, OptionalUserDep
+from app.core.config import get_settings
 from app.crud.keyword_history import create_keyword_history, list_keyword_history_by_user
 from app.schemas.keyword_history import KeywordHistoryItem, KeywordHistoryListResponse
 from app.schemas.keyword_research import (
@@ -53,8 +54,8 @@ async def keyword_research(
                 detail="游客配额已用完，请登录以获取更多配额",
             )
 
-    # 解析集成配置（游客使用系统级 fallback）
-    org_id = current_user.org_id if current_user else None
+    # 解析集成配置：游客使用默认组织的设置中心配置。
+    org_id = current_user.org_id if current_user else get_settings().guest_default_org_id
     icfg = await resolve_integration_config(db, org_id=org_id)
 
     # 检查 YouTube API Key 是否可用，不可用时返回 503

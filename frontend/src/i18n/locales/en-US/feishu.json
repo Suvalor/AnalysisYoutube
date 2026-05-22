@@ -28,5 +28,89 @@
   "empty": {
     "noData": "No Feishu document data",
     "noDocs": "No documents"
+  },
+  "docList": {
+    "message": {
+      "loadFailed": "Failed to load Feishu document list",
+      "alreadyArchived": "Document already archived",
+      "archiveSubmitted": "Archive task submitted. Backend will verify PDF. Watch list status.",
+      "archiving": "Document is being archived",
+      "archiveFailed": "Archive submission failed",
+      "deleteSuccess": "Deleted",
+      "deleteFailed": "Delete failed",
+      "createSuccess": "Document added",
+      "createFailed": "Failed to add"
+    },
+    "label": {
+      "docId": "Feishu Doc #{{id}}",
+      "docName": "Document Name",
+      "addTime": "Added At",
+      "archiveStatus": "Archive Status",
+      "statusSuccess": "Success",
+      "statusArchiving": "Saving",
+      "statusFailed": "Save Failed",
+      "statusUnarchived": "Not Archived"
+    },
+    "action": {
+      "view": "View",
+      "archive": "Offline Save",
+      "reArchive": "Re-save",
+      "archiving": "Archiving...",
+      "delete": "Delete",
+      "confirmDelete": "Confirm delete this document?"
+    },
+    "title": "Feishu Doc Management",
+    "loadFailed": "Failed to load Feishu doc list",
+    "searchPlaceholder": "Search by name",
+    "search": "Search",
+    "addDoc": "+ Add Document",
+    "docNameColumn": "Document Name",
+    "addedAtColumn": "Added At",
+    "archiveStatusColumn": "Archive Status",
+    "actionColumn": "Action",
+    "view": "View",
+    "archiving": "Archiving...",
+    "resave": "Re-save",
+    "offlineSave": "Offline Save",
+    "confirmDelete": "Confirm delete this document?",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "deleteSuccess": "Deleted",
+    "alreadyArchived": "Document already archived",
+    "archiveSubmitted": "Archive task submitted, backend will verify PDF, check list status",
+    "archivingWarning": "Document is being archived",
+    "archiveFailed": "Archive submission failed",
+    "titleRequired": "Please enter document name",
+    "urlRequired": "Please enter Feishu link",
+    "createSuccess": "Document added",
+    "createFailed": "Add failed",
+    "addTitle": "Add Feishu Document",
+    "submit": "Submit",
+    "docNameLabel": "Document Name",
+    "docNamePlaceholder": "e.g.: Topic Library / Script Template Library",
+    "urlLabel": "Feishu Link (URL)",
+    "urlPlaceholder": "Enter Feishu share link",
+    "feishuDocPrefix": "Feishu Doc #",
+    "success": "Success",
+    "saving": "Saving",
+    "saveFailed": "Save failed",
+    "unarchived": "Unarchived"
+  },
+  "docViewer": {
+    "message": {
+      "invalidId": "Invalid document ID",
+      "loadFailed": "Failed to load document",
+      "emptyUrl": "Document URL is empty"
+    },
+    "label": {
+      "defaultTitle": "Feishu Cloud Document",
+      "originalPreview": "Original Link Preview",
+      "archivePreview": "Offline Backup Preview",
+      "archiveIframe": "Offline Archive Preview",
+      "originalIframe": "Feishu Original Link Preview"
+    },
+    "loadFailed": "Failed to load document content",
+    "backToList": "Back to Document List",
+    "docListTitle": "Feishu Doc Management"
   }
 }

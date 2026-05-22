@@ -1,6 +1,7 @@
 import { Modal, Button, Typography, Space } from "antd";
 import { LockOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type { QuotaUsage } from "@/types/auth";
 import QuotaProgress from "@/components/QuotaProgress";
 
@@ -17,10 +18,11 @@ interface GuestLimitModalProps {
 
 /**
  * 游客超限弹窗：游客配额用完时弹出提示。
- * 显示"今日配额已用完"提示，提供"注册获取更多配额"按钮。
+ * 显示"今日配额已用完"提示，提供注册按钮。
  */
 export default function GuestLimitModal({ open, onClose, usage }: GuestLimitModalProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation("common");
 
   /** 跳转到登录/注册页面 */
   const handleRegister = () => {
@@ -40,20 +42,20 @@ export default function GuestLimitModal({ open, onClose, usage }: GuestLimitModa
       <Space direction="vertical" size="middle" className="w-full text-center py-4">
         <LockOutlined style={{ fontSize: 40, color: "#faad14" }} />
 
-        <Title level={4}>今日配额已用完</Title>
+        <Title level={4}>{t('guestLimit.quotaExhausted')}</Title>
 
         <Text type="secondary">
-          游客每日配额有限，注册后可获得更多使用额度。
+          {t('guestLimit.quotaHint')}
         </Text>
 
         {usage && <QuotaProgress usage={usage} />}
 
         <Space className="mt-2">
           <Button type="primary" size="large" onClick={handleRegister}>
-            注册获取更多配额
+            {t('guestLimit.register')}
           </Button>
           <Button size="large" onClick={onClose}>
-            稍后再说
+            {t('guestLimit.later')}
           </Button>
         </Space>
       </Space>

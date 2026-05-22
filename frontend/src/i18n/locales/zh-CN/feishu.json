@@ -28,5 +28,89 @@
   "empty": {
     "noData": "暂无飞书文档数据",
     "noDocs": "暂无文档"
+  },
+  "docList": {
+    "message": {
+      "loadFailed": "加载飞书文档列表失败",
+      "alreadyArchived": "该文档已归档",
+      "archiveSubmitted": "归档任务已提交，后台将校验 PDF，请留意列表状态",
+      "archiving": "文档正在归档中",
+      "archiveFailed": "提交归档失败",
+      "deleteSuccess": "已删除",
+      "deleteFailed": "删除失败",
+      "createSuccess": "已新增文档",
+      "createFailed": "新增失败"
+    },
+    "label": {
+      "docId": "飞书文档 #{{id}}",
+      "docName": "文档名称",
+      "addTime": "添加时间",
+      "archiveStatus": "归档状态",
+      "statusSuccess": "成功",
+      "statusArchiving": "保存中",
+      "statusFailed": "保存失败",
+      "statusUnarchived": "未归档"
+    },
+    "action": {
+      "view": "查看",
+      "archive": "离线保存",
+      "reArchive": "重新保存",
+      "archiving": "归档中...",
+      "delete": "删除",
+      "confirmDelete": "确认删除该文档？"
+    },
+    "title": "飞书文档管理",
+    "loadFailed": "加载飞书文档列表失败",
+    "searchPlaceholder": "按名称搜索",
+    "search": "搜索",
+    "addDoc": "+ 新增文档",
+    "docNameColumn": "文档名称",
+    "addedAtColumn": "添加时间",
+    "archiveStatusColumn": "归档状态",
+    "actionColumn": "操作",
+    "view": "查看",
+    "archiving": "归档中...",
+    "resave": "重新保存",
+    "offlineSave": "离线保存",
+    "confirmDelete": "确认删除该文档？",
+    "delete": "删除",
+    "cancel": "取消",
+    "deleteSuccess": "已删除",
+    "alreadyArchived": "该文档已归档",
+    "archiveSubmitted": "归档任务已提交，后台将校验 PDF，请留意列表状态",
+    "archivingWarning": "文档正在归档中",
+    "archiveFailed": "提交归档失败",
+    "titleRequired": "请输入文档名称",
+    "urlRequired": "请输入飞书链接",
+    "createSuccess": "已新增文档",
+    "createFailed": "新增失败",
+    "addTitle": "新增飞书文档",
+    "submit": "提交",
+    "docNameLabel": "文档名称",
+    "docNamePlaceholder": "例如：选题库 / 脚本模板库",
+    "urlLabel": "飞书链接（URL）",
+    "urlPlaceholder": "请输入飞书分享链接",
+    "feishuDocPrefix": "飞书文档 #",
+    "success": "成功",
+    "saving": "保存中",
+    "saveFailed": "保存失败",
+    "unarchived": "未归档"
+  },
+  "docViewer": {
+    "message": {
+      "invalidId": "文档 ID 不合法",
+      "loadFailed": "加载文档失败",
+      "emptyUrl": "文档链接为空"
+    },
+    "label": {
+      "defaultTitle": "飞书云文档",
+      "originalPreview": "原链接预览",
+      "archivePreview": "离线备份预览",
+      "archiveIframe": "离线归档预览",
+      "originalIframe": "飞书原链预览"
+    },
+    "loadFailed": "加载文档内容失败",
+    "backToList": "返回文档列表",
+    "docListTitle": "飞书文档管理"
   }
 }

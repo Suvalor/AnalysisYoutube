@@ -1,0 +1,11 @@
+{
+  "title": "YouTube Compassへようこそ",
+  "desc": "フォロー中のクリエイター情報を保存し、競合分析を行えます。",
+  "quota": {
+    "todayTotal": "本日の無料枠",
+    "todayUsed": "本日の使用枠",
+    "todayRemaining": "本日の残り枠",
+    "loadFailed": "クォータデータの読み込みに失敗しました",
+    "weeklyApiUsage": "過去7日間のAPI使用量"
+  }
+}

@@ -34,7 +34,11 @@
     "expand": "Expand",
     "collapse": "Collapse",
     "selectAll": "Select All",
-    "deselectAll": "Deselect All"
+    "deselectAll": "Deselect All",
+    "ariaOpenSidebar": "Open sidebar",
+    "ariaUserMenu": "User menu",
+    "ariaCloseTab": "Close tab",
+    "keyword": "Keyword"
   },
   "status": {
     "success": "Success",
@@ -83,7 +87,8 @@
     "filterConfirm": "OK",
     "filterReset": "Reset",
     "selectAll": "Select current page",
-    "selectInvert": "Invert current page"
+    "selectInvert": "Invert current page",
+    "action": "Action"
   },
   "time": {
     "justNow": "Just now",
@@ -95,5 +100,53 @@
     "delete": "Confirm delete? This action cannot be undone",
     "leavePage": "Unsaved changes. Confirm leaving?",
     "clearData": "Confirm clear? This action cannot be undone"
+  },
+  "mixConfig": {
+    "title": "AI Mix Config",
+    "cancel": "Cancel",
+    "submit": "Submit Mix",
+    "selectedAssets": "Selected Assets",
+    "audioSource": "Audio Source",
+    "audioText": "Enter Text (TTS)",
+    "audioFile": "Upload Audio File",
+    "narrationText": "Narration Text",
+    "narrationPlaceholder": "Enter narration text, system will auto-generate TTS audio...",
+    "selectAudioFile": "Select Audio File",
+    "audioFormatHint": "Supports MP3, WAV and other audio formats",
+    "aspectRatio": "Aspect Ratio",
+    "vertical": "Vertical 9:16",
+    "horizontal": "Horizontal 16:9",
+    "highlightsPriority": "Highlights Priority",
+    "backgroundTaskHint": "Mix is a background task. Check progress in Task Center after submission.",
+    "message": {
+      "noVideo": "No video in selected assets, cannot mix",
+      "narrationRequired": "Please enter narration text",
+      "audioFileRequired": "Please upload an audio file",
+      "audioUploadFailed": "Audio file upload failed",
+      "submitted": "Mix task submitted. Check progress in Task Center.",
+      "submitFailed": "Mix submission failed"
+    }
+  },
+  "guestLimit": {
+    "title": "Daily Quota Exhausted",
+    "description": "Guest quota is limited. Register to get more usage allowance.",
+    "register": "Register for More Quota",
+    "later": "Later"
+  },
+  "markdownEditor": {
+    "edit": "Edit",
+    "preview": "Preview",
+    "split": "Split"
+  },
+  "quotaProgress": {
+    "unlimited": "Unlimited",
+    "refresh": "Refresh Quota"
+  },
+  "scriptPreview": {
+    "title": "Script Preview",
+    "sourceCode": "Markdown Source",
+    "preview": "Markdown Preview",
+    "saveToLibrary": "Save to Script Library",
+    "emptyHint": "After clicking \"Start Generate\", content will be displayed here in real-time."
   }
 }

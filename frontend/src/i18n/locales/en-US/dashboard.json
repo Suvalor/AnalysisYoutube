@@ -1,0 +1,11 @@
+{
+  "title": "Welcome to YouTube Compass",
+  "desc": "Save information about creators you follow and conduct competitor analysis.",
+  "quota": {
+    "todayTotal": "Today's Free Quota",
+    "todayUsed": "Today's Used Quota",
+    "todayRemaining": "Today's Remaining Quota",
+    "loadFailed": "Failed to load quota data",
+    "weeklyApiUsage": "Last 7 Days API Usage"
+  }
+}

@@ -185,7 +185,7 @@ export async function streamSopAiSplitApi(
     body: JSON.stringify(payload),
   });
   if (!resp.ok || !resp.body) {
-    throw new Error(`流式连接失败: ${resp.status}`);
+    throw new Error(`Stream connection failed: ${resp.status}`);
   }
   const reader = resp.body.getReader();
   const decoder = new TextDecoder("utf-8");

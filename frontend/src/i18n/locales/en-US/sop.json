@@ -111,5 +111,12 @@
     "sourceAssetId": "Source Asset ID: ",
     "visualPromptPlaceholder": "Enter visual prompt (Markdown supported)",
     "aiResultPlaceholder": "After clicking 'AI Smart Split', editable Markdown results will appear here"
+  },
+  "scriptPreview": {
+    "title": "Script Preview",
+    "sourceCode": "Markdown Source",
+    "preview": "Markdown Preview",
+    "saveToLibrary": "Save to Script Library",
+    "emptyHint": "Click 'Start Generating' and script content will appear here in real-time"
   }
 }

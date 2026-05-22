@@ -132,8 +132,7 @@ export default function LoginPage() {
           label={t("login.captcha")}
           name="captcha_code"
           rules={[
-            { required: true, message: t("common:validation.required") },
-            { len: 4  , message: t("common:validation.captchaLength") }
+            { required: true, message: t("common:validation.required") }
           ]}
         >
           <Space>

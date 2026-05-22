@@ -81,7 +81,8 @@
     "FR": "フランス",
     "BR": "ブラジル",
     "IN": "インド",
-    "TW": "台湾"
+    "TW": "台湾",
+    "HK": "香港"
   },
   "message": {
     "noResults": "推薦結果がありません。入力を調整して再試行してください",
@@ -134,7 +135,8 @@
     "matchScore": "マッチ度",
     "categoryCount": "ニッチ",
     "confirmDelete": "このレコードを削除しますか？",
-    "empty": "推薦記録がありません"
+    "empty": "推薦記録がありません",
+    "listSeparator": "、"
   },
   "quota": {
     "title": "APIクォータダッシュボード",

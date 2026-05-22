@@ -1,0 +1,11 @@
+{
+  "title": "欢迎来到 YouTube Compass",
+  "desc": "您可以将关注博主的信息保存，做竞争对手分析。",
+  "quota": {
+    "todayTotal": "今日免费总额度",
+    "todayUsed": "今日已消耗额度",
+    "todayRemaining": "今日剩余额度",
+    "loadFailed": "加载配额数据失败",
+    "weeklyApiUsage": "近 7 天 API 消耗量"
+  }
+}

@@ -12,6 +12,7 @@ import { Button, Card, message, Select, Spin, Typography } from "antd";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useBoardStore } from "@/store/useBoardStore";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
 import apiClient from "@/services/apiClient";
@@ -41,7 +42,7 @@ function parseDragId(id: string) {
   return { type: "unknown" as const, value: id };
 }
 
-function SortableTaskCard({ task }: { task: BoardTask }) {
+function SortableTaskCard({ task, t }: { task: BoardTask; t: (key: string) => string }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: taskId(task.id),
   });
@@ -60,8 +61,8 @@ function SortableTaskCard({ task }: { task: BoardTask }) {
     >
       <h4 className="font-medium text-yc-text-primary">{task.title}</h4>
       <div className="mt-2 text-xs text-yc-text-secondary space-y-1">
-        <div>截止日期：{task.due_date ?? "未设置"}</div>
-        {task.script_id ? <div>已关联剧本</div> : <div>未关联剧本</div>}
+        <div>{t("board.dueDate")}{task.due_date ?? t("board.dueDateNotSet")}</div>
+        {task.script_id ? <div>{t("board.linkedScript")}</div> : <div>{t("board.noLinkedScript")}</div>}
       </div>
     </div>
   );
@@ -72,11 +73,13 @@ function BoardColumn({
   title,
   tasks,
   onCreate,
+  t,
 }: {
   status: string;
   title: string;
   tasks: BoardTask[];
   onCreate: () => void;
+  t: (key: string) => string;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: columnId(status) });
   return (
@@ -84,13 +87,13 @@ function BoardColumn({
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-yc-text-column">{title}</h3>
         <button onClick={onCreate} className="text-xs px-2 py-1 rounded bg-yc-bg-inset hover:bg-yc-bg-card text-yc-text-secondary">
-          + 新建项目
+          {t("board.newProject")}
         </button>
       </div>
       <div ref={setNodeRef} className={`min-h-[120px] space-y-2 rounded-xl p-1 transition-colors ${isOver ? "bg-yc-bg-inset" : ""}`}>
         <SortableContext items={tasks.map((t) => taskId(t.id))} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
-            <SortableTaskCard key={task.id} task={task} />
+            <SortableTaskCard key={task.id} task={task} t={t} />
           ))}
         </SortableContext>
       </div>
@@ -99,6 +102,7 @@ function BoardColumn({
 }
 
 export default function VideoBoard() {
+  const { t } = useTranslation("video");
   const { columns, tasks, fetchTasks, createTask, moveTask } = useBoardStore();
   const [creatingForStatus, setCreatingForStatus] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
@@ -201,7 +205,7 @@ export default function VideoBoard() {
     try {
       await moveTask(activeTask.id, targetStatus, targetIndex);
     } catch {
-      message.error("移动任务失败");
+      message.error(t("board.moveTaskFailed"));
       await fetchTasks();
     }
   };
@@ -219,13 +223,13 @@ export default function VideoBoard() {
         }
       }
     } catch {
-      message.error("创建任务失败");
+      message.error(t("board.createTaskFailed"));
     }
   };
 
   const onAiSuggest = async () => {
     if (!selectedModelLibId || !selectedLlmModelName) {
-      message.warning("请先选择模型名");
+      message.warning(t("board.selectModelFirst"));
       return;
     }
     setAiLoading(true);
@@ -238,7 +242,7 @@ export default function VideoBoard() {
       });
       setAiSuggestion(res.data.suggestion);
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? "AI 策略建议失败");
+      message.error(e?.response?.data?.detail ?? t("board.aiSuggestFailed"));
     } finally {
       setAiLoading(false);
     }
@@ -247,12 +251,12 @@ export default function VideoBoard() {
   return (
     <div className="p-6 md:p-8">
       {/* AI 策略建议区域 */}
-      <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm mb-6" title="AI 内容策略建议">
+      <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm mb-6" title={t("board.aiSuggestTitle")}>
         <div className="flex items-center gap-3 flex-wrap mb-3">
           <Select
             showSearch
             style={{ width: 240 }}
-            placeholder="选择模型名"
+            placeholder={t("board.selectModelPlaceholder")}
             value={
               selectedModelLibId !== undefined && selectedLlmModelName
                 ? `${selectedModelLibId}::${selectedLlmModelName}`
@@ -272,23 +276,23 @@ export default function VideoBoard() {
           />
           <Select
             style={{ width: 200 }}
-            placeholder="AI 智能体"
+            placeholder={t("board.selectAgentPlaceholder")}
             value={selectedAgentId}
             onChange={setSelectedAgentId}
             options={agentOptions.map((p) => ({ value: p.id, label: p.title }))}
             allowClear
           />
           <Button type="primary" loading={aiLoading} onClick={onAiSuggest}>
-            生成策略建议
+            {t("board.generateSuggestion")}
           </Button>
         </div>
-        {aiLoading && <div className="flex justify-center py-4"><Spin tip="AI 正在分析…" /></div>}
+        {aiLoading && <div className="flex justify-center py-4"><Spin tip={t("board.aiAnalyzing")} /></div>}
         {aiSuggestion && (
           <div className="space-y-3">
-            {aiSuggestion.content_gaps && <div><Text strong>内容缺口</Text><Paragraph className="!mb-0">{aiSuggestion.content_gaps}</Paragraph></div>}
-            {aiSuggestion.publishing_strategy && <div><Text strong>发布策略</Text><Paragraph className="!mb-0">{aiSuggestion.publishing_strategy}</Paragraph></div>}
-            {aiSuggestion.improvement_suggestions && <div><Text strong>改进建议</Text><Paragraph className="!mb-0">{aiSuggestion.improvement_suggestions}</Paragraph></div>}
-            {aiSuggestion.trend_opportunities && <div><Text strong>趋势机会</Text><Paragraph className="!mb-0">{aiSuggestion.trend_opportunities}</Paragraph></div>}
+            {aiSuggestion.content_gaps && <div><Text strong>{t("board.contentGap")}</Text><Paragraph className="!mb-0">{aiSuggestion.content_gaps}</Paragraph></div>}
+            {aiSuggestion.publishing_strategy && <div><Text strong>{t("board.publishStrategy")}</Text><Paragraph className="!mb-0">{aiSuggestion.publishing_strategy}</Paragraph></div>}
+            {aiSuggestion.improvement_suggestions && <div><Text strong>{t("board.improvementSuggestion")}</Text><Paragraph className="!mb-0">{aiSuggestion.improvement_suggestions}</Paragraph></div>}
+            {aiSuggestion.trend_opportunities && <div><Text strong>{t("board.trendOpportunity")}</Text><Paragraph className="!mb-0">{aiSuggestion.trend_opportunities}</Paragraph></div>}
           </div>
         )}
       </Card>
@@ -302,21 +306,22 @@ export default function VideoBoard() {
                 title={col.title}
                 tasks={grouped[col.id] || []}
                 onCreate={() => setCreatingForStatus(col.id)}
+                t={t}
               />
               {creatingForStatus === col.id && (
                 <div className="mt-2 rounded-xl border border-yc-border bg-yc-bg-column-card p-3 w-[300px]">
                   <input
                     className="w-full rounded-md bg-yc-bg-column-input border border-yc-border px-3 py-2 text-sm"
-                    placeholder="输入项目标题"
+                    placeholder={t("board.inputTitlePlaceholder")}
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                   />
                   <div className="flex justify-end gap-2 mt-2">
                     <button className="px-3 py-1 text-sm rounded bg-yc-bg-inset text-yc-text-secondary" onClick={() => setCreatingForStatus(null)}>
-                      取消
+                      {t("board.cancel")}
                     </button>
                     <button className="px-3 py-1 text-sm rounded bg-yc-primary text-yc-text-inverse" onClick={() => submitCreate(col.id)}>
-                      创建
+                      {t("board.create")}
                     </button>
                   </div>
                 </div>
@@ -328,4 +333,3 @@ export default function VideoBoard() {
     </div>
   );
 }
-

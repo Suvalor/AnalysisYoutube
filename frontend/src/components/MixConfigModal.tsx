@@ -2,6 +2,7 @@ import { Button, Form, Input, Modal, Radio, Switch, Upload, message } from 'antd
 import { UploadOutlined } from '@ant-design/icons';
 import type { UploadFile } from 'antd/es/upload/interface';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { submitMix } from '@/services/downloadApi';
 import { uploadAssetWithProcessApi } from '@/services/libraryApi';
 import type { AssetItem } from '@/services/libraryApi';
@@ -16,6 +17,7 @@ type AspectRatio = '16:9' | '9:16';
 type AudioMode = 'text' | 'file';
 
 export default function MixConfigModal({ open, onClose, selectedAssets }: MixConfigModalProps) {
+  const { t } = useTranslation('common');
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const [audioMode, setAudioMode] = useState<AudioMode>('text');
@@ -32,7 +34,7 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
         .map((a) => String(a.id));
 
       if (videoIds.length === 0) {
-        message.warning('所选素材中没有视频，无法混编');
+        message.warning(t('mixConfig.message.noVideo'));
         return;
       }
 
@@ -41,13 +43,13 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
 
       if (audioMode === 'text') {
         if (!values.narration_text?.trim()) {
-          message.warning('请输入配音文案');
+          message.warning(t('mixConfig.message.narrationRequired'));
           return;
         }
         narrationText = values.narration_text.trim();
       } else {
         if (!audioFile) {
-          message.warning('请上传配音文件');
+          message.warning(t('mixConfig.message.audioFileRequired'));
           return;
         }
       }
@@ -63,7 +65,7 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
           const d = err && typeof err === 'object' && 'response' in err
             ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
             : undefined;
-          message.error(typeof d === 'string' ? d : '配音文件上传失败');
+          message.error(typeof d === 'string' ? d : t('mixConfig.message.audioUploadFailed'));
           setSubmitting(false);
           return;
         }
@@ -77,7 +79,7 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
         use_highlights: useHighlights,
       });
 
-      message.success(res.message || '混编任务已提交，可在任务中心查看进度');
+      message.success(res.message || t('mixConfig.message.submitted'));
       form.resetFields();
       setAudioFile(null);
       setAudioFileList([]);
@@ -87,7 +89,7 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
       const d = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
         : undefined;
-      message.error(typeof d === 'string' ? d : '混编提交失败');
+      message.error(typeof d === 'string' ? d : t('mixConfig.message.submitFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -103,23 +105,23 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
 
   return (
     <Modal
-      title="AI 混编配置"
+      title={t('mixConfig.title')}
       open={open}
       onCancel={handleCancel}
       width={600}
       footer={[
         <Button key="cancel" onClick={handleCancel} disabled={submitting}>
-          取消
+          {t('mixConfig.cancel')}
         </Button>,
         <Button key="submit" type="primary" loading={submitting} onClick={handleSubmit}>
-          提交混编
+          {t('mixConfig.submit')}
         </Button>,
       ]}
     >
       <div className="space-y-4">
         {/* Selected assets summary */}
         <div>
-          <h4 className="text-sm font-medium text-yc-text-primary mb-2">已选素材 ({selectedAssets.length})</h4>
+          <h4 className="text-sm font-medium text-yc-text-primary mb-2">{t('mixConfig.selectedAssets')} ({selectedAssets.length})</h4>
           <div className="max-h-40 overflow-y-auto space-y-1">
             {selectedAssets.map((asset) => (
               <div
@@ -138,15 +140,15 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
         <Form form={form} layout="vertical" initialValues={{ aspect_ratio: '9:16' }}>
           {/* Audio mode toggle */}
           <div>
-            <h4 className="text-sm font-medium text-yc-text-primary mb-2">配音来源</h4>
+            <h4 className="text-sm font-medium text-yc-text-primary mb-2">{t('mixConfig.audioSource')}</h4>
             <Radio.Group
               value={audioMode}
               onChange={(e) => setAudioMode(e.target.value as AudioMode)}
               optionType="button"
               buttonStyle="solid"
               options={[
-                { label: '输入文案 (TTS)', value: 'text' },
-                { label: '上传配音文件', value: 'file' },
+                { label: t('mixConfig.audioText'), value: 'text' },
+                { label: t('mixConfig.audioFile'), value: 'file' },
               ]}
             />
           </div>
@@ -154,16 +156,16 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
           {audioMode === 'text' ? (
             <Form.Item
               name="narration_text"
-              label="配音文案"
+              label={t('mixConfig.narrationText')}
               rules={[
-                { required: true, message: '请输入配音文案' },
-                { max: 2000, message: '文案不能超过2000字' },
-                { whitespace: true, message: '不能只输入空格' },
+                { required: true, message: t('mixConfig.message.narrationRequired') },
+                { max: 2000, message: t('mixConfig.message.maxLength', { defaultValue: 'Text cannot exceed 2000 characters' }) },
+                { whitespace: true, message: t('mixConfig.message.whitespace', { defaultValue: 'Cannot be only whitespace' }) },
               ]}
             >
               <Input.TextArea
                 rows={4}
-                placeholder="输入文案内容，系统将自动生成 TTS 配音..."
+                placeholder={t('mixConfig.narrationPlaceholder')}
                 showCount
                 maxLength={2000}
               />
@@ -184,10 +186,10 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
                   setAudioFileList([]);
                 }}
               >
-                <Button icon={<UploadOutlined />}>选择配音文件</Button>
+                <Button icon={<UploadOutlined />}>{t('mixConfig.selectAudioFile')}</Button>
               </Upload>
               {!audioFile && (
-                <p className="text-xs text-yc-text-tertiary mt-1">支持 MP3、WAV 等音频格式</p>
+                <p className="text-xs text-yc-text-tertiary mt-1">{t('mixConfig.audioFormatHint')}</p>
               )}
             </div>
           )}
@@ -195,15 +197,15 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
           {/* Aspect ratio */}
           <Form.Item
             name="aspect_ratio"
-            label="画面比例"
+            label={t('mixConfig.aspectRatio')}
             rules={[{ required: true }]}
           >
             <Radio.Group
               optionType="button"
               buttonStyle="solid"
               options={[
-                { label: '竖屏 9:16', value: '9:16' },
-                { label: '横屏 16:9', value: '16:9' },
+                { label: t('mixConfig.vertical'), value: '9:16' },
+                { label: t('mixConfig.horizontal'), value: '16:9' },
               ]}
             />
           </Form.Item>
@@ -211,12 +213,12 @@ export default function MixConfigModal({ open, onClose, selectedAssets }: MixCon
           {/* Highlights toggle */}
           <div className="flex items-center gap-2">
             <Switch checked={useHighlights} onChange={setUseHighlights} />
-            <span className="text-sm text-yc-text-secondary">精彩片段优先</span>
+            <span className="text-sm text-yc-text-secondary">{t('mixConfig.highlightsPriority')}</span>
           </div>
         </Form>
 
         <p className="text-xs text-yc-text-tertiary">
-          混编为后台任务，提交后可在任务中心查看进度与结果。
+          {t('mixConfig.backgroundTaskHint')}
         </p>
       </div>
     </Modal>

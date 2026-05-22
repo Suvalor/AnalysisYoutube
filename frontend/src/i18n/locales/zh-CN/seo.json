@@ -43,5 +43,65 @@
   },
   "empty": {
     "noData": "暂无 SEO 数据，请输入视频 URL 开始分析"
+  },
+  "scoring": {
+    "grade": {
+      "excellent": "优秀",
+      "good": "良好",
+      "average": "一般",
+      "needsOptimization": "需优化"
+    },
+    "dimension": {
+      "title": "标题",
+      "description": "描述",
+      "tags": "标签"
+    },
+    "message": {
+      "deleteSuccess": "删除成功",
+      "deleteFailed": "删除失败",
+      "loadFailed": "加载评分列表失败",
+      "noData": "暂无评分数据",
+      "confirmDelete": "确定删除该评分记录吗？"
+    },
+    "action": "操作",
+    "label": {
+      "score": "评分",
+      "grade": "等级",
+      "createdAt": "创建时间",
+      "videoTitle": "视频标题"
+    },
+    "scoringTitle": "SEO 评分",
+    "scoreHistory": "评分历史",
+    "videoTitleLabel": "视频标题 *",
+    "videoTitlePlaceholder": "输入视频标题",
+    "videoDescLabel": "视频描述",
+    "videoDescPlaceholder": "输入视频描述（可选）",
+    "tagsLabel": "标签（逗号分隔）",
+    "tagsPlaceholder": "标签1, 标签2, 标签3",
+    "targetKeywordLabel": "目标关键词",
+    "targetKeywordPlaceholder": "如：Python 教程",
+    "thumbnailUrlLabel": "缩略图 URL",
+    "thumbnailUrlPlaceholder": "输入缩略图图片 URL（可选，用于缩略图评分）",
+    "startScoring": "开始评分",
+    "scoreDetail": "评分明细",
+    "thumbnail": "缩略图",
+    "baseScore": "基础",
+    "aiBonus": "AI",
+    "aiBenchmark": "AI 竞品对标分析",
+    "titleBenchmark": "标题对标",
+    "descBenchmark": "描述对标",
+    "tagsBenchmark": "标签对标",
+    "thumbBenchmark": "缩略图对标",
+    "noAnalysis": "暂无分析",
+    "competitorRef": "竞品视频参考",
+    "optimizationSuggestions": "优化建议",
+    "historyTitle": "SEO 评分历史",
+    "totalScore": "总分",
+    "keyword": "关键词",
+    "time": "时间",
+    "confirmDeleteRecord": "确定删除此记录？",
+    "deleteSuccess": "删除成功",
+    "deleteFailed": "删除失败",
+    "totalRecords": "共 {{total}} 条"
   }
 }

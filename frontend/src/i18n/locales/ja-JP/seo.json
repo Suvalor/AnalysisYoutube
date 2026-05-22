@@ -43,5 +43,65 @@
   },
   "empty": {
     "noData": "SEOデータがありません。動画URLを入力して分析を開始してください"
+  },
+  "scoring": {
+    "grade": {
+      "excellent": "優秀",
+      "good": "良好",
+      "average": "普通",
+      "needsOptimization": "改善必要"
+    },
+    "dimension": {
+      "title": "タイトル",
+      "description": "説明",
+      "tags": "タグ"
+    },
+    "message": {
+      "deleteSuccess": "削除しました",
+      "deleteFailed": "削除失敗",
+      "loadFailed": "スコアリストの読み込み失敗",
+      "noData": "スコアデータなし",
+      "confirmDelete": "このスコア記録を削除しますか？"
+    },
+    "action": "操作",
+    "label": {
+      "score": "スコア",
+      "grade": "グレード",
+      "createdAt": "作成日時",
+      "videoTitle": "動画タイトル"
+    },
+    "scoringTitle": "SEO スコアリング",
+    "scoreHistory": "スコア履歴",
+    "videoTitleLabel": "動画タイトル *",
+    "videoTitlePlaceholder": "動画タイトルを入力",
+    "videoDescLabel": "動画説明",
+    "videoDescPlaceholder": "動画説明を入力（任意）",
+    "tagsLabel": "タグ（カンマ区切り）",
+    "tagsPlaceholder": "タグ1, タグ2, タグ3",
+    "targetKeywordLabel": "ターゲットキーワード",
+    "targetKeywordPlaceholder": "例：Python チュートリアル",
+    "thumbnailUrlLabel": "サムネイル URL",
+    "thumbnailUrlPlaceholder": "サムネイル画像 URL を入力（任意、サムネイル評価用）",
+    "startScoring": "スコアリング開始",
+    "scoreDetail": "スコア内訳",
+    "thumbnail": "サムネイル",
+    "baseScore": "ベース",
+    "aiBonus": "AI",
+    "aiBenchmark": "AI 競合ベンチマーク",
+    "titleBenchmark": "タイトルベンチマーク",
+    "descBenchmark": "説明ベンチマーク",
+    "tagsBenchmark": "タグベンチマーク",
+    "thumbBenchmark": "サムネイルベンチマーク",
+    "noAnalysis": "分析なし",
+    "competitorRef": "競合動画参考",
+    "optimizationSuggestions": "最適化の提案",
+    "historyTitle": "SEO スコア履歴",
+    "totalScore": "合計",
+    "keyword": "キーワード",
+    "time": "時間",
+    "confirmDeleteRecord": "この記録を削除しますか？",
+    "deleteSuccess": "削除しました",
+    "deleteFailed": "削除に失敗しました",
+    "totalRecords": "全{{total}}件"
   }
 }

@@ -111,5 +111,12 @@
     "sourceAssetId": "来源资产ID：",
     "visualPromptPlaceholder": "输入画面提示词（支持 Markdown）",
     "aiResultPlaceholder": "点击“AI 智能拆解分镜”后，将在这里展示可编辑的 Markdown 结果"
+  },
+  "scriptPreview": {
+    "title": "剧本预览",
+    "sourceCode": "Markdown 源码",
+    "preview": "Markdown 预览",
+    "saveToLibrary": "保存到剧本库",
+    "emptyHint": "点击「开始生成」后，剧本内容将实时显示在这里"
   }
 }

@@ -40,5 +40,43 @@
   },
   "empty": {
     "noData": "스크립트가 없습니다. 주제를 입력하여 생성을 시작하세요"
+  },
+  "creator": {
+    "message": {
+      "loadConfigFailed": "설정 로드 실패",
+      "topicRequired": "창작 주제/핵심 포인트를 먼저 입력하세요",
+      "configIncomplete": "설정 센터에서 사용 가능한 에이전트와 스타일을 먼저 유지하세요",
+      "generateFailed": "생성 요청 실패",
+      "generateError": "생성 오류",
+      "generateFail": "생성 실패",
+      "unnamedScript": "이름 없는 스크립트",
+      "savedToLibrary": "스크립트 라이브러리에 저장됨",
+      "saveFailed": "저장 실패",
+      "noContent": "저장할 콘텐츠가 없습니다"
+    },
+    "label": {
+      "knowledgeBase": "지식 베이스 관리",
+      "scriptPreview": "스크립트 미리보기 (실시간 스트림)"
+    },
+    "title": "AI 스크립트 워크샵",
+    "selectModel": "모델 선택",
+    "selectPrompt": "프롬프트 선택",
+    "selectStyle": "스타일 선택",
+    "coreIdea": "창작 테마 / 핵심 소재",
+    "coreIdeaPlaceholder": "예: 2026 AI Agent 생산성 도구에 대한 90초 숏 비디오 스크립트 작성",
+    "startGenerate": "생성 시작",
+    "loadModelPlaceholder": "모델 목록 로딩...",
+    "selectAgentPlaceholder": "智能体 선택",
+    "selectStylePlaceholder": "스타일 선택",
+    "loadConfigFailed": "설정 로드 실패",
+    "topicRequired": "창작 테마/핵심 소재를 입력하세요",
+    "configIncomplete": "설정 센터에서 사용 가능한智能体와 스타일을 먼저 유지하세요",
+    "generateFailed": "생성 요청 실패",
+    "generateError": "생성 오류",
+    "noContent": "저장할 콘텐츠 없음",
+    "unnamedScript": "이름 없는 스크립트",
+    "savedToLibrary": "스크립트 라이브러리에 저장됨",
+    "saveFailed": "저장 실패",
+    "knowledgeBase": "지식 베이스 관리"
   }
 }

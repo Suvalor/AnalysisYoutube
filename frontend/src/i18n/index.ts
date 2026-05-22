@@ -82,12 +82,17 @@ import feishu_enUS from "./locales/en-US/feishu.json";
 import feishu_jaJP from "./locales/ja-JP/feishu.json";
 import feishu_koKR from "./locales/ko-KR/feishu.json";
 
+import dashboard_zhCN from "./locales/zh-CN/dashboard.json";
+import dashboard_enUS from "./locales/en-US/dashboard.json";
+import dashboard_jaJP from "./locales/ja-JP/dashboard.json";
+import dashboard_koKR from "./locales/ko-KR/dashboard.json";
+
 /** 所有 namespace 名称列表 */
 const namespaces = [
   "common", "nav", "auth", "settings",
   "radar", "navigation", "keyword", "seo", "trend",
   "youtube", "video", "inspiration", "ai", "sop",
-  "knowledge", "feishu",
+  "knowledge", "feishu", "dashboard",
 ] as const;
 
 i18n
@@ -112,6 +117,7 @@ i18n
         sop: sop_zhCN,
         knowledge: knowledge_zhCN,
         feishu: feishu_zhCN,
+        dashboard: dashboard_zhCN,
       },
       "en-US": {
         common: common_enUS,
@@ -130,6 +136,7 @@ i18n
         sop: sop_enUS,
         knowledge: knowledge_enUS,
         feishu: feishu_enUS,
+        dashboard: dashboard_enUS,
       },
       "ja-JP": {
         common: common_jaJP,
@@ -148,6 +155,7 @@ i18n
         sop: sop_jaJP,
         knowledge: knowledge_jaJP,
         feishu: feishu_jaJP,
+        dashboard: dashboard_jaJP,
       },
       "ko-KR": {
         common: common_koKR,
@@ -166,6 +174,7 @@ i18n
         sop: sop_koKR,
         knowledge: knowledge_koKR,
         feishu: feishu_koKR,
+        dashboard: dashboard_koKR,
       },
     },
     fallbackLng: "zh-CN",

@@ -81,7 +81,8 @@
     "FR": "프랑스",
     "BR": "브라질",
     "IN": "인도",
-    "TW": "대만"
+    "TW": "대만",
+    "HK": "홍콩"
   },
   "message": {
     "noResults": "추천 결과가 없습니다. 입력을 조정 후 재시도하세요",
@@ -134,7 +135,8 @@
     "matchScore": "매치도",
     "categoryCount": "틈새",
     "confirmDelete": "이 기록을 삭제하시겠습니까?",
-    "empty": "추천 기록 없음"
+    "empty": "추천 기록 없음",
+    "listSeparator": ", "
   },
   "quota": {
     "title": "API 할당량 대시보드",

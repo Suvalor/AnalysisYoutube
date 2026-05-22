@@ -43,5 +43,65 @@
   },
   "empty": {
     "noData": "No SEO data. Enter a video URL to start analysis"
+  },
+  "scoring": {
+    "grade": {
+      "excellent": "Excellent",
+      "good": "Good",
+      "average": "Average",
+      "needsOptimization": "Needs Optimization"
+    },
+    "dimension": {
+      "title": "Title",
+      "description": "Description",
+      "tags": "Tags"
+    },
+    "message": {
+      "deleteSuccess": "Deleted successfully",
+      "deleteFailed": "Delete failed",
+      "loadFailed": "Failed to load score list",
+      "noData": "No score data yet",
+      "confirmDelete": "Are you sure you want to delete this score record?"
+    },
+    "action": "Action",
+    "label": {
+      "score": "Score",
+      "grade": "Grade",
+      "createdAt": "Created At",
+      "videoTitle": "Video Title"
+    },
+    "scoringTitle": "SEO Scoring",
+    "scoreHistory": "Score History",
+    "videoTitleLabel": "Video Title *",
+    "videoTitlePlaceholder": "Enter video title",
+    "videoDescLabel": "Video Description",
+    "videoDescPlaceholder": "Enter video description (optional)",
+    "tagsLabel": "Tags (comma-separated)",
+    "tagsPlaceholder": "tag1, tag2, tag3",
+    "targetKeywordLabel": "Target Keyword",
+    "targetKeywordPlaceholder": "e.g.: Python tutorial",
+    "thumbnailUrlLabel": "Thumbnail URL",
+    "thumbnailUrlPlaceholder": "Enter thumbnail image URL (optional, for thumbnail scoring)",
+    "startScoring": "Start Scoring",
+    "scoreDetail": "Score Breakdown",
+    "thumbnail": "Thumbnail",
+    "baseScore": "Base",
+    "aiBonus": "AI",
+    "aiBenchmark": "AI Competitive Benchmark",
+    "titleBenchmark": "Title Benchmark",
+    "descBenchmark": "Description Benchmark",
+    "tagsBenchmark": "Tags Benchmark",
+    "thumbBenchmark": "Thumbnail Benchmark",
+    "noAnalysis": "No analysis yet",
+    "competitorRef": "Competitor Video References",
+    "optimizationSuggestions": "Optimization Suggestions",
+    "historyTitle": "SEO Score History",
+    "totalScore": "Total",
+    "keyword": "Keyword",
+    "time": "Time",
+    "confirmDeleteRecord": "Confirm delete this record?",
+    "deleteSuccess": "Deleted successfully",
+    "deleteFailed": "Delete failed",
+    "totalRecords": "{{total}} total"
   }
 }

@@ -3,6 +3,7 @@ import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useTabStore } from "@/store/useTabStore";
 import {
@@ -16,6 +17,7 @@ import {
 dayjs.extend(relativeTime);
 
 export default function FeishuDocList() {
+  const { t } = useTranslation("feishu");
   const navigate = useNavigate();
   const openTab = useTabStore((s) => s.openTab);
 
@@ -39,7 +41,7 @@ export default function FeishuDocList() {
       setItems(res.items);
       setTotal(res.total);
     } catch {
-      message.error("加载飞书文档列表失败");
+      message.error(t("docList.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -61,7 +63,7 @@ export default function FeishuDocList() {
       const path = `/feishu/view/${row.id}`;
       openTab({
         id: `feishu-view-${row.id}`,
-        title: row.title || `飞书文档 #${row.id}`,
+        title: row.title || `${t("docList.feishuDocPrefix")}${row.id}`,
         path,
         type: "feishu-viewer",
         feishuDocId: row.id,
@@ -77,18 +79,18 @@ export default function FeishuDocList() {
       try {
         const res = await triggerFeishuDocArchiveApi(id);
         if (res.status === "already_archived") {
-          message.success(res.message ?? "该文档已归档");
+          message.success(res.message ?? t("docList.alreadyArchived"));
         } else {
-          message.info(res.message ?? "归档任务已提交，后台将校验 PDF，请留意列表状态");
+          message.info(res.message ?? t("docList.archiveSubmitted"));
         }
         void load();
       } catch (e: unknown) {
         const err = e as { response?: { status?: number; data?: { detail?: string } } };
         const detail = err?.response?.data?.detail;
         if (err?.response?.status === 409) {
-          message.warning(typeof detail === "string" ? detail : "文档正在归档中");
+          message.warning(typeof detail === "string" ? detail : t("docList.archivingWarning"));
         } else {
-          message.error(typeof detail === "string" ? detail : "提交归档失败");
+          message.error(typeof detail === "string" ? detail : t("docList.archiveFailed"));
         }
       } finally {
         setArchiveSubmittingId(null);
@@ -100,7 +102,7 @@ export default function FeishuDocList() {
   const columns: ColumnsType<FeishuDocItem> = useMemo(
     () => [
       {
-        title: "文档名称",
+        title: t("docList.docNameColumn"),
         dataIndex: "title",
         render: (v: string, r) => (
           <button type="button" className="text-blue-600 hover:text-blue-500" onClick={() => openViewer(r)}>
@@ -109,7 +111,7 @@ export default function FeishuDocList() {
         ),
       },
       {
-        title: "添加时间",
+        title: t("docList.addedAtColumn"),
         dataIndex: "created_at",
         width: 160,
         render: (v: string) => {
@@ -119,25 +121,25 @@ export default function FeishuDocList() {
         },
       },
       {
-        title: "归档状态",
+        title: t("docList.archiveStatusColumn"),
         key: "archive_state",
         width: 120,
         render: (_, r) => {
           const st = r.archive_status ?? "UNARCHIVED";
           if (st === "SUCCESS") {
-            return <Tag color="success">成功</Tag>;
+            return <Tag color="success">{t("docList.success")}</Tag>;
           }
           if (st === "ARCHIVING") {
-            return <Tag color="processing">保存中</Tag>;
+            return <Tag color="processing">{t("docList.saving")}</Tag>;
           }
           if (st === "FAILED") {
-            return <Tag color="error">保存失败</Tag>;
+            return <Tag color="error">{t("docList.saveFailed")}</Tag>;
           }
-          return <Tag>未归档</Tag>;
+          return <Tag>{t("docList.unarchived")}</Tag>;
         },
       },
       {
-        title: "操作",
+        title: t("docList.actionColumn"),
         key: "op",
         width: 340,
         render: (_, r) => {
@@ -146,29 +148,29 @@ export default function FeishuDocList() {
           return (
             <div className="flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
               <Button size="small" onClick={() => openViewer(r)}>
-                查看
+                {t("docList.view")}
               </Button>
               {st === "ARCHIVING" ? (
                 <Button size="small" loading disabled>
-                  归档中...
+                  {t("docList.archiving")}
                 </Button>
               ) : canArchive ? (
                 <Button size="small" onClick={() => void handleArchive(r.id)} loading={archiveSubmittingId === r.id}>
-                  {st === "FAILED" ? "重新保存" : "离线保存"}
+                  {st === "FAILED" ? t("docList.resave") : t("docList.offlineSave")}
                 </Button>
               ) : null}
               <Popconfirm
-                title="确认删除该文档？"
-                okText="删除"
-                cancelText="取消"
+                title={t("docList.confirmDelete")}
+                okText={t("docList.delete")}
+                cancelText={t("docList.cancel")}
                 onConfirm={async () => {
                   await deleteFeishuDocApi(r.id);
-                  message.success("已删除");
+                  message.success(t("docList.deleteSuccess"));
                   void load();
                 }}
               >
                 <Button danger size="small">
-                  删除
+                  {t("docList.delete")}
                 </Button>
               </Popconfirm>
             </div>
@@ -180,27 +182,28 @@ export default function FeishuDocList() {
   );
 
   const handleCreate = async () => {
-    const t = formTitle.trim();
-    const u = formUrl.trim();
-    if (!t) {
-      message.warning("请输入文档名称");
+    const titleVal = formTitle.trim();
+    const urlVal = formUrl.trim();
+    if (!titleVal) {
+      message.warning(t("docList.titleRequired"));
       return;
     }
-    if (!u) {
-      message.warning("请输入飞书链接");
+    if (!urlVal) {
+      message.warning(t("docList.urlRequired"));
       return;
     }
     setCreating(true);
     try {
-      await createFeishuDocApi({ title: t, url: u });
-      message.success("已新增文档");
+      await createFeishuDocApi({ title: titleVal, url: urlVal });
+      message.success(t("docList.createSuccess"));
       setCreateOpen(false);
       setFormTitle("");
       setFormUrl("");
       setPage(1);
       void load();
-    } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? "新增失败");
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      message.error(err?.response?.data?.detail ?? t("docList.createFailed"));
     } finally {
       setCreating(false);
     }
@@ -212,7 +215,7 @@ export default function FeishuDocList() {
         <div className="flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
           <div className="flex gap-2 items-center">
             <Input
-              placeholder="按名称搜索"
+              placeholder={t("docList.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onPressEnter={() => {
@@ -228,11 +231,11 @@ export default function FeishuDocList() {
               }}
               loading={loading}
             >
-              搜索
+              {t("docList.search")}
             </Button>
           </div>
           <Button type="primary" onClick={() => setCreateOpen(true)}>
-            + 新增文档
+            {t("docList.addDoc")}
           </Button>
         </div>
       </div>
@@ -258,22 +261,22 @@ export default function FeishuDocList() {
       </div>
 
       <Modal
-        title="新增飞书文档"
+        title={t("docList.addTitle")}
         open={createOpen}
         onCancel={() => setCreateOpen(false)}
-        okText="提交"
-        cancelText="取消"
+        okText={t("docList.submit")}
+        cancelText={t("docList.cancel")}
         confirmLoading={creating}
         onOk={() => void handleCreate()}
       >
         <div className="space-y-3">
           <div>
-            <div className="text-xs text-yc-text-secondary mb-1">文档名称</div>
-            <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="例如：选题库 / 脚本模板库" />
+            <div className="text-xs text-yc-text-secondary mb-1">{t("docList.docNameLabel")}</div>
+            <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder={t("docList.docNamePlaceholder")} />
           </div>
           <div>
-            <div className="text-xs text-yc-text-secondary mb-1">飞书链接（URL）</div>
-            <Input value={formUrl} onChange={(e) => setFormUrl(e.target.value)} placeholder="请输入飞书分享链接" />
+            <div className="text-xs text-yc-text-secondary mb-1">{t("docList.urlLabel")}</div>
+            <Input value={formUrl} onChange={(e) => setFormUrl(e.target.value)} placeholder={t("docList.urlPlaceholder")} />
           </div>
         </div>
       </Modal>

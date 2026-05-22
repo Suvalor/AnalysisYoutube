@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { Eye, MessageCircle, ThumbsUp } from "lucide-react";
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { listYouTubeChannelsApi, listYouTubeVideosAllApi, scrapeVideoCommentsApi, batchCheckVideoAnalysisApi, quickTrackChannelApi, type VideoListItem, type BatchAnalysisStatusItem } from "@/services/authApi";
 import { listModelsApi, listPromptsApi, type ModelItem, type PromptItem } from "@/services/libraryApi";
 import { analyzeYouTubeVideoApi, getYouTubeVideoAnalysisApi, extractVideoHighlightsApi, getVideoHighlightsApi, type YouTubeVideoAnalysisResponse, type VideoHighlight } from "@/services/videosApi";
@@ -13,46 +14,6 @@ import { formatNumber } from "@/utils/format";
 import { buildYouTubeWatchUrl } from "@/utils/youtubeLinks";
 
 dayjs.extend(relativeTime);
-
-/** 全局视频：四列可叠加排序，后端优先级为 发布时间 → 播放量 → 点赞数 → 评论数 */
-const VIDEO_SORT_METRICS = [
-  {
-    field: "publish_time" as const,
-    stateKey: "sort_publish_time" as const,
-    label: "发布时间",
-    options: [
-      { label: "新→旧", value: "desc" as const },
-      { label: "旧→新", value: "asc" as const },
-    ],
-  },
-  {
-    field: "view_count" as const,
-    stateKey: "sort_view_count" as const,
-    label: "播放量",
-    options: [
-      { label: "高→低", value: "desc" as const },
-      { label: "低→高", value: "asc" as const },
-    ],
-  },
-  {
-    field: "like_count" as const,
-    stateKey: "sort_like_count" as const,
-    label: "点赞数",
-    options: [
-      { label: "高→低", value: "desc" as const },
-      { label: "低→高", value: "asc" as const },
-    ],
-  },
-  {
-    field: "comment_count" as const,
-    stateKey: "sort_comment_count" as const,
-    label: "评论数",
-    options: [
-      { label: "高→低", value: "desc" as const },
-      { label: "低→高", value: "asc" as const },
-    ],
-  },
-];
 
 type ModelOption = { value: string; label: string };
 
@@ -87,6 +48,47 @@ function toModelOptions(rows: ModelItem[]): ModelOption[] {
 }
 
 export default function GlobalVideoList() {
+  const { t } = useTranslation("youtube");
+
+  /** 全局视频：四列可叠加排序，后端优先级为 发布时间 → 播放量 → 点赞数 → 评论数 */
+  const VIDEO_SORT_METRICS = useMemo(() => [
+    {
+      field: "publish_time" as const,
+      stateKey: "sort_publish_time" as const,
+      label: t("globalVideo.sort.publishTime"),
+      options: [
+        { label: t("globalVideo.sort.newToOld"), value: "desc" as const },
+        { label: t("globalVideo.sort.oldToNew"), value: "asc" as const },
+      ],
+    },
+    {
+      field: "view_count" as const,
+      stateKey: "sort_view_count" as const,
+      label: t("globalVideo.sort.viewCount"),
+      options: [
+        { label: t("globalVideo.sort.highToLow"), value: "desc" as const },
+        { label: t("globalVideo.sort.lowToHigh"), value: "asc" as const },
+      ],
+    },
+    {
+      field: "like_count" as const,
+      stateKey: "sort_like_count" as const,
+      label: t("globalVideo.sort.likeCount"),
+      options: [
+        { label: t("globalVideo.sort.highToLow"), value: "desc" as const },
+        { label: t("globalVideo.sort.lowToHigh"), value: "asc" as const },
+      ],
+    },
+    {
+      field: "comment_count" as const,
+      stateKey: "sort_comment_count" as const,
+      label: t("globalVideo.sort.commentCount"),
+      options: [
+        { label: t("globalVideo.sort.highToLow"), value: "desc" as const },
+        { label: t("globalVideo.sort.lowToHigh"), value: "asc" as const },
+      ],
+    },
+  ], [t]);
   const [videos, setVideos] = useState<VideoListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -141,22 +143,22 @@ export default function GlobalVideoList() {
 
   const handleBatchDownload = async () => {
     if (selectedVideoIds.size === 0) {
-      message.warning('请选择至少一个视频');
+      message.warning(t('globalVideo.message.selectAtLeastOne'));
       return;
     }
     setDownloadLoading(true);
     try {
       const res = await submitDownload({ video_ids: Array.from(selectedVideoIds) });
-      message.success(res.message || `已提交 ${res.task_count} 个下载任务`);
+      message.success(res.message || t('globalVideo.message.batchDownloadSubmitted', { count: res.task_count }));
       if (res.skipped?.length) {
-        message.info(`${res.skipped.length} 个视频已在下载队列中，已跳过`);
+        message.info(t('globalVideo.message.skippedExisting', { count: res.skipped.length }));
       }
       setSelectedVideoIds(new Set());
     } catch (err: unknown) {
       const d = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
         : undefined;
-      message.error(typeof d === 'string' ? d : '批量下载提交失败');
+      message.error(typeof d === 'string' ? d : t('globalVideo.message.batchDownloadFailed'));
     } finally {
       setDownloadLoading(false);
     }
@@ -176,7 +178,7 @@ export default function GlobalVideoList() {
       }
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      message.error(detail || "追踪博主失败");
+      message.error(detail || t('globalVideo.message.trackFailed'));
     } finally {
       setTrackingChannelIds((prev) => {
         const next = new Set(prev);
@@ -191,12 +193,12 @@ export default function GlobalVideoList() {
     try {
       const res = await extractVideoHighlightsApi(videoId);
       setHighlightsByVideoId((prev) => ({ ...prev, [videoId]: res.highlights }));
-      message.success(res.message || `已提取 ${res.highlights.length} 个精彩片段`);
+      message.success(res.message || t('globalVideo.message.extractSuccess', { count: res.highlights.length }));
     } catch (err: unknown) {
       const d = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
         : undefined;
-      message.error(typeof d === 'string' ? d : '提取精彩片段失败');
+      message.error(typeof d === 'string' ? d : t('globalVideo.message.extractFailed'));
     } finally {
       setExtractingHighlights((prev) => ({ ...prev, [videoId]: false }));
     }
@@ -214,7 +216,7 @@ export default function GlobalVideoList() {
         setPromptAgents(prompts);
       } catch (e) {
         if (!mounted) return;
-        message.error(e instanceof Error ? e.message : "加载模型/智能体配置失败");
+        message.error(e instanceof Error ? e.message : t('globalVideo.message.loadModelAgentFailed'));
       }
     })();
     return () => {
@@ -267,7 +269,7 @@ export default function GlobalVideoList() {
         }
       }
     } catch {
-      message.error("加载视频列表失败");
+      message.error(t("youtube:globalVideo.message.loadVideoFailed"));
     } finally {
       setLoading(false);
     }
@@ -292,17 +294,17 @@ export default function GlobalVideoList() {
 
   const confirmScrape = async () => {
     if (!scrapeVideoId || !scrapeKeyword.trim()) {
-      message.warning("请输入关键字");
+      message.warning(t('globalVideo.message.scrapeKeywordRequired'));
       return;
     }
     setScrapeLoading(true);
     try {
       const res = await scrapeVideoCommentsApi(scrapeVideoId, scrapeKeyword.trim());
-      message.success(`已抓取并保存 ${res.scraped_count} 条评论，消耗额度 ${res.quota_used} 点`);
+      message.success(t('globalVideo.message.scrapeSuccess', { count: res.scraped_count, quota: res.quota_used }));
       setScrapeOpen(false);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
-      message.error(err.response?.data?.detail ?? "抓取失败");
+      message.error(err.response?.data?.detail ?? t('globalVideo.message.scrapeFailed'));
     } finally {
       setScrapeLoading(false);
     }
@@ -325,7 +327,7 @@ export default function GlobalVideoList() {
       const d = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
         : undefined;
-      message.error(typeof d === 'string' ? d : "获取分析结果失败");
+      message.error(typeof d === 'string' ? d : t('globalVideo.message.getResultFailed'));
     }
   };
 
@@ -334,7 +336,7 @@ export default function GlobalVideoList() {
     const defaultModelId = modelOptions[0]?.value ?? "";
     const modelId = selectedModelByVideoId[videoId] ?? defaultModelId;
     if (!modelId) {
-      message.warning("请先在设置中心配置模型，并为模型选择一个可用的 Model ID");
+      message.warning(t("youtube:globalVideo.message.configModelFirst"));
       return;
     }
 
@@ -353,7 +355,7 @@ export default function GlobalVideoList() {
       const d = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
         : undefined;
-      message.error(typeof d === 'string' ? d : "视频分析失败");
+      message.error(typeof d === 'string' ? d : t('globalVideo.message.analysisFailed'));
     } finally {
       setPanelLoading((prev) => ({ ...prev, [videoId]: false }));
     }
@@ -364,7 +366,7 @@ export default function GlobalVideoList() {
       <div className="bg-yc-bg-card border border-yc-border rounded-lg p-3 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-2">
           <Input
-            placeholder="标题关键词"
+            placeholder={t("youtube:globalVideo.filter.titleKeyword")}
             value={filters.keyword}
             onChange={(e) => setFilters((s) => ({ ...s, keyword: e.target.value }))}
           />
@@ -372,11 +374,11 @@ export default function GlobalVideoList() {
             value={filters.dateRange as any}
             onChange={(v) => setFilters((s) => ({ ...s, dateRange: v as any }))}
           />
-          <InputNumber className="w-full" placeholder="最小时长(秒)" value={filters.min_duration} onChange={(v) => setFilters((s) => ({ ...s, min_duration: Number(v) || undefined }))} />
-          <InputNumber className="w-full" placeholder="最大时长(秒)" value={filters.max_duration} onChange={(v) => setFilters((s) => ({ ...s, max_duration: Number(v) || undefined }))} />
+          <InputNumber className="w-full" placeholder={t("youtube:globalVideo.filter.minDuration")} value={filters.min_duration} onChange={(v) => setFilters((s) => ({ ...s, min_duration: Number(v) || undefined }))} />
+          <InputNumber className="w-full" placeholder={t("youtube:globalVideo.filter.maxDuration")} value={filters.max_duration} onChange={(v) => setFilters((s) => ({ ...s, max_duration: Number(v) || undefined }))} />
           <Select
             allowClear
-            placeholder="频道"
+            placeholder={t("youtube:globalVideo.filter.channel")}
             value={filters.channel_id}
             onChange={(v) => setFilters((s) => ({ ...s, channel_id: v }))}
             options={pool.map((x) => ({ label: x.title, value: x.id }))}
@@ -384,7 +386,7 @@ export default function GlobalVideoList() {
           />
           <Select
             allowClear
-            placeholder="清晰度"
+            placeholder={t("youtube:globalVideo.filter.definition")}
             value={filters.definition}
             onChange={(v) => setFilters((s) => ({ ...s, definition: v }))}
             options={[
@@ -394,18 +396,18 @@ export default function GlobalVideoList() {
           />
           <Select
             allowClear
-            placeholder="隐私"
+            placeholder={t("youtube:globalVideo.filter.privacy")}
             value={filters.privacy_status}
             onChange={(v) => setFilters((s) => ({ ...s, privacy_status: v }))}
             options={[
-              { label: "公开", value: "public" },
-              { label: "不公开", value: "unlisted" },
-              { label: "私密", value: "private" },
+              { label: t("youtube:globalVideo.filter.public"), value: "public" },
+              { label: t("youtube:globalVideo.filter.unlisted"), value: "unlisted" },
+              { label: t("youtube:globalVideo.filter.private"), value: "private" },
             ]}
           />
           <div className="col-span-1 md:col-span-4 lg:col-span-6 space-y-2 pt-1 border-t border-yc-border-light mt-1">
             <p className="text-xs text-yc-text-tertiary">
-              以下四列可同时参与排序；数据库优先级为：发布时间 → 播放量 → 点赞数 → 评论数（先按第一列排，相同再按下一列）。
+              {t('globalVideo.sort.priorityHint')}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
               {VIDEO_SORT_METRICS.map(({ field, stateKey, label, options }) => (
@@ -413,7 +415,7 @@ export default function GlobalVideoList() {
                   <span className="text-xs text-yc-text-tertiary">{label}</span>
                   <Select
                     allowClear
-                    placeholder={`按${label}`}
+                    placeholder={t('globalVideo.sort.sortBy', { label })}
                     className="w-full"
                     value={filters[stateKey]}
                     onChange={(v) => {
@@ -434,7 +436,7 @@ export default function GlobalVideoList() {
           </div>
           <div className="flex gap-2 md:col-span-2">
             <Button type="primary" onClick={() => void loadVideos(1, pageSize, filters)}>
-              筛选
+              {t('globalVideo.filter.screen')}
             </Button>
             <Button
               onClick={() => {
@@ -455,7 +457,7 @@ export default function GlobalVideoList() {
                 void loadVideos(1, pageSize, reset);
               }}
             >
-              重置
+              {t('globalVideo.filter.reset')}
             </Button>
           </div>
         </div>
@@ -464,14 +466,14 @@ export default function GlobalVideoList() {
       {selectedVideoIds.size > 0 && (
         <div className="flex items-center gap-3 bg-yc-info-bg border border-yc-info rounded-lg px-4 py-2">
           <CloudDownloadOutlined className="text-yc-info text-lg" />
-          <span className="text-sm text-yc-info">已选 {selectedVideoIds.size} 个视频</span>
+          <span className="text-sm text-yc-info">{t('globalVideo.action.selectedVideos', { count: selectedVideoIds.size })}</span>
           <Button
             type="primary"
             size="small"
             loading={downloadLoading}
             onClick={() => void handleBatchDownload()}
           >
-            批量下载素材
+            {t('globalVideo.action.batchDownload')}
           </Button>
           <Button
             type="primary"
@@ -479,20 +481,20 @@ export default function GlobalVideoList() {
             icon={<MergeOutlined />}
             onClick={() => setMixModalOpen(true)}
           >
-            AI 混剪
+            {t('globalVideo.action.aiMix')}
           </Button>
           <Button
             size="small"
             onClick={() => setSelectedVideoIds(new Set())}
           >
-            清除选择
+            {t('globalVideo.action.clearSelection')}
           </Button>
         </div>
       )}
 
       <div className="space-y-2">
         {loading ? (
-          <div className="text-yc-text-tertiary">加载中...</div>
+          <div className="text-yc-text-tertiary">{t('globalVideo.message.loading')}</div>
         ) : (
           videos.map((video) => {
             const hasAnalyzed = video.has_analysis || !!analysisStatusOverride[video.id]?.has_analysis;
@@ -501,7 +503,7 @@ export default function GlobalVideoList() {
             const openYouTube = (e: MouseEvent) => {
               e.stopPropagation();
               if (!watchUrl) {
-                message.warning("该视频缺少有效的 YouTube 视频 ID，无法跳转");
+                message.warning(t('globalVideo.message.noValidVideoId'));
                 return;
               }
               window.open(watchUrl, "_blank", "noopener,noreferrer");
@@ -526,7 +528,7 @@ export default function GlobalVideoList() {
                         type="button"
                         onClick={openYouTube}
                         className="block w-full p-0 border-0 bg-transparent cursor-pointer rounded overflow-hidden group/thumb"
-                        aria-label="在 YouTube 打开视频"
+                        aria-label={t("youtube:globalVideo.message.openVideo")}
                       >
                         <img
                           src={video.thumbnail_url || ""}
@@ -556,7 +558,7 @@ export default function GlobalVideoList() {
                     )}
                     
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {video.channel_title && <div className="text-xs text-yc-text-tertiary mt-0.5 truncate">频道：{video.channel_title}</div>}
+                      {video.channel_title && <div className="text-xs text-yc-text-tertiary mt-0.5 truncate">{t('globalVideo.message.channelLabel')}{video.channel_title}</div>}
                       <Tag className="!border-yc-border !bg-yc-bg-card !text-yc-text-secondary">{video.definition.toUpperCase()}</Tag>
                       <Tag className="!border-yc-border !bg-yc-bg-card !text-yc-text-secondary">{video.privacy_status}</Tag>
                       {hasAnalyzed && (
@@ -566,12 +568,12 @@ export default function GlobalVideoList() {
                           className="cursor-pointer"
                           onClick={(e) => { e.stopPropagation(); void handleViewAnalysis(video.id); }}
                         >
-                          已分析{analyzedAt ? ` ${dayjs(analyzedAt).fromNow()}` : ''}
+                          {t('globalVideo.message.analyzed')}{analyzedAt ? ` ${dayjs(analyzedAt).fromNow()}` : ''}
                         </Tag>
                       )}
                     </div>
                     <div className="text-yc-text-tertiary text-sm mt-2">
-                      发布于 {video.published_at ? dayjs(video.published_at).format("YYYY-MM-DD HH:mm") : "-"} ·{" "}
+                      {t('globalVideo.message.publishedAt')} {video.published_at ? dayjs(video.published_at).format('YYYY-MM-DD HH:mm') : '-'} ·{' '}
                       {video.published_at ? dayjs(video.published_at).fromNow() : ""}
                     </div>
                     {highlightsByVideoId[video.id] && highlightsByVideoId[video.id].length > 0 && (
@@ -585,9 +587,9 @@ export default function GlobalVideoList() {
                     )}
                     {/* 统计数据 */}
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm">
-                      <span className="text-yc-info flex items-center gap-1"><Eye className="h-4 w-4 shrink-0" aria-hidden />播放量：{formatNumber(video.view_count)}</span>
-                      <span className="text-yc-success flex items-center gap-1"><ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />点赞：{formatNumber(video.like_count)}</span>
-                      <span className="text-yc-warning flex items-center gap-1"><MessageCircle className="h-4 w-4 shrink-0" aria-hidden />评论：{formatNumber(video.comment_count)}</span>
+                      <span className="text-yc-info flex items-center gap-1"><Eye className="h-4 w-4 shrink-0" aria-hidden />{t('globalVideo.message.viewsLabel')}{formatNumber(video.view_count)}</span>
+                      <span className="text-yc-success flex items-center gap-1"><ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />{t('globalVideo.message.likesLabel')}{formatNumber(video.like_count)}</span>
+                      <span className="text-yc-warning flex items-center gap-1"><MessageCircle className="h-4 w-4 shrink-0" aria-hidden />{t('globalVideo.message.commentsLabel')}{formatNumber(video.comment_count)}</span>
                     </div>
                     {/* 操作按钮栏 */}
                     <div className="mt-3 flex flex-wrap gap-2 items-center">
@@ -598,10 +600,10 @@ export default function GlobalVideoList() {
                         disabled={!video.yt_channel_id || trackedChannelIds.has(video.yt_channel_id ?? "") || trackingChannelIds.has(video.yt_channel_id ?? "")}
                         onClick={(e) => video.yt_channel_id && void handleTrackChannel(video.yt_channel_id, e)}
                       >
-                        {trackedChannelIds.has(video.yt_channel_id ?? "") ? "已追踪" : "追踪博主"}
+                        {trackedChannelIds.has(video.yt_channel_id ?? "") ? t("youtube:globalVideo.action.tracked") : t("youtube:globalVideo.action.trackChannel")}
                       </Button>
                       <Button type="primary" size="small" onClick={() => openScrape(video.id)}>
-                        抓取评论
+                        {t('globalVideo.action.scrapeComments')}
                       </Button>
                       <Button
                         size="small"
@@ -609,11 +611,11 @@ export default function GlobalVideoList() {
                         loading={Boolean(extractingHighlights[video.id])}
                         onClick={() => void handleExtractHighlights(video.id)}
                       >
-                        提取精彩片段
+                        {t('globalVideo.action.extractHighlights')}
                       </Button>
                       <Select
                         showSearch
-                        placeholder="选择模型"
+                        placeholder={t("youtube:globalVideo.action.selectModel")}
                         style={{ minWidth: 160 }}
                         value={selectedModelByVideoId[video.id] ?? (modelOptions[0]?.value ?? undefined)}
                         options={modelOptions}
@@ -621,7 +623,7 @@ export default function GlobalVideoList() {
                       />
                       <Select
                         allowClear
-                        placeholder="选择智能体（可选）"
+                        placeholder={t("youtube:globalVideo.action.selectAgent")}
                         style={{ minWidth: 160 }}
                         value={selectedAgentByVideoId[video.id] ?? undefined}
                         options={promptAgents.map((p) => ({ value: p.id, label: p.title }))}
@@ -633,7 +635,7 @@ export default function GlobalVideoList() {
                         onClick={() => void handleAnalyzeVideo(video)}
                         loading={Boolean(panelLoading[video.id])}
                       >
-                        {hasAnalyzed ? "重新分析" : "一键 AI 视频分析"}
+                        {hasAnalyzed ? t("youtube:globalVideo.action.reanalyze") : t("youtube:globalVideo.action.oneClickAnalysis")}
                       </Button>
                       {hasAnalyzed && (
                         <Button
@@ -644,7 +646,7 @@ export default function GlobalVideoList() {
                           disabled={Boolean(panelLoading[video.id])}
                           className={panelOpenVideoId !== video.id ? "!bg-yc-success !border-yc-success" : undefined}
                         >
-                          查看结果{analyzedAt ? `(${dayjs(analyzedAt).fromNow()})` : ''}
+                          {t('globalVideo.action.viewResult')}{analyzedAt ? `(${dayjs(analyzedAt).fromNow()})` : ''}
                         </Button>
                       )}
                     </div>
@@ -655,15 +657,15 @@ export default function GlobalVideoList() {
                   <div className="mt-3 rounded-lg border border-yc-border bg-yc-bg-inset p-3">
                     {panelLoading[video.id] ? (
                       <div className="flex items-center gap-2 text-yc-text-secondary">
-                        <Spin size="small" /> 分析中…
+                        <Spin size="small" /> {t('globalVideo.message.analyzing')}
                       </div>
                     ) : panelContentByVideoId[video.id] ? (
                       <MarkdownPreview>{panelContentByVideoId[video.id]}</MarkdownPreview>
                     ) : (
                       <div className="text-yc-text-tertiary text-sm">
                         {hasAnalyzed
-                          ? "暂无缓存展示。请点击「查看结果」拉取已保存的分析内容。"
-                          : "暂无分析结果。点击「一键 AI 视频分析」生成内容。"}
+                          ? t("youtube:globalVideo.message.noCacheResult")
+                          : t("youtube:globalVideo.message.noAnalysisResult")}
                       </div>
                     )}
                   </div>
@@ -685,19 +687,19 @@ export default function GlobalVideoList() {
       </div>
 
       <Modal
-        title="定向抓取评论"
+        title={t("youtube:globalVideo.modal.scrapeTitle")}
         open={scrapeOpen}
         onOk={() => void confirmScrape()}
         onCancel={() => setScrapeOpen(false)}
         confirmLoading={scrapeLoading}
-        okText="开始抓取"
+        okText={t("youtube:globalVideo.modal.scrapeOk")}
       >
-        <p className="text-sm text-yc-text-secondary mb-2">将使用 YouTube commentThreads 接口按关键字搜索评论（最多 100 条）。</p>
-        <Input placeholder="搜索关键字" value={scrapeKeyword} onChange={(e) => setScrapeKeyword(e.target.value)} />
+        <p className="text-sm text-yc-text-secondary mb-2">{t('globalVideo.modal.scrapeHint')}</p>
+        <Input placeholder={t("youtube:globalVideo.modal.scrapePlaceholder")} value={scrapeKeyword} onChange={(e) => setScrapeKeyword(e.target.value)} />
       </Modal>
 
       <Modal
-        title="AI 混剪"
+        title={t("youtube:globalVideo.action.aiMix")}
         open={mixModalOpen}
         onCancel={() => setMixModalOpen(false)}
         onOk={async () => {
@@ -707,24 +709,24 @@ export default function GlobalVideoList() {
               aspect_ratio: '9:16',
               use_highlights: true,
             });
-            message.success(res.message || '混剪任务已提交');
+            message.success(res.message || t('globalVideo.message.mixSubmitted'));
             setMixModalOpen(false);
             setSelectedVideoIds(new Set());
           } catch (err: unknown) {
             const d = err && typeof err === 'object' && 'response' in err
               ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
               : undefined;
-            message.error(typeof d === 'string' ? d : '混剪提交失败');
+            message.error(typeof d === 'string' ? d : t('globalVideo.message.mixFailed'));
           }
         }}
-        okText="提交混剪"
+        okText={t('globalVideo.modal.mixOk')}
       >
         <div className="space-y-3">
           <p className="text-sm text-yc-text-secondary">
-            将对选中的 {selectedVideoIds.size} 个视频执行 AI 混剪，优先使用已提取的精彩片段。
+            {t('globalVideo.message.mixSelectedCount', { count: selectedVideoIds.size })}
           </p>
           <p className="text-xs text-yc-text-tertiary">
-            混剪为后台任务，提交后可在任务中心查看进度与结果。
+            {t('globalVideo.message.mixBackgroundHint')}
           </p>
         </div>
       </Modal>

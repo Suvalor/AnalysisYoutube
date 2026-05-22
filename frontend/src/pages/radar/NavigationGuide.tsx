@@ -206,7 +206,7 @@ function NicheCard({ rec, index, isExpanded, onToggleExpand }: { rec: NicheRecom
               children: (
                 <div>
                   <div className="text-sm font-medium text-yc-text-primary">
-                    Day {step.day_range}：{step.task}
+                    {t("card.dayRange", { range: step.day_range, task: step.task })}
                   </div>
                   <div className="text-xs text-yc-text-tertiary mt-0.5">{t("card.expectedResult", { result: step.expected_result })}</div>
                 </div>
@@ -580,20 +580,20 @@ function RadarInlinePanel({
 // ── 主页面 ──
 
 export default function NavigationGuide() {
-  const { t } = useTranslation("navigation");
+  const { t, i18n } = useTranslation("navigation");
 
   // ── 国际化选项 ──
   const LANGUAGE_OPTIONS = useMemo(() => [
-    { value: "中文", label: t("option.langChinese") },
-    { value: "英语", label: t("option.langEnglish") },
-    { value: "日语", label: t("option.langJapanese") },
-    { value: "韩语", label: t("option.langKorean") },
-    { value: "阿拉伯语", label: t("option.langArabic") },
-    { value: "西班牙语", label: t("option.langSpanish") },
-    { value: "法语", label: t("option.langFrench") },
-    { value: "德语", label: t("option.langGerman") },
-    { value: "葡萄牙语", label: t("option.langPortuguese") },
-    { value: "印地语", label: t("option.langHindi") },
+    { value: "zh", label: t("option.langChinese") },
+    { value: "en", label: t("option.langEnglish") },
+    { value: "ja", label: t("option.langJapanese") },
+    { value: "ko", label: t("option.langKorean") },
+    { value: "ar", label: t("option.langArabic") },
+    { value: "es", label: t("option.langSpanish") },
+    { value: "fr", label: t("option.langFrench") },
+    { value: "de", label: t("option.langGerman") },
+    { value: "pt", label: t("option.langPortuguese") },
+    { value: "hi", label: t("option.langHindi") },
   ], [t]);
 
   const FORMAT_OPTIONS = useMemo(() => [
@@ -837,7 +837,7 @@ export default function NavigationGuide() {
             form={form}
             layout="vertical"
             initialValues={{
-              languages: ["中文"],
+              languages: ["zh"],
               content_format: ["video"],
               budget_level: "low",
               core_skills: [],
@@ -974,13 +974,20 @@ export default function NavigationGuide() {
               const isExpanded = expandedRadarIndex === i;
               // 从 niche_title 提取关键词和地区
               const keyword = rec.niche_title.split(" - ")[0].split(" → ")[0].trim() || rec.niche_title;
-              // 从 niche_title 提取地区代码（如 "美国" → "US"）
+              // 从 niche_title 提取地区代码（支持中英文地区名）
               const regionNameToCode: Record<string, string> = {
+                // 中文地区名
                 "美国": "US", "英国": "GB", "加拿大": "CA", "澳大利亚": "AU",
                 "新加坡": "SG", "马来西亚": "MY", "菲律宾": "PH", "越南": "VN",
                 "印尼": "ID", "泰国": "TH", "阿联酋": "AE", "沙特": "SA",
                 "日本": "JP", "韩国": "KR", "台湾": "TW", "香港": "HK",
                 "德国": "DE", "法国": "FR", "巴西": "BR", "印度": "IN",
+                // 英文地区名
+                "United States": "US", "United Kingdom": "GB", "Canada": "CA", "Australia": "AU",
+                "Singapore": "SG", "Malaysia": "MY", "Philippines": "PH", "Vietnam": "VN",
+                "Indonesia": "ID", "Thailand": "TH", "UAE": "AE", "Saudi Arabia": "SA",
+                "Japan": "JP", "South Korea": "KR", "Taiwan": "TW", "Hong Kong": "HK",
+                "Germany": "DE", "France": "FR", "Brazil": "BR", "India": "IN",
               };
               const regionPart = rec.niche_title.split("→").pop()?.trim() || "";
               const regionCode = regionNameToCode[regionPart] || "US";
@@ -1050,13 +1057,13 @@ export default function NavigationGuide() {
               {/* 请求参数摘要 */}
               <Card size="small" title={t("history.paramTitle")} className="!border-yc-border">
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div><Text type="secondary">{t("history.langLabel")}</Text>{(historyDetail.request_params.languages as string[])?.join("、") ?? "-"}</div>
+                  <div><Text type="secondary">{t("history.langLabel")}</Text>{(historyDetail.request_params.languages as string[])?.join(t("history.listSeparator")) ?? "-"}</div>
                   <div><Text type="secondary">{t("history.budgetLabel")}</Text>{(historyDetail.request_params.budget_level as string) ?? "-"}</div>
-                  <div><Text type="secondary">{t("history.skillLabel")}</Text>{(historyDetail.request_params.core_skills as string[])?.join("、") ?? "-"}</div>
-                  <div><Text type="secondary">{t("history.formatLabel")}</Text>{(historyDetail.request_params.content_format as string[])?.join("、") ?? "-"}</div>
+                  <div><Text type="secondary">{t("history.skillLabel")}</Text>{(historyDetail.request_params.core_skills as string[])?.join(t("history.listSeparator")) ?? "-"}</div>
+                  <div><Text type="secondary">{t("history.formatLabel")}</Text>{(historyDetail.request_params.content_format as string[])?.join(t("history.listSeparator")) ?? "-"}</div>
                 </div>
                 <div className="text-xs text-yc-text-muted mt-2">
-                  {new Date(historyDetail.created_at).toLocaleString("zh-CN")}
+                  {new Date(historyDetail.created_at).toLocaleString(i18n.language)}
                 </div>
               </Card>
 
@@ -1105,7 +1112,7 @@ export default function NavigationGuide() {
                           {item.top_niche_title ?? t("history.resultDefault")}
                         </div>
                         <div className="text-xs text-yc-text-tertiary mt-0.5">
-                          {(item.request_params.core_skills as string[])?.join("、")}
+                          {(item.request_params.core_skills as string[])?.join(t("history.listSeparator"))}
                           {item.top_match_score != null && (
                             <Tag color="blue" className="ml-2">{t("card.matchScore")} {item.top_match_score}</Tag>
                           )}
@@ -1141,7 +1148,7 @@ export default function NavigationGuide() {
                       </div>
                     </div>
                     <div className="text-xs text-yc-text-muted">
-                      {new Date(item.created_at).toLocaleString("zh-CN")}
+                      {new Date(item.created_at).toLocaleString(i18n.language)}
                     </div>
                   </div>
                 ))}

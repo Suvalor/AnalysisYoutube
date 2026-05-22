@@ -82,16 +82,19 @@
     "retrospectiveFailed": "AI retrospective failed",
     "noRetrospectiveData": "No retrospective data available",
     "aiConfigLoadFailed": "Failed to load AI model/agent config, please check settings center",
-    "needAiConfig": "Please set up model and agent in settings center first, and complete selection on this page"
+    "needAiConfig": "Please set up model and agent in settings center first, and complete selection on this page",
+    "applyFailed": "Failed to apply parameters",
+    "autoRetroSuccess": "Auto retrospective complete, recommended parameters updated",
+    "autoRetroFailed": "Auto retrospective failed"
   },
   "card": {
     "scanConsole": "Search Console",
     "scanResults": "Radar Scan Results",
     "categoryReport": "Category Opportunity Report",
     "crossCompare": "Cross-Region Comparison",
-    "newChannels": "New Channels",
-    "successfulChannels": "Successful Channels",
-    "successRate": "Success Rate",
+    "newChannels": "New Channels: ",
+    "successfulChannels": "Successful Channels: ",
+    "successRate": "Success Rate: ",
     "topGrowth": "Top Channel Growth",
     "contentGaps": "Content Gaps",
     "newcomerStats": "Newcomer Statistics",
@@ -120,9 +123,22 @@
     "noKeywordSuggestions": "No keyword suggestions"
   },
   "label": {
-    "maxSubscribers": "Max Subscribers",
-    "outlierMultiplier": "Outlier Multiplier",
-    "suggestedAction": "Suggested Action",
+    "maxSubscribers": "Max Subscribers: ",
+    "outlierMultiplier": "Outlier Multiplier: ",
+    "suggestedAction": "Suggested Action: ",
     "sampleCoverage": "Sample coverage: last {{lookbackDays}} days, high sample {{topCount}} items, low sample {{lowCount}} items"
+  },
+  "paramIteration": {
+    "title": "Parameter Iteration History",
+    "retroNow": "Retrospect Now",
+    "noHistory": "No iteration records",
+    "applied": "Applied",
+    "apply": "Apply",
+    "auto": "Auto",
+    "manual": "Manual",
+    "scanParams": "Scan Params",
+    "recommendedParams": "Recommended Params",
+    "none": "None",
+    "totalRecords": "{{total}} records total, showing latest 10"
   }
 }

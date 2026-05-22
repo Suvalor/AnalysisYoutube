@@ -82,16 +82,19 @@
     "retrospectiveFailed": "AI 复盘失败",
     "noRetrospectiveData": "暂无复盘数据",
     "aiConfigLoadFailed": "加载 AI 模型/智能体配置失败，请前往设置中心检查",
-    "needAiConfig": "请先在设置中心维护模型与智能体，并在本页完成选择"
+    "needAiConfig": "请先在设置中心维护模型与智能体，并在本页完成选择",
+    "applyFailed": "应用参数失败",
+    "autoRetroSuccess": "自动复盘完成，推荐参数已更新",
+    "autoRetroFailed": "自动复盘失败"
   },
   "card": {
     "scanConsole": "搜索控制台",
     "scanResults": "雷达扫描结果",
     "categoryReport": "品类机会报告",
     "crossCompare": "跨地区对比",
-    "newChannels": "新频道数",
-    "successfulChannels": "成功频道",
-    "successRate": "成功率",
+    "newChannels": "新频道数：",
+    "successfulChannels": "成功频道：",
+    "successRate": "成功率：",
     "topGrowth": "头部频道增速",
     "contentGaps": "内容缺口",
     "newcomerStats": "新入局者统计",
@@ -120,9 +123,22 @@
     "noKeywordSuggestions": "暂无关键词建议"
   },
   "label": {
-    "maxSubscribers": "粉丝上限",
-    "outlierMultiplier": "爆款系数",
-    "suggestedAction": "建议动作",
+    "maxSubscribers": "粉丝上限：",
+    "outlierMultiplier": "爆款系数：",
+    "suggestedAction": "建议动作：",
     "sampleCoverage": "样本覆盖：近 {{lookbackDays}} 天，高样本 {{topCount}} 条，低样本 {{lowCount}} 条"
+  },
+  "paramIteration": {
+    "title": "参数迭代历史",
+    "retroNow": "立即复盘",
+    "noHistory": "暂无迭代记录",
+    "applied": "已应用",
+    "apply": "应用",
+    "auto": "自动",
+    "manual": "手动",
+    "scanParams": "扫描参数",
+    "recommendedParams": "推荐参数",
+    "none": "无",
+    "totalRecords": "共 {{total}} 条记录，当前显示最近 10 条"
   }
 }

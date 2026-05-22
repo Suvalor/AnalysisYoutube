@@ -1,5 +1,7 @@
-import { Button, Form, Input, Popconfirm, message } from "antd";
+import { ArrowLeftOutlined, ExclamationCircleOutlined } from "@ant-design/icons";
+import { Button, Form, Input, message, Modal, Spin } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { getPromptApi, updatePromptApi } from "@/services/libraryApi";
 
@@ -9,10 +11,13 @@ type AgentFormValues = {
 };
 
 type AgentEditorPageProps = {
+  /** 来自标签页 store 的 promptId */
   promptId?: number;
 };
 
+/** 智能体编辑页面：编辑系统提示词规则，保存后立即生效 */
 export default function AgentEditorPage({ promptId: promptIdFromTab }: AgentEditorPageProps) {
+  const { t } = useTranslation("settings");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [form] = Form.useForm<AgentFormValues>();
@@ -21,6 +26,7 @@ export default function AgentEditorPage({ promptId: promptIdFromTab }: AgentEdit
   const initialRef = useRef<AgentFormValues | null>(null);
   const [invalidId, setInvalidId] = useState(false);
 
+  /** 解析 promptId：优先 Tab 传入 > 路由动态段 */
   const promptId = useMemo(() => {
     if (typeof promptIdFromTab === "number" && Number.isFinite(promptIdFromTab) && promptIdFromTab > 0) {
       return promptIdFromTab;
@@ -46,9 +52,10 @@ export default function AgentEditorPage({ promptId: promptIdFromTab }: AgentEdit
         const initial = { title: row.title, content: row.content };
         initialRef.current = initial;
         form.setFieldsValue(initial);
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!mounted) return;
-        message.error(e?.response?.data?.detail ?? e?.message ?? "加载智能体详情失败");
+        const err = e as { response?: { data?: { detail?: string } }; message?: string };
+        message.error(err?.response?.data?.detail ?? err?.message ?? t("agent.loadFailed"));
       } finally {
         if (mounted) setLoading(false);
       }
@@ -56,8 +63,9 @@ export default function AgentEditorPage({ promptId: promptIdFromTab }: AgentEdit
     return () => {
       mounted = false;
     };
-  }, [form, navigate, promptId]);
+  }, [form, navigate, promptId, t]);
 
+  /** 检查表单是否有未保存修改 */
   const isDirty = () => {
     const init = initialRef.current;
     if (!init) return false;
@@ -65,20 +73,28 @@ export default function AgentEditorPage({ promptId: promptIdFromTab }: AgentEdit
     return current.title !== init.title || current.content !== init.content;
   };
 
+  /** 返回智能体管理列表 */
   const goBack = () => {
     navigate("/config-center?tab=prompts");
   };
 
+  /** 处理返回按钮点击，有未保存修改时弹确认 */
   const handleBack = () => {
     if (!isDirty()) {
       goBack();
       return;
     }
-    // 使用浏览器 confirm，保证轻量且不引入额外状态
-    const ok = window.confirm("当前有未保存修改，确认返回吗？");
-    if (ok) goBack();
+    Modal.confirm({
+      title: t("agent.confirmBackTitle"),
+      icon: <ExclamationCircleOutlined />,
+      content: t("agent.unsavedBackDesc"),
+      okText: t("agent.backButton"),
+      cancelText: t("agent.cancel"),
+      onOk: goBack,
+    });
   };
 
+  /** 保存智能体编辑 */
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
@@ -91,69 +107,82 @@ export default function AgentEditorPage({ promptId: promptIdFromTab }: AgentEdit
       const latest = { title: row.title, content: row.content };
       initialRef.current = latest;
       form.setFieldsValue(latest);
-      message.success("保存成功");
-    } catch (e: any) {
-      if (e?.errorFields) return;
-      message.error(e?.response?.data?.detail ?? e?.message ?? "保存失败");
+      message.success(t("agent.saveSuccess"));
+    } catch (e: unknown) {
+      if ((e as { errorFields?: unknown })?.errorFields) return;
+      const err = e as { response?: { data?: { detail?: string } }; message?: string };
+      message.error(err?.response?.data?.detail ?? err?.message ?? t("agent.saveFailed"));
     } finally {
       setSaving(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Spin />
+      </div>
+    );
+  }
+
+  if (invalidId) {
+    return (
+      <div className="p-6 text-center text-yc-text-secondary">
+        <p>{t("agent.invalidIdDesc")}</p>
+        <Button type="primary" onClick={goBack}>
+          {t("agent.backToAgentList")}
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-4 md:p-6">
-      <div className="bg-yc-bg-card border border-yc-border rounded-lg p-5 shadow-sm">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold text-yc-text-primary">智能体编辑</h2>
-            <p className="text-yc-text-secondary mt-1">可在此编辑复杂系统提示词规则，保存后立即生效。</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Popconfirm
-              title="确认返回设置中心？"
-              description={isDirty() ? "存在未保存修改，返回将丢失本次编辑。" : "将返回到智能体管理列表。"}
-              okText="返回"
-              cancelText="取消"
-              onConfirm={goBack}
-            >
-              <Button>返回</Button>
-            </Popconfirm>
-            <Button type="primary" loading={saving} onClick={handleSave}>
-              保存
-            </Button>
-          </div>
-        </div>
-
-        {invalidId ? (
-          <div className="py-10 text-center">
-            <p className="text-yc-text-secondary mb-4">当前智能体 ID 无效，请返回智能体列表重新选择。</p>
-            <Button type="primary" onClick={goBack}>
-              返回智能体管理
-            </Button>
-          </div>
-        ) : (
-          <Form form={form} layout="vertical" disabled={loading}>
-          <Form.Item name="title" label="名称" rules={[{ required: true, message: "请输入名称" }]}>
-            <Input placeholder="例如：短视频脚本智能体" />
-          </Form.Item>
-          <Form.Item
-            name="content"
-            label="系统提示词规则 (Prompt)"
-            rules={[{ required: true, message: "请输入系统提示词规则" }]}
+    <div className="h-full overflow-y-auto bg-yc-bg-layout p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-4 flex items-center gap-2">
+          <button
+            className="inline-flex items-center gap-1 text-yc-text-secondary hover:text-yc-primary transition-colors"
+            onClick={handleBack}
           >
-            <Input.TextArea
-              placeholder="请输入完整系统提示词规则..."
-              autoSize={{ minRows: 20, maxRows: 36 }}
-            />
-          </Form.Item>
-          </Form>
-        )}
+            <ArrowLeftOutlined /> {t("agent.backButton")}
+          </button>
+        </div>
+        <div className="bg-yc-bg-card border border-yc-border rounded-lg p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold text-yc-text-primary">{t("agent.title")}</h2>
+              <p className="text-yc-text-secondary mt-1">{t("agent.description")}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={handleBack}>{t("agent.backButton")}</Button>
+              <Button type="primary" loading={saving} onClick={handleSave}>
+                {t("agent.save")}
+              </Button>
+            </div>
+          </div>
 
-        <div className="mt-4 flex gap-2">
-          <Button onClick={handleBack}>返回</Button>
-          <Button type="primary" loading={saving} onClick={handleSave} disabled={invalidId}>
-            保存
-          </Button>
+          <Form form={form} layout="vertical">
+            <Form.Item name="title" label={t("agent.nameLabel")} rules={[{ required: true, message: t("agent.nameRequired") }]}>
+              <Input placeholder={t("agent.namePlaceholder")} />
+            </Form.Item>
+            <Form.Item
+              name="content"
+              label={t("agent.systemPromptLabel")}
+              rules={[{ required: true, message: t("agent.systemPromptRequired") }]}
+            >
+              <Input.TextArea
+                placeholder={t("agent.systemPromptPlaceholder")}
+                autoSize={{ minRows: 20, maxRows: 36 }}
+              />
+            </Form.Item>
+          </Form>
+
+          <div className="mt-4 flex gap-2">
+            <Button onClick={handleBack}>{t("agent.backButton")}</Button>
+            <Button type="primary" loading={saving} onClick={handleSave}>
+              {t("agent.save")}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

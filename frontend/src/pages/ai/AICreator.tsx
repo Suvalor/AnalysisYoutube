@@ -1,5 +1,6 @@
 import { Button, Card, Input, Select, Typography, message } from "antd";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { authFetch } from "@/services/apiClient";
 import {
@@ -48,6 +49,7 @@ function toModelOptions(rows: ModelItem[]): ModelOption[] {
 }
 
 export default function AICreator() {
+  const { t } = useTranslation("ai");
   const navigate = useNavigate();
   const openTab = useTabStore((s) => s.openTab);
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
@@ -81,7 +83,7 @@ export default function AICreator() {
         setSelectedStyle((prev) => (prev && styles.some((s) => s.id === prev) ? prev : (styles[0]?.id ?? null)));
       } catch (e: any) {
         if (!mounted) return;
-        message.error(e?.response?.data?.detail ?? e?.message ?? "加载配置失败");
+        message.error(e?.response?.data?.detail ?? e?.message ?? t("creator.loadConfigFailed"));
         setModelOptions([]);
       } finally {
         if (mounted) setOptionsLoading(false);
@@ -107,14 +109,14 @@ export default function AICreator() {
 
   const startGenerate = async () => {
     if (!coreIdea.trim()) {
-      message.warning("请先填写创作主题/素材核心点");
+      message.warning(t("creator.topicRequired"));
       return;
     }
     if (!canGenerate) return;
     const promptRow = promptRows.find((x) => x.id === selectedPrompt);
     const styleRow = styleRows.find((x) => x.id === selectedStyle);
     if (!promptRow || !styleRow) {
-      message.warning("请先在设置中心维护可用的智能体和风格");
+      message.warning(t("creator.configIncomplete"));
       return;
     }
     setGenerating(true);
@@ -136,7 +138,7 @@ export default function AICreator() {
         return;
       }
       if (!resp.ok || !resp.body) {
-        throw new Error(`生成请求失败：${resp.status}`);
+        throw new Error(`${t("creator.generateFailed")}: ${resp.status}`);
       }
 
       const reader = resp.body.getReader();
@@ -161,13 +163,13 @@ export default function AICreator() {
             if (parsed.type === "delta" && parsed.content) {
               setGeneratedText((prev) => prev + parsed.content);
             } else if (parsed.type === "error") {
-              throw new Error(parsed.message || "生成出错");
+              throw new Error(parsed.message || t("creator.generateError"));
             }
           }
         }
       }
     } catch (e: any) {
-      message.error(e?.message ?? "生成失败");
+      message.error(e?.message ?? t("creator.generateFailed"));
     } finally {
       setGenerating(false);
     }
@@ -175,28 +177,28 @@ export default function AICreator() {
 
   const saveScript = async () => {
     if (!generatedText.trim()) {
-      message.warning("没有可保存内容");
+      message.warning(t("creator.noContent"));
       return;
     }
     try {
       const promptRow = promptRows.find((x) => x.id === selectedPrompt);
       const styleRow = styleRows.find((x) => x.id === selectedStyle);
       await createScriptApi({
-        title: coreIdea.slice(0, 60) || "未命名剧本",
+        title: coreIdea.slice(0, 60) || t("creator.unnamedScript"),
         content: generatedText,
         prompt_id: promptRow?.id ?? null,
         style_id: styleRow?.id ?? null,
       });
-      message.success("已保存到剧本库");
+      message.success(t("creator.savedToLibrary"));
       openTab({
         id: "knowledge-base",
-        title: "知识库管理",
+        title: t("creator.knowledgeBase"),
         path: "/knowledge-base",
         type: "knowledge-base",
       });
       navigate("/knowledge-base");
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? "保存失败");
+      message.error(e?.response?.data?.detail ?? t("creator.saveFailed"));
     }
   };
 
@@ -207,61 +209,61 @@ export default function AICreator() {
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className={`lg:col-span-1 ${cardClass}`}>
           <Title level={4} className="!mb-4 !text-yc-text-primary">
-            AI 脚本工坊
+            {t("creator.title")}
           </Title>
           <div className="space-y-4">
             <div>
-              <Text className="text-yc-text-secondary">选择模型</Text>
+              <Text className="text-yc-text-secondary">{t("creator.selectModel")}</Text>
               <Select
                 className="w-full mt-1"
                 value={selectedModel || undefined}
                 onChange={(v) => setSelectedModel(v)}
                 options={modelOptions}
                 loading={optionsLoading}
-                placeholder="加载模型列表…"
+                placeholder={t("creator.loadModelPlaceholder")}
               />
             </div>
             <div>
-              <Text className="text-yc-text-secondary">选择提示词</Text>
+              <Text className="text-yc-text-secondary">{t("creator.selectPrompt")}</Text>
               <Select
                 className="w-full mt-1"
                 value={selectedPrompt ?? undefined}
                 onChange={(v: number) => setSelectedPrompt(v)}
                 options={promptRows.map((x) => ({ value: x.id, label: x.title }))}
                 loading={optionsLoading}
-                placeholder="请选择智能体"
+                placeholder={t("creator.selectAgentPlaceholder")}
               />
             </div>
             <div>
-              <Text className="text-yc-text-secondary">选择风格</Text>
+              <Text className="text-yc-text-secondary">{t("creator.selectStyle")}</Text>
               <Select
                 className="w-full mt-1"
                 value={selectedStyle ?? undefined}
                 onChange={(v: number) => setSelectedStyle(v)}
                 options={styleRows.map((x) => ({ value: x.id, label: x.title }))}
                 loading={optionsLoading}
-                placeholder="请选择风格"
+                placeholder={t("creator.selectStylePlaceholder")}
               />
             </div>
             <div>
-              <Text className="text-yc-text-secondary">创作主题 / 素材核心点</Text>
+              <Text className="text-yc-text-secondary">{t("creator.coreIdea")}</Text>
               <TextArea
                 rows={8}
                 value={coreIdea}
                 onChange={(e) => setCoreIdea(e.target.value)}
-                placeholder="例如：围绕 2026 AI Agent 生产力工具，写一条 90 秒短视频脚本"
+                placeholder={t("creator.coreIdeaPlaceholder")}
                 className="mt-1"
               />
             </div>
             <Button type="primary" size="large" loading={generating} disabled={!canGenerate} onClick={startGenerate} block>
-              开始生成
+              {t("creator.startGenerate")}
             </Button>
           </div>
         </Card>
 
         <Card className={`lg:col-span-2 ${cardClass}`}>
           <ScriptPreview
-            title="剧本预览（实时流式）"
+            title={t("creator.scriptPreview", { defaultValue: "Script Preview (Real-time Streaming)" })}
             content={generatedText}
             saving={false}
             saveDisabled={generating || !generatedText.trim()}

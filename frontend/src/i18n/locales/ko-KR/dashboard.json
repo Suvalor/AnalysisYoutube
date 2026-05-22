@@ -1,0 +1,11 @@
+{
+  "title": "YouTube Compass에 오신 것을 환영합니다",
+  "desc": "팔로우하는 크리에이터 정보를 저장하고 경쟁자 분석을 수행할 수 있습니다.",
+  "quota": {
+    "todayTotal": "오늘 무료 할당량",
+    "todayUsed": "오늘 사용 할당량",
+    "todayRemaining": "오늘 남은 할당량",
+    "loadFailed": "할당량 데이터 로드 실패",
+    "weeklyApiUsage": "최근 7일 API 사용량"
+  }
+}

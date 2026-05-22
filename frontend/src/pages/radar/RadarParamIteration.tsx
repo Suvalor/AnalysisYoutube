@@ -1,5 +1,6 @@
 import { Badge, Button, Card, Descriptions, Empty, List, Spin, Tag, Typography, message } from "antd";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useRadarParamStore } from "@/store/useRadarParamStore";
 import { applyParamIterationApi } from "@/services/authApi";
 
@@ -15,6 +16,7 @@ export default function RadarParamIterationPanel() {
     fetchHistory,
     triggerAutoRetro,
   } = useRadarParamStore();
+  const { t } = useTranslation("radar");
 
   useEffect(() => {
     void fetchHistory(10, 0);
@@ -26,7 +28,7 @@ export default function RadarParamIterationPanel() {
       message.success(res.message);
       void fetchHistory(10, 0);
     } catch {
-      message.error("应用参数失败");
+      message.error(t("message.applyFailed"));
     }
   };
 
@@ -34,27 +36,27 @@ export default function RadarParamIterationPanel() {
     try {
       const params = await triggerAutoRetro(true);
       if (params) {
-        message.success("自动复盘完成，推荐参数已更新");
+        message.success(t("message.autoRetroSuccess"));
       }
       void fetchHistory(10, 0);
     } catch {
-      message.error("自动复盘失败");
+      message.error(t("message.autoRetroFailed"));
     }
   };
 
   return (
     <Card
-      title="参数迭代历史"
+      title={t("paramIteration.title")}
       extra={
         <Button type="primary" loading={autoRetroLoading} onClick={handleAutoRetro}>
-          立即复盘
+          {t("paramIteration.retroNow")}
         </Button>
       }
     >
       {loading && history.length === 0 ? (
         <div className="flex justify-center py-8"><Spin /></div>
       ) : history.length === 0 ? (
-        <Empty description="暂无迭代记录" />
+        <Empty description={t("paramIteration.noHistory")} />
       ) : (
         <List
           dataSource={history}
@@ -62,10 +64,10 @@ export default function RadarParamIterationPanel() {
             <List.Item
               actions={[
                 item.is_applied ? (
-                  <Tag color="green">已应用</Tag>
+                  <Tag color="green">{t("paramIteration.applied")}</Tag>
                 ) : (
                   <Button size="small" onClick={() => handleApply(item.id)}>
-                    应用
+                    {t("paramIteration.apply")}
                   </Button>
                 ),
               ]}
@@ -74,20 +76,20 @@ export default function RadarParamIterationPanel() {
                 title={
                   <Space>
                     <Tag color={item.iteration_type === "auto" ? "blue" : "orange"}>
-                      {item.iteration_type === "auto" ? "自动" : "手动"}
+                      {item.iteration_type === "auto" ? t("paramIteration.auto") : t("paramIteration.manual")}
                     </Tag>
                     <Text type="secondary">{new Date(item.created_at).toLocaleString()}</Text>
                   </Space>
                 }
                 description={
                   <Descriptions size="small" column={2} className="mt-1">
-                    <Descriptions.Item label="扫描参数">
+                    <Descriptions.Item label={t("paramIteration.scanParams")}>
                       {JSON.stringify(item.scan_params, null, 0)}
                     </Descriptions.Item>
-                    <Descriptions.Item label="推荐参数">
+                    <Descriptions.Item label={t("paramIteration.recommendedParams")}>
                       {item.recommended_params
                         ? JSON.stringify(item.recommended_params, null, 0)
-                        : "无"}
+                        : t("paramIteration.none")}
                     </Descriptions.Item>
                   </Descriptions>
                 }
@@ -98,7 +100,7 @@ export default function RadarParamIterationPanel() {
       )}
       {historyTotal > 10 && (
         <Text type="secondary" className="block text-center mt-2">
-          共 {historyTotal} 条记录，当前显示最近 10 条
+          {t("paramIteration.totalRecords", { total: historyTotal })}
         </Text>
       )}
     </Card>

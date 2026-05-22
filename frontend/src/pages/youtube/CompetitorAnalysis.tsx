@@ -1,5 +1,6 @@
 import { Button, Card, Checkbox, Empty, InputNumber, message, Select, Space, Spin, Typography } from "antd";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   CartesianGrid,
   Legend,
@@ -28,12 +29,13 @@ type PoolItem = {
 
 export default function CompetitorAnalysis() {
   const chartColors = useChartColors();
+  const { t } = useTranslation("youtube");
   const [pool, setPool] = useState<PoolItem[]>([]);
   const [selectedChannelIds, setSelectedChannelIds] = useState<number[]>([]);
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(false);
   const [chartData, setChartData] = useState<Array<Record<string, string | number>>>([]);
-  // AI 洞察
+  // {t("competitor.aiAnalysis")}
   const [aiInsight, setAiInsight] = useState<Record<string, string> | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [modelOptions, setModelOptions] = useState<ModelItem[]>([]);
@@ -97,7 +99,7 @@ export default function CompetitorAnalysis() {
         },
       }));
       setPool(mapped);
-    })().catch(() => message.error("加载监控池失败"));
+    })().catch(() => message.error(t("competitor.loadPoolFailed")));
   }, []);
 
   const selectedChannels = useMemo(
@@ -107,7 +109,7 @@ export default function CompetitorAnalysis() {
 
   const onAnalyze = async () => {
     if (selectedChannelIds.length < 2 || selectedChannelIds.length > 3) {
-      message.warning("请勾选 2-3 个频道进行对比");
+      message.warning(t("competitor.selectChannelWarning"));
       return;
     }
     setLoading(true);
@@ -115,7 +117,7 @@ export default function CompetitorAnalysis() {
       const data = await compareCompetitorsApi({ channel_ids: selectedChannelIds, days });
       setChartData(data);
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? "获取对比数据失败");
+      message.error(e?.response?.data?.detail ?? t("competitor.getCompareFailed"));
     } finally {
       setLoading(false);
     }
@@ -123,11 +125,11 @@ export default function CompetitorAnalysis() {
 
   const onAiInsight = async () => {
     if (selectedChannelIds.length < 2) {
-      message.warning("请先选择至少 2 个频道");
+      message.warning(t("competitor.selectAtLeastTwo"));
       return;
     }
     if (!selectedModelLibId || !selectedLlmModelName) {
-      message.warning("请先选择模型名");
+      message.warning(t("competitor.selectModelFirst"));
       return;
     }
     setAiLoading(true);
@@ -141,7 +143,7 @@ export default function CompetitorAnalysis() {
       });
       setAiInsight(res.data.insight);
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? "AI 竞对分析失败");
+      message.error(e?.response?.data?.detail ?? t("competitor.aiInsightFailed"));
     } finally {
       setAiLoading(false);
     }
@@ -152,10 +154,10 @@ export default function CompetitorAnalysis() {
       <div className="max-w-7xl mx-auto space-y-6">
         <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm">
           <Title level={3} className="text-yc-text-primary" style={{ marginBottom: 8 }}>
-            竞对洞察
+            {t("competitor.title")}
           </Title>
           <Text className="text-yc-text-secondary">
-            勾选 2-3 个监控频道，生成总播放量与订阅量增长趋势图。
+            {t("competitor.description")}
           </Text>
           <div className="mt-4 flex flex-col gap-4">
             <Checkbox.Group
@@ -173,10 +175,10 @@ export default function CompetitorAnalysis() {
               ))}
             </Checkbox.Group>
             <div className="flex items-center gap-3">
-              <span className="text-yc-text-secondary">回溯天数</span>
+              <span className="text-yc-text-secondary">{t("competitor.lookbackDays")}</span>
               <InputNumber min={7} max={180} value={days} onChange={(v) => setDays(Number(v ?? 30))} />
               <Button type="primary" onClick={onAnalyze} loading={loading}>
-                生成对比图
+              {t("competitor.generateCompare")}
               </Button>
             </div>
             {/* AI 模型选择 */}
@@ -184,7 +186,7 @@ export default function CompetitorAnalysis() {
               <Select
                 showSearch
                 style={{ width: 240 }}
-                placeholder="选择模型名"
+                placeholder={t("competitor.selectModel")}
                 value={
                   selectedModelLibId !== undefined && selectedLlmModelName
                     ? `${selectedModelLibId}::${selectedLlmModelName}`
@@ -204,14 +206,14 @@ export default function CompetitorAnalysis() {
               />
               <Select
                 style={{ width: 200 }}
-                placeholder="AI 智能体"
+                placeholder={t("competitor.selectAgent")}
                 value={selectedAgentId}
                 onChange={setSelectedAgentId}
                 options={agentOptions.map((p) => ({ value: p.id, label: p.title }))}
                 allowClear
               />
               <Button type="primary" ghost loading={aiLoading} onClick={onAiInsight}>
-                AI 竞争分析
+                {t("competitor.aiCompeteAnalysis")}
               </Button>
             </div>
           </div>
@@ -220,12 +222,12 @@ export default function CompetitorAnalysis() {
         <Spin spinning={loading}>
           {chartData.length === 0 ? (
             <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm">
-              <Empty description="暂无图表数据，请先选择频道并生成" />
+              <Empty description={t("competitor.noChartData")} />
             </Card>
           ) : (
             <>
               <Card
-                title={<span className="text-yc-text-primary">播放量增长趋势（total_views）</span>}
+                title={<span className="text-yc-text-primary">{t("competitor.viewCountTrend")}</span>}
                 className="!bg-yc-bg-card !border-yc-border !shadow-sm"
               >
                 <div className="h-[360px]">
@@ -252,7 +254,7 @@ export default function CompetitorAnalysis() {
               </Card>
 
               <Card
-                title={<span className="text-yc-text-primary">订阅量增长趋势（subscriber_count）</span>}
+                title={<span className="text-yc-text-primary">{t("competitor.subscriberCountTrend")}</span>}
                 className="!bg-yc-bg-card !border-yc-border !shadow-sm"
               >
                 <div className="h-[360px]">
@@ -283,28 +285,28 @@ export default function CompetitorAnalysis() {
 
         {/* AI 竞争分析结果 */}
         {aiInsight && (
-          <Card title="AI 竞争格局分析" className="!bg-yc-bg-card !border-yc-border !shadow-sm">
+          <Card title={t("competitor.aiCompeteInsight")} className="!bg-yc-bg-card !border-yc-border !shadow-sm">
             <div className="space-y-4">
               {aiInsight.positioning_diff && (
-                <div><Text strong>定位差异</Text><Paragraph className="!mb-0">{aiInsight.positioning_diff}</Paragraph></div>
+                <div><Text strong>{t("competitor.positioningDiff")}</Text><Paragraph className="!mb-0">{aiInsight.positioning_diff}</Paragraph></div>
               )}
               {aiInsight.content_strategy_diff && (
-                <div><Text strong>内容策略差异</Text><Paragraph className="!mb-0">{aiInsight.content_strategy_diff}</Paragraph></div>
+                <div><Text strong>{t("competitor.contentStrategyDiff")}</Text><Paragraph className="!mb-0">{aiInsight.content_strategy_diff}</Paragraph></div>
               )}
               {aiInsight.audience_overlap && (
-                <div><Text strong>受众重叠度</Text><Paragraph className="!mb-0">{aiInsight.audience_overlap}</Paragraph></div>
+                <div><Text strong>{t("competitor.audienceOverlap")}</Text><Paragraph className="!mb-0">{aiInsight.audience_overlap}</Paragraph></div>
               )}
               {aiInsight.competitive_summary && (
-                <div><Text strong>竞争格局总结</Text><Paragraph className="!mb-0">{aiInsight.competitive_summary}</Paragraph></div>
+                <div><Text strong>{t("competitor.competitiveSummary")}</Text><Paragraph className="!mb-0">{aiInsight.competitive_summary}</Paragraph></div>
               )}
               {aiInsight.actionable_advice && (
-                <div><Text strong>可操作建议</Text><Paragraph className="!mb-0">{aiInsight.actionable_advice}</Paragraph></div>
+                <div><Text strong>{t("competitor.actionableAdvice")}</Text><Paragraph className="!mb-0">{aiInsight.actionable_advice}</Paragraph></div>
               )}
             </div>
           </Card>
         )}
         {aiLoading && (
-          <div className="flex justify-center py-8"><Spin size="large" tip="AI 正在分析竞争格局…" /></div>
+          <div className="flex justify-center py-8"><Spin size="large" tip={t("competitor.aiAnalyzing")} /></div>
         )}
       </div>
     </div>

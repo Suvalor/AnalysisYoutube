@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { buildYouTubeWatchUrl } from "@/utils/youtubeLinks";
 import {
   Card,
@@ -35,27 +36,7 @@ import { useAuth } from "@/store/authStore";
 
 const { Title, Text } = Typography;
 
-const REGION_OPTIONS = [
-  { value: "US", label: "🇺🇸 美国" },
-  { value: "GB", label: "🇬🇧 英国" },
-  { value: "JP", label: "🇯🇵 日本" },
-  { value: "KR", label: "🇰🇷 韩国" },
-  { value: "DE", label: "🇩🇪 德国" },
-  { value: "FR", label: "🇫🇷 法国" },
-  { value: "BR", label: "🇧🇷 巴西" },
-  { value: "IN", label: "🇮🇳 印度" },
-];
-
-const LANGUAGE_OPTIONS = [
-  { value: "zh", label: "中文" },
-  { value: "en", label: "英语" },
-  { value: "ja", label: "日语" },
-  { value: "ko", label: "韩语" },
-  { value: "de", label: "德语" },
-  { value: "fr", label: "法语" },
-  { value: "pt", label: "葡萄牙语" },
-  { value: "hi", label: "印地语" },
-];
+// REGION_OPTIONS and LANGUAGE_OPTIONS are defined inside the component as useMemo
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -63,18 +44,47 @@ function formatNumber(n: number): string {
   return String(n);
 }
 
-function getRegionLabel(region: string): string {
-  const found = REGION_OPTIONS.find((o) => o.value === region);
-  return found ? found.label.replace(/^./, "").trim() : region;
-}
-
-function getLanguageLabel(language: string): string {
-  const found = LANGUAGE_OPTIONS.find((o) => o.value === language);
-  return found ? found.label : language;
-}
-
 export default function KeywordResearch() {
+  const { t } = useTranslation("keyword");
   const { token } = useAuth();
+
+  /** 地区选项（i18n） */
+  const REGION_OPTIONS = useMemo(() => [
+    { value: "US", label: `🇺🇸 ${t('research.regionUS')}` },
+    { value: "GB", label: `🇬🇧 ${t('research.regionGB')}` },
+    { value: "JP", label: `🇯🇵 ${t('research.regionJP')}` },
+    { value: "KR", label: `🇰🇷 ${t('research.regionKR')}` },
+    { value: "DE", label: `🇩🇪 ${t('research.regionDE')}` },
+    { value: "FR", label: `🇫🇷 ${t('research.regionFR')}` },
+    { value: "BR", label: `🇧🇷 ${t('research.regionBR')}` },
+    { value: "IN", label: `🇮🇳 ${t('research.regionIN')}` },
+    { value: "CA", label: `🇨🇦 ${t('research.regionCA')}` },
+    { value: "AU", label: `🇦🇺 ${t('research.regionAU')}` },
+  ], [t]);
+
+  /** 语言选项（i18n） */
+  const LANGUAGE_OPTIONS = useMemo(() => [
+    { value: "zh", label: t('research.langZh') },
+    { value: "en", label: t('research.langEn') },
+    { value: "ja", label: t('research.langJa') },
+    { value: "ko", label: t('research.langKo') },
+    { value: "de", label: t('research.langDe') },
+    { value: "fr", label: t('research.langFr') },
+    { value: "pt", label: t('research.langPt') },
+    { value: "hi", label: t('research.langHi') },
+  ], [t]);
+
+  /** 根据地区代码获取地区标签 */
+  function getRegionLabel(region: string): string {
+    const found = REGION_OPTIONS.find((o) => o.value === region);
+    return found ? found.label.replace(/^./, "").trim() : region;
+  }
+
+  /** 根据语言代码获取语言标签 */
+  function getLanguageLabel(language: string): string {
+    const found = LANGUAGE_OPTIONS.find((o) => o.value === language);
+    return found ? found.label : language;
+  }
   const [keyword, setKeyword] = useState("");
   const [region, setRegion] = useState("US");
   const [language, setLanguage] = useState("zh");
@@ -87,7 +97,7 @@ export default function KeywordResearch() {
   const [displayCount, setDisplayCount] = useState(10);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  /** 获取关键词研究历史（仅已登录用户，游客无历史记录） */
+  /** 获取{t('research.title')}历史（仅已登录用户，游客无历史记录） */
   const fetchHistory = useCallback(async () => {
     if (!token) return;
     setHistoryLoading(true);
@@ -107,7 +117,7 @@ export default function KeywordResearch() {
 
   const handleSearch = async () => {
     if (!keyword.trim()) {
-      message.warning("请输入关键词");
+      message.warning(t("research.keywordRequired"));
       return;
     }
     setLoading(true);
@@ -123,7 +133,7 @@ export default function KeywordResearch() {
       setDisplayCount(10);
       await fetchHistory();
     } catch (e: any) {
-      message.error(e?.response?.data?.detail || "关键词研究失败");
+      message.error(e?.response?.data?.detail || t("research.researchFailed"));
     } finally {
       setLoading(false);
     }
@@ -167,7 +177,7 @@ export default function KeywordResearch() {
       setResult(res);
       setDisplayCount(10);
     } catch (e: any) {
-      message.error(e?.response?.data?.detail || "关键词研究失败");
+      message.error(e?.response?.data?.detail || t("research.researchFailed"));
     } finally {
       setLoading(false);
     }
@@ -199,7 +209,7 @@ export default function KeywordResearch() {
       setDisplayCount(10);
       await fetchHistory();
     } catch (e: any) {
-      message.error(e?.response?.data?.detail || "关键词研究失败");
+      message.error(e?.response?.data?.detail || t("research.researchFailed"));
     } finally {
       setLoading(false);
     }
@@ -209,7 +219,7 @@ export default function KeywordResearch() {
     <div className="p-6 max-w-[1200px] mx-auto">
       <Title level={3} style={{ marginBottom: 24 }}>
         <SearchOutlined style={{ marginRight: 8, color: "var(--color-primary)" }} />
-        关键词研究
+        {t('research.title')}
       </Title>
 
       {/* 搜索区 */}
@@ -217,7 +227,7 @@ export default function KeywordResearch() {
         <Row gutter={16} align="middle">
           <Col flex="auto">
             <Input
-              placeholder="输入关键词..."
+              placeholder={t('research.searchPlaceholder')}
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               onPressEnter={handleSearch}
@@ -228,7 +238,7 @@ export default function KeywordResearch() {
           <Col>
             <Space>
               <GlobalOutlined />
-              <Text strong>地区</Text>
+              <Text strong>{t('research.region')}</Text>
             </Space>
             <Select
               value={region}
@@ -240,7 +250,7 @@ export default function KeywordResearch() {
           <Col>
             <Space>
               <RiseOutlined />
-              <Text strong>语言</Text>
+              <Text strong>{t('research.language')}</Text>
             </Space>
             <Select
               value={language}
@@ -257,7 +267,7 @@ export default function KeywordResearch() {
               onClick={handleSearch}
               size="large"
             >
-              搜索
+              {t('action.search')}
             </Button>
           </Col>
         </Row>
@@ -266,7 +276,7 @@ export default function KeywordResearch() {
       {/* 关键词历史（仅已登录用户显示） */}
       {token && history.length > 0 && (
         <Card
-          title={<><HistoryOutlined style={{ marginRight: 8 }} />研究历史</>}
+          title={<><HistoryOutlined style={{ marginRight: 8 }} />{t('research.researchHistory')}</>}
           style={{ marginBottom: 24 }}
           size="small"
           loading={historyLoading}
@@ -296,7 +306,7 @@ export default function KeywordResearch() {
             <Col span={6}>
               <Card>
                 <Statistic
-                  title="搜索量"
+                  title={t('research.searchVolume')}
                   value={result.search_volume || 0}
                   prefix={<SearchOutlined />}
                 />
@@ -305,7 +315,7 @@ export default function KeywordResearch() {
             <Col span={6}>
               <Card>
                 <Statistic
-                  title="竞争度"
+                  title={t('research.competition')}
                   value={result.competition || 0}
                   prefix={<RiseOutlined />}
                 />
@@ -314,7 +324,7 @@ export default function KeywordResearch() {
             <Col span={6}>
               <Card>
                 <Statistic
-                  title="相关关键词"
+                  title={t('research.relatedKeywords')}
                   value={result.related_keywords?.length || 0}
                   prefix={<GlobalOutlined />}
                 />
@@ -323,7 +333,7 @@ export default function KeywordResearch() {
             <Col span={6}>
               <Card>
                 <Statistic
-                  title="热门视频"
+                  title={t('research.popularVideos')}
                   value={result.popular_videos?.length || 0}
                   prefix={<EyeOutlined />}
                 />
@@ -331,9 +341,9 @@ export default function KeywordResearch() {
             </Col>
           </Row>
 
-          {/* 相关关键词 */}
+          {/* {t('research.relatedKeywords')} */}
           {result.related_keywords?.length > 0 && (
-            <Card title="相关关键词" style={{ marginBottom: 24 }} size="small">
+            <Card title={t('research.relatedKeywords')} style={{ marginBottom: 24 }} size="small">
               <Space wrap>
                 {result.related_keywords.map((kw: any, i: number) => (
                   <Tag
@@ -353,9 +363,9 @@ export default function KeywordResearch() {
             </Card>
           )}
 
-          {/* 热门视频 - 无限滚动 */}
+          {/* {t('research.popularVideos')} - 无限滚动 */}
           {result.popular_videos?.length > 0 && (
-            <Card title="热门视频" size="small">
+            <Card title={t('research.popularVideos')} size="small">
               <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
                 {/* 表头 */}
                 <div
@@ -371,11 +381,11 @@ export default function KeywordResearch() {
                   }}
                 >
                   <div>#</div>
-                  <div>视频</div>
-                  <div>播放量</div>
-                  <div>点赞</div>
-                  <div>评论</div>
-                  <div>互动率</div>
+                  <div>{t('research.video')}</div>
+                  <div>{t('research.viewCount')}</div>
+                  <div>{t('research.likeCount')}</div>
+                  <div>{t('research.commentCount')}</div>
+                  <div>{t('research.engagementRate')}</div>
                 </div>
 
                 {visibleVideos.map((record: any, idx: number) => (
@@ -430,13 +440,13 @@ export default function KeywordResearch() {
                 {result.popular_videos.length > displayCount && (
                   <div ref={sentinelRef} style={{ textAlign: "center", padding: "16px 0" }}>
                     <Spin size="small" />
-                    <Text type="secondary" style={{ marginLeft: 8 }}>加载更多...</Text>
+                    <Text type="secondary" style={{ marginLeft: 8 }}>{t('research.loadMore')}</Text>
                   </div>
                 )}
 
                 {displayCount >= result.popular_videos.length && result.popular_videos.length > 0 && (
                   <div style={{ textAlign: "center", padding: "16px 0", color: "var(--color-text-tertiary)" }}>
-                    共 {result.popular_videos.length} 条，已全部加载
+                    {t('research.allLoaded', { count: result.popular_videos.length })}
                   </div>
                 )}
               </div>
@@ -448,7 +458,7 @@ export default function KeywordResearch() {
       {!result && !loading && (
         <Card>
           <Empty
-            description="输入关键词，点击「搜索」查看 YouTube 关键词分析"
+            description={t('research.emptyHint')}
             image={Empty.PRESENTED_IMAGE_SIMPLE}
           />
         </Card>

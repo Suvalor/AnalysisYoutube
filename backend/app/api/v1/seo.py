@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 
 from app.api.deps import CurrentUserDep, DBSessionDep, GuestInfoDep, OptionalUserDep
+from app.core.config import get_settings
 from app.models.seo_score import SeoScoreRecord
 from app.models.library import ModelLibrary
 from app.crud.library import get_by_user
@@ -70,8 +71,8 @@ async def seo_scoring_endpoint(
                 detail="游客配额已用完，请登录以获取更多配额",
             )
 
-    # 解析集成配置（游客使用系统级 fallback）
-    org_id = current_user.org_id if current_user else None
+    # 解析集成配置：游客使用默认组织的设置中心配置。
+    org_id = current_user.org_id if current_user else get_settings().guest_default_org_id
     icfg = await resolve_integration_config(db, org_id=org_id)
     youtube_api_key = icfg.youtube_api_key or None
 
@@ -342,8 +343,8 @@ async def trend_discovery_endpoint(
             await db.commit()
         return TrendDiscoveryResponse(**cached)
 
-    # 解析集成配置（游客使用系统级 fallback）
-    org_id = current_user.org_id if current_user else None
+    # 解析集成配置：游客使用默认组织的设置中心配置。
+    org_id = current_user.org_id if current_user else get_settings().guest_default_org_id
     icfg = await resolve_integration_config(db, org_id=org_id)
     if not icfg.youtube_api_key:
         # 区分游客和管理员的错误提示

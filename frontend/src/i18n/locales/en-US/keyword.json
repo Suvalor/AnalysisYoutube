@@ -41,5 +41,71 @@
   },
   "empty": {
     "noData": "No keyword data. Please search keywords"
+  },
+  "research": {
+    "country": {
+      "US": "United States",
+      "GB": "United Kingdom",
+      "JP": "Japan",
+      "KR": "South Korea",
+      "IN": "India",
+      "DE": "Germany",
+      "FR": "France",
+      "BR": "Brazil",
+      "AU": "Australia",
+      "CA": "Canada"
+    },
+    "message": {
+      "loadConfigFailed": "Failed to load configuration",
+      "topicRequired": "Please fill in the creative topic/key points first",
+      "configIncomplete": "Please maintain available agents and styles in Settings Center first",
+      "generateFailed": "Generation request failed",
+      "unnamedScript": "Unnamed Script",
+      "savedToLibrary": "Saved to script library",
+      "knowledgeBase": "Knowledge Base",
+      "loadKeywordsFailed": "Failed to load keywords",
+      "generateSuccess": "Keywords generated successfully",
+      "noResult": "No keyword data yet"
+    },
+    "action": {
+      "selectAgent": "Select Agent",
+      "selectStyle": "Select Style",
+      "topicPlaceholder": "Enter creative topic/key points",
+      "generate": "Generate",
+      "generating": "Generating...",
+      "selectCountry": "Select country/region"
+    },
+    "label": {
+      "keyword": "Keyword",
+      "searchVolume": "Search Volume",
+      "competition": "Competition",
+      "trend": "Trend"
+    },
+    "region": "Region",
+    "language": "Language",
+    "searchPlaceholder": "Enter keyword...",
+    "keywordRequired": "Please enter a keyword",
+    "researchFailed": "Keyword research failed",
+    "researchHistory": "Research History",
+    "searchVolume": "Search Volume",
+    "competition": "Competition",
+    "relatedKeywords": "Related Keywords",
+    "popularVideos": "Popular Videos",
+    "video": "Video",
+    "viewCount": "Views",
+    "likeCount": "Likes",
+    "commentCount": "Comments",
+    "engagementRate": "Engagement",
+    "loadMore": "Loading more...",
+    "allLoaded": "{{count}} total, all loaded",
+    "emptyHint": "Enter a keyword and click 'Search' to view YouTube keyword analysis",
+    "langZh": "Chinese",
+    "langEn": "English",
+    "langJa": "Japanese",
+    "langKo": "Korean",
+    "langDe": "German",
+    "langFr": "French",
+    "langPt": "Portuguese",
+    "langHi": "Hindi"
   }
 }

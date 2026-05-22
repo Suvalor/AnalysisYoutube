@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { Pin } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import MarkdownEditorToggle from "@/components/MarkdownEditorToggle";
 import {
   createManualKnowledgeScriptApi,
@@ -23,14 +24,16 @@ function getScriptStatus(row: ScriptItem): ScriptStatus {
   return "unconfigured";
 }
 
-function getScriptStatusLabel(status: ScriptStatus): string {
-  if (status === "configured") return "已配置提示词与风格";
-  if (status === "unconfigured") return "待补全配置";
-  return "已保存";
-}
-
 export default function KnowledgeBase() {
+  const { t } = useTranslation("knowledge");
   const navigate = useNavigate();
+
+  /** 根据脚本状态获取标签文本 */
+  function getScriptStatusLabel(status: ScriptStatus): string {
+    if (status === "configured") return t("base.configuredLabel");
+    if (status === "unconfigured") return t("base.unconfiguredLabel");
+    return t("base.savedLabel");
+  }
   const [rows, setRows] = useState<ScriptItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [titleKeyword, setTitleKeyword] = useState("");
@@ -52,7 +55,7 @@ export default function KnowledgeBase() {
       });
       setRows(data);
     } catch (e: any) {
-      message.error(e?.response?.data?.detail ?? e?.message ?? "加载剧本列表失败");
+      message.error(e?.response?.data?.detail ?? e?.message ?? t("base.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -69,11 +72,11 @@ export default function KnowledgeBase() {
       setPinningId(row.id);
       try {
         await pinKnowledgeScriptApi(row.id, next);
-        message.success(next ? "已置顶" : "已取消置顶");
+        message.success(next ? t("base.pinned") : t("base.unpinned"));
         await reloadScripts();
       } catch (e: unknown) {
         const err = e as { response?: { data?: { detail?: string } } };
-        message.error(err?.response?.data?.detail ?? "置顶操作失败");
+        message.error(err?.response?.data?.detail ?? t("base.pinFailed"));
       } finally {
         setPinningId(null);
       }
@@ -84,7 +87,7 @@ export default function KnowledgeBase() {
   const columns: ColumnsType<ScriptItem> = useMemo(
     () => [
     {
-      title: "标题",
+      title: t("base.titleColumn"),
       dataIndex: "title",
       key: "title",
       render: (v: string, row) => (
@@ -92,8 +95,8 @@ export default function KnowledgeBase() {
           {viewMode === "active" ? (
             <button
               type="button"
-              title={row.is_pinned ? "取消置顶" : "置顶"}
-              aria-label={row.is_pinned ? "取消置顶" : "置顶"}
+              title={row.is_pinned ? t("base.unpinTitle") : t("base.pinTitle")}
+              aria-label={row.is_pinned ? t("base.unpinTitle") : t("base.pinTitle")}
               disabled={pinningId === row.id}
               onClick={(e) => {
                 e.stopPropagation();
@@ -110,7 +113,7 @@ export default function KnowledgeBase() {
           ) : null}
           {row.origin_type === "MANUAL" ? (
             <Tag color="blue" className="m-0">
-              手动
+              {t("base.manualTag")}
             </Tag>
           ) : null}
           <span>{v}</span>
@@ -118,20 +121,20 @@ export default function KnowledgeBase() {
       ),
     },
     {
-      title: "状态",
+      title: t("base.statusColumn"),
       key: "status",
       width: 170,
       render: (_, row) => getScriptStatusLabel(getScriptStatus(row)),
     },
     {
-      title: timeSort === "updated_at" ? "更新时间" : "创建时间",
+      title: timeSort === "updated_at" ? t("base.updatedAtColumn") : t("base.createdAtColumn"),
       dataIndex: timeSort === "updated_at" ? "updated_at" : "created_at",
       key: timeSort,
       render: (v: string) => dayjs(v).format("YYYY-MM-DD HH:mm"),
       width: 180,
     },
     {
-      title: "操作",
+      title: t("base.actionColumn"),
       key: "op",
       width: 260,
       render: (_, row) => (
@@ -144,47 +147,47 @@ export default function KnowledgeBase() {
                 onClick={() => {
                   localStorage.setItem("sop_current_script_id", String(row.id));
                   localStorage.setItem("sop_current_script_title", row.title);
-                  message.success(`已选中剧本《${row.title}》，进入下一步流程`);
+                  message.success(t("base.selectedScript", { title: row.title }));
                   navigate("/sop-workflow");
                 }}
               >
-                继续 SOP
+                {t("base.continueSop")}
               </Button>
               <Popconfirm
-                title="确定要删除该剧本吗？"
-                okText="确定删除"
-                cancelText="取消"
+                title={t("base.confirmDelete")}
+                okText={t("base.confirmDeleteOk")}
+                cancelText={t("base.cancel")}
                 onConfirm={async () => {
                   try {
                     await deleteScriptApi(row.id);
-                    message.success("删除成功");
+                    message.success(t("base.deleteSuccess"));
                     await reloadScripts();
                   } catch (e: any) {
-                    message.error(e?.response?.data?.detail ?? e?.message ?? "删除失败");
+                    message.error(e?.response?.data?.detail ?? e?.message ?? t("base.deleteFailed"));
                   }
                 }}
               >
                 <Button danger size="small">
-                  删除
+                  {t("base.delete")}
                 </Button>
               </Popconfirm>
             </>
           ) : (
             <Popconfirm
-              title="确定要恢复该剧本吗？"
-              okText="确定恢复"
-              cancelText="取消"
+              title={t("base.confirmRestore")}
+              okText={t("base.confirmRestoreOk")}
+              cancelText={t("base.cancel")}
               onConfirm={async () => {
                 try {
                   await restoreScriptApi(row.id);
-                  message.success("恢复成功");
+                  message.success(t("base.restoreSuccess"));
                   await reloadScripts();
                 } catch (e: any) {
-                  message.error(e?.response?.data?.detail ?? e?.message ?? "恢复失败");
+                  message.error(e?.response?.data?.detail ?? e?.message ?? t("base.restoreFailed"));
                 }
               }}
             >
-              <Button size="small">恢复</Button>
+              <Button size="small">{t("base.restore")}</Button>
             </Popconfirm>
           )}
         </Space>
@@ -213,23 +216,23 @@ export default function KnowledgeBase() {
     const title = formTitle.trim();
     const plot = formPlot.trim();
     if (!title) {
-      message.warning("请填写标题/项目名");
+      message.warning(t("base.titleRequired"));
       return;
     }
     if (!plot) {
-      message.warning("请填写核心内容/剧情");
+      message.warning(t("base.plotRequired"));
       return;
     }
     setCreateSubmitting(true);
     try {
       await createManualKnowledgeScriptApi({ title, plot });
-      message.success("已保存到知识库");
+      message.success(t("base.savedToLibrary"));
       resetCreateForm();
       setCreateOpen(false);
       await reloadScripts();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
-      message.error(err?.response?.data?.detail ?? "保存失败");
+      message.error(err?.response?.data?.detail ?? t("base.saveFailed"));
     } finally {
       setCreateSubmitting(false);
     }
@@ -238,26 +241,26 @@ export default function KnowledgeBase() {
   return (
     <div className="p-6 md:p-10">
       <div className="max-w-6xl rounded-2xl border border-yc-border bg-yc-bg-card p-6 shadow-sm">
-        <h2 className="text-xl font-semibold mb-2 text-yc-text-primary">知识库管理</h2>
-        <p className="text-yc-text-secondary mb-4">在此查看已保存剧本，并从任意剧本继续进入 SOP 下一步。</p>
+        <h2 className="text-xl font-semibold mb-2 text-yc-text-primary">{t("base.title")}</h2>
+        <p className="text-yc-text-secondary mb-4">{t("base.subtitle")}</p>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Segmented
             value={viewMode}
             onChange={(v) => setViewMode(v as "active" | "recycle")}
             options={[
-              { label: "正常列表", value: "active" },
-              { label: "回收站", value: "recycle" },
+              { label: t("base.activeList"), value: "active" },
+              { label: t("base.recycleBin"), value: "recycle" },
             ]}
           />
           {viewMode === "active" ? (
             <Button type="primary" onClick={() => setCreateOpen(true)}>
-              新建知识
+              {t("base.newKnowledge")}
             </Button>
           ) : null}
         </div>
         <div className="mb-4 flex flex-col md:flex-row gap-3 flex-wrap">
           <Input
-            placeholder="按标题搜索"
+            placeholder={t("base.searchPlaceholder")}
             value={titleKeyword}
             onChange={(e) => setTitleKeyword(e.target.value)}
             allowClear
@@ -267,8 +270,8 @@ export default function KnowledgeBase() {
             value={timeSort}
             onChange={(v) => setTimeSort(v as "updated_at" | "created_at")}
             options={[
-              { value: "updated_at", label: "按最近更新" },
-              { value: "created_at", label: "按创建时间" },
+              { value: "updated_at", label: t("base.sortByUpdated") },
+              { value: "created_at", label: t("base.sortByCreated") },
             ]}
             className="md:w-44"
           />
@@ -277,9 +280,9 @@ export default function KnowledgeBase() {
               value={statusFilter}
               onChange={(v) => setStatusFilter(v)}
               options={[
-                { value: "all", label: "全部状态" },
-                { value: "configured", label: "已配置提示词与风格" },
-                { value: "unconfigured", label: "待补全配置" },
+                { value: "all", label: t("base.allStatus") },
+                { value: "configured", label: t("base.configuredLabel") },
+                { value: "unconfigured", label: t("base.unconfiguredLabel") },
               ]}
               className="md:w-60"
             />
@@ -295,7 +298,7 @@ export default function KnowledgeBase() {
         />
 
         <Modal
-          title="新建知识"
+          title={t("base.newKnowledge")}
           open={createOpen}
           onCancel={() => {
             if (!createSubmitting) {
@@ -303,8 +306,8 @@ export default function KnowledgeBase() {
               resetCreateForm();
             }
           }}
-          okText="保存"
-          cancelText="取消"
+          okText={t("base.save")}
+          cancelText={t("base.cancel")}
           confirmLoading={createSubmitting}
           onOk={() => void submitManualCreate()}
           destroyOnClose
@@ -312,22 +315,22 @@ export default function KnowledgeBase() {
         >
           <div className="space-y-4 pt-2">
             <div>
-              <div className="text-xs text-yc-text-secondary mb-1">标题 / 项目名</div>
+              <div className="text-xs text-yc-text-secondary mb-1">{t("base.titleLabel")}</div>
               <Input
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
-                placeholder="例如：第一集 · 开场冲突"
+                placeholder={t("base.titlePlaceholder")}
                 maxLength={255}
                 showCount
               />
             </div>
             <div>
-              <div className="text-xs text-yc-text-secondary mb-1">核心内容 / 剧情（Markdown，与 AI 脚本工坊落库格式一致）</div>
+              <div className="text-xs text-yc-text-secondary mb-1">{t("base.plotLabel")}</div>
               <MarkdownEditorToggle
                 value={formPlot}
                 onChange={setFormPlot}
                 minRows={12}
-                placeholder="支持 ### 标题、**加粗**、表格、围栏代码块等；可切换「预览」或「分栏」查看渲染效果"
+                placeholder={t("base.plotPlaceholder")}
               />
               <div className="text-right text-xs text-yc-text-tertiary mt-1">{formPlot.length} / 500000</div>
             </div>

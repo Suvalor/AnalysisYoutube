@@ -1,5 +1,6 @@
 import { Button, Result } from "antd";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 /** 游客可访问的安全首页，用于"返回"按钮的兜底导航 */
 const SAFE_LANDING_PATH = "/keyword-research";
@@ -11,6 +12,7 @@ const SAFE_LANDING_PATH = "/keyword-research";
 export default function UpgradePrompt() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation("auth");
   const state = location.state as { requiredRole?: string; currentRole?: string; from?: string } | null;
 
   /** 导航到游客可访问的安全页面，避免返回受限页面触发重定向死循环 */
@@ -22,14 +24,14 @@ export default function UpgradePrompt() {
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
       <Result
         status="403"
-        title="权限不足"
-        subTitle={`您当前的角色（${state?.currentRole ?? "游客"}）无法访问此功能，请联系管理员升级您的账户权限。`}
+        title={t("upgrade.title")}
+        subTitle={t("upgrade.subtitle", { currentRole: state?.currentRole ?? t("upgrade.guest") })}
         extra={[
           <Button key="back" onClick={handleGoBack}>
-            返回首页
+            {t("upgrade.backToHome")}
           </Button>,
           <Button key="home" type="primary" onClick={() => navigate("/login", { replace: true })}>
-            登录/注册
+            {t("upgrade.loginRegister")}
           </Button>,
         ]}
       />

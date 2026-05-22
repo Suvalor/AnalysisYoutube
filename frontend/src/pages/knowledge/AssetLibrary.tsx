@@ -29,6 +29,7 @@ import {
 import { type Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   deleteAssetApi,
   listModelsApi,
@@ -93,6 +94,7 @@ function mediaSrc(a: AssetItem): string {
 }
 
 export default function AssetLibraryPage() {
+  const { t } = useTranslation("knowledge");
   const [items, setItems] = useState<AssetItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -124,7 +126,7 @@ export default function AssetLibraryPage() {
       const resp = await listMixTasks({ limit: 20 });
       setMixTasks(resp.items ?? []);
     } catch {
-      message.error("加载混剪任务列表失败");
+      message.error(t("asset.loadMixTaskFailed"));
     } finally {
       setMixTasksLoading(false);
     }
@@ -138,19 +140,19 @@ export default function AssetLibraryPage() {
     setDownloadingTaskId(taskId);
     try {
       await downloadMixResult(taskId);
-      message.success("下载已开始");
+      message.success(t("asset.downloadStarted"));
     } catch {
-      message.error("下载混剪结果失败");
+      message.error(t("asset.downloadMixFailed"));
     } finally {
       setDownloadingTaskId(null);
     }
   }, []);
 
   const MIX_TASK_STATUS_MAP: Record<MixTaskStatus, { color: string; label: string }> = {
-    PENDING: { color: "default", label: "等待中" },
-    PROCESSING: { color: "processing", label: "处理中" },
-    COMPLETED: { color: "success", label: "已完成" },
-    FAILED: { color: "error", label: "失败" },
+    PENDING: { color: "default", label: t("asset.statusPending") },
+    PROCESSING: { color: "processing", label: t("asset.statusProcessing") },
+    COMPLETED: { color: "success", label: t("asset.statusCompleted") },
+    FAILED: { color: "error", label: t("asset.statusFailed") },
   };
 
   const sortApi = useMemo(() => sortPresetToApi(sortPreset), [sortPreset]);
@@ -185,7 +187,7 @@ export default function AssetLibraryPage() {
             err && typeof err === "object" && "response" in err
               ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
               : undefined;
-          message.error(typeof d === "string" ? d : "加载素材列表失败");
+          message.error(typeof d === "string" ? d : t("asset.loadListFailed"));
           setItems([]);
           setTotal(0);
         }
@@ -228,7 +230,7 @@ export default function AssetLibraryPage() {
       } catch {
         if (!cancelled) {
           setWatermarkModels([]);
-          message.error("加载去水印模型失败");
+          message.error(t("asset.loadWatermarkModelFailed"));
         }
       } finally {
         if (!cancelled) setLoadingWatermarkModels(false);
@@ -246,18 +248,18 @@ export default function AssetLibraryPage() {
 
   const onConfirmUpload = async () => {
     if (!selectedFile) {
-      message.warning("请先选择素材文件");
+      message.warning(t("asset.selectFileFirst"));
       return;
     }
     const type = inferType(selectedFile);
     if (!type) {
-      message.error("仅支持图片、视频、音频文件");
+      message.error(t("asset.unsupportedFileType"));
       return;
     }
     try {
       setUploading(true);
       if (removeWatermark && !selectedWatermarkModelId) {
-        message.warning("请先选择去水印模型");
+        message.warning(t("asset.selectWatermarkModelFirst"));
         return;
       }
       const uploadRes = await uploadAssetWithProcessApi({
@@ -266,12 +268,12 @@ export default function AssetLibraryPage() {
         watermark_model_id: removeWatermark ? Number(selectedWatermarkModelId) : undefined,
       });
       if (!uploadRes.access_url && !uploadRes.file_url) {
-        message.error("上传未返回可访问地址");
+        message.error(t("asset.uploadNoUrl"));
         return;
       }
       setPage(1);
       setReloadToken((t) => t + 1);
-      message.success("上传成功");
+      message.success(t("asset.uploadSuccess"));
       setUploadModalOpen(false);
       setSelectedFile(null);
       setRemoveWatermark(false);
@@ -280,7 +282,7 @@ export default function AssetLibraryPage() {
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : undefined;
-      message.error(typeof d === "string" ? d : "上传失败，请稍后重试");
+      message.error(typeof d === "string" ? d : t("asset.uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -289,7 +291,7 @@ export default function AssetLibraryPage() {
   const onDelete = async (id: number) => {
     try {
       await deleteAssetApi(id);
-      message.success("删除成功");
+      message.success(t("asset.deleteSuccess"));
       const nextTotal = Math.max(0, total - 1);
       const maxPage = Math.max(1, Math.ceil(nextTotal / pageSize));
       if (page > maxPage) setPage(maxPage);
@@ -299,14 +301,14 @@ export default function AssetLibraryPage() {
         err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : undefined;
-      message.error(typeof d === "string" ? d : "删除失败");
+      message.error(typeof d === "string" ? d : t("asset.deleteFailed"));
     }
   };
 
   const onDownload = (asset: AssetItem) => {
     const href = mediaSrc(asset);
     if (!href) {
-      message.warning("无可下载地址");
+      message.warning(t("asset.noDownloadUrl"));
       return;
     }
     const a = document.createElement("a");
@@ -349,7 +351,7 @@ export default function AssetLibraryPage() {
           <Row gutter={[12, 12]} align="middle">
             <Col xs={24} sm={12} md={6} lg={5}>
               <Button type="primary" block onClick={() => setUploadModalOpen(true)} loading={uploading}>
-                上传素材
+                {t("asset.uploadAsset")}
               </Button>
             </Col>
             <Col xs={24} sm={12} md={6} lg={5}>
@@ -358,10 +360,10 @@ export default function AssetLibraryPage() {
                 value={typeFilter}
                 onChange={setTypeFilter}
                 options={[
-                  { label: "全部类型", value: "all" },
-                  { label: "图片", value: "image" },
-                  { label: "视频", value: "video" },
-                  { label: "音频", value: "audio" },
+                  { label: t("asset.filterAll"), value: "all" },
+                  { label: t("asset.filterImage"), value: "image" },
+                  { label: t("asset.filterVideo"), value: "video" },
+                  { label: t("asset.filterAudio"), value: "audio" },
                 ]}
               />
             </Col>
@@ -378,10 +380,10 @@ export default function AssetLibraryPage() {
                 value={sortPreset}
                 onChange={setSortPreset}
                 options={[
-                  { label: "上传时间 · 从新到旧", value: "time_desc" },
-                  { label: "上传时间 · 从旧到新", value: "time_asc" },
-                  { label: "文件大小 · 从大到小", value: "size_desc" },
-                  { label: "文件大小 · 从小到大", value: "size_asc" },
+                  { label: t("asset.sortTimeDesc"), value: "time_desc" },
+                  { label: t("asset.sortTimeAsc"), value: "time_asc" },
+                  { label: t("asset.sortSizeDesc"), value: "size_desc" },
+                  { label: t("asset.sortSizeAsc"), value: "size_asc" },
                 ]}
               />
             </Col>
@@ -390,13 +392,13 @@ export default function AssetLibraryPage() {
                 <Input
                   allowClear
                   className="flex-1 min-w-0"
-                  placeholder="按素材名称搜索"
+                  placeholder={t("asset.searchPlaceholder")}
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   onPressEnter={() => setSearchText(keyword.trim())}
                 />
                 <Button type="primary" onClick={() => setSearchText(keyword.trim())}>
-                  搜索
+                  {t("asset.search")}
                 </Button>
               </Space.Compact>
             </Col>
@@ -407,7 +409,7 @@ export default function AssetLibraryPage() {
         {selectedIds.size > 0 && (
           <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 shadow-sm">
             <span className="text-sm text-blue-700 font-medium">
-              已选 {selectedIds.size} 项
+              {t("asset.selectedCount", { count: selectedIds.size })}
             </span>
             <Button
               size="small"
@@ -415,10 +417,10 @@ export default function AssetLibraryPage() {
               icon={<MergeOutlined />}
               onClick={() => setMixModalOpen(true)}
             >
-              一键 AI 混编
+              {t("asset.aiMix")}
             </Button>
             <Button size="small" onClick={() => setSelectedIds(new Set())}>
-              清除选择
+              {t("asset.clearSelection")}
             </Button>
           </div>
         )}
@@ -426,7 +428,7 @@ export default function AssetLibraryPage() {
         <Spin spinning={listLoading}>
           {items.length === 0 && !listLoading ? (
             <Card className="!bg-slate-900/60 !border-slate-800">
-              <Empty description="暂无素材，点击上传或调整筛选条件" />
+              <Empty description={t("asset.emptyDescription")} />
             </Card>
           ) : (
             <Row gutter={[16, 16]}>
@@ -438,7 +440,7 @@ export default function AssetLibraryPage() {
                     indeterminate={selectedIds.size > 0 && selectedIds.size < items.length}
                     onChange={toggleSelectAll}
                   >
-                    全选本页 ({items.length})
+                    {t("asset.selectAllPage", { count: items.length })}
                   </Checkbox>
                 </Col>
               )}
@@ -472,7 +474,7 @@ export default function AssetLibraryPage() {
                               />
                             ) : (
                               <div className="w-full h-52 flex items-center justify-center text-yc-text-secondary text-xs px-3 text-center">
-                                图片无法加载。请确认 access_url 有效，或在 OSS/COS/CDN 配置 CORS 允许当前站点。
+                                {t("asset.imageLoadFailed")}
                               </div>
                             )}
                           </>
@@ -489,7 +491,7 @@ export default function AssetLibraryPage() {
                               />
                             ) : (
                               <div className="w-full h-52 flex items-center justify-center text-yc-text-secondary text-xs px-3 text-center">
-                                暂无视频地址
+                                {t("asset.noVideoUrl")}
                               </div>
                             )}
                           </>
@@ -499,22 +501,22 @@ export default function AssetLibraryPage() {
                             {src ? (
                               <audio src={src} controls className="w-full" preload="metadata" />
                             ) : (
-                              <div className="text-yc-text-secondary text-xs text-center px-2">暂无音频地址</div>
+                              <div className="text-yc-text-secondary text-xs text-center px-2">{t("asset.noAudioUrl")}</div>
                             )}
                           </div>
                         )}
                         {ft === "unknown" && (
                           <div className="w-full h-52 flex items-center justify-center text-yc-text-secondary text-xs px-3 text-center">
-                            无法识别的素材类型，请刷新列表或联系管理员。
+                            {t("asset.unknownType")}
                           </div>
                         )}
                         {(ft === "image" || ft === "video") && src && !broken && (
                           <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 pointer-events-none group-hover:pointer-events-auto">
                             <Button size="small" icon={<EyeOutlined />} onClick={() => setPreviewAsset(asset)}>
-                              预览
+                              {t("asset.preview")}
                             </Button>
                             <Button size="small" icon={<DownloadOutlined />} onClick={() => onDownload(asset)}>
-                              下载
+                              {t("asset.download")}
                             </Button>
                           </div>
                         )}
@@ -534,7 +536,7 @@ export default function AssetLibraryPage() {
                             <FileImageOutlined className="text-yc-text-secondary" aria-hidden />
                           )}
                           <span>
-                            {ft === "image" ? "图片" : ft === "video" ? "视频" : ft === "audio" ? "音频" : "未知类型"}
+                            {ft === "image" ? t("asset.typeImage") : ft === "video" ? t("asset.typeVideo") : ft === "audio" ? t("asset.typeAudio") : t("asset.typeUnknown")}
                           </span>
                           <span>·</span>
                           <span>{dayjs(asset.created_at).format("YYYY-MM-DD HH:mm")}</span>
@@ -543,13 +545,13 @@ export default function AssetLibraryPage() {
                         </div>
                         <div className="flex justify-end pt-2">
                           <Popconfirm
-                            title="确认删除"
-                            description="删除后无法恢复，确认继续？"
+                            title={t("asset.confirmDeleteTitle")}
+                            description={t("asset.confirmDeleteDesc")}
                             onConfirm={() => void onDelete(asset.id)}
-                            okText="确认"
-                            cancelText="取消"
+                            okText={t("asset.confirmDeleteOk")}
+                            cancelText={t("asset.confirmDeleteCancel")}
                           >
-                            <Button danger size="small">删除</Button>
+                            <Button danger size="small">{t("asset.deleteButton")}</Button>
                           </Popconfirm>
                         </div>
                       </div>
@@ -568,7 +570,7 @@ export default function AssetLibraryPage() {
               pageSize={pageSize}
               total={total}
               showSizeChanger
-              showTotal={(t) => `共 ${t} 条`}
+              showTotal={(total) => t("asset.totalItems", { total })}
               pageSizeOptions={[12, 20, 40, 60]}
               onChange={(p, ps) => {
                 setPage(p);
@@ -582,17 +584,17 @@ export default function AssetLibraryPage() {
 
       {/* 混剪任务列表 */}
       <Card
-        title="混剪任务"
+        title={t("asset.mixTaskTitle")}
         size="small"
         style={{ marginTop: 16, maxWidth: 1280, marginLeft: "auto", marginRight: "auto" }}
         extra={
           <Button size="small" onClick={loadMixTasks} loading={mixTasksLoading}>
-            刷新
+            {t("asset.refresh")}
           </Button>
         }
       >
         {mixTasks.length === 0 ? (
-          <Empty description="暂无混剪任务" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          <Empty description={t("asset.mixTaskEmpty")} image={Empty.PRESENTED_IMAGE_SIMPLE} />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {mixTasks.map((task) => {
@@ -623,7 +625,7 @@ export default function AssetLibraryPage() {
                       loading={downloadingTaskId === task.id}
                       onClick={() => handleDownloadMixResult(task.id)}
                     >
-                      下载混剪结果
+                      {t("asset.downloadMixResult")}
                     </Button>
                   )}
                 </div>
@@ -640,7 +642,7 @@ export default function AssetLibraryPage() {
       />
 
       <Modal
-        title="上传素材"
+        title={t("asset.uploadModalTitle")}
         open={uploadModalOpen}
         onCancel={() => {
           if (uploading) return;
@@ -651,8 +653,8 @@ export default function AssetLibraryPage() {
         }}
         onOk={() => void onConfirmUpload()}
         confirmLoading={uploading}
-        okText="确定上传"
-        cancelText="取消"
+        okText={t("asset.uploadOk")}
+        cancelText={t("asset.uploadCancel")}
       >
         <div className="space-y-4">
           <Upload.Dragger
@@ -676,16 +678,16 @@ export default function AssetLibraryPage() {
               setSelectedFile(null);
             }}
           >
-            <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-            <p className="ant-upload-hint">支持图片、视频、音频。上传前可选择 AI 去水印（仅对图片/视频尝试）。</p>
+            <p className="ant-upload-text">{t("asset.uploadDragText")}</p>
+            <p className="ant-upload-hint">{t("asset.uploadHint")}</p>
           </Upload.Dragger>
           <Checkbox checked={removeWatermark} onChange={(e) => setRemoveWatermark(e.target.checked)}>
-            一键去水印（AI 智能处理）
+            {t("asset.removeWatermark")}
           </Checkbox>
           {removeWatermark ? (
             <Select
               showSearch
-              placeholder={loadingWatermarkModels ? "正在加载模型..." : "请选择去水印模型"}
+              placeholder={loadingWatermarkModels ? t("asset.loadingWatermarkModelPlaceholder") : t("asset.selectWatermarkModelPlaceholder")}
               loading={loadingWatermarkModels}
               value={selectedWatermarkModelId || undefined}
               onChange={(v) => {
@@ -693,10 +695,10 @@ export default function AssetLibraryPage() {
                 setWatermarkPrefModelId(v);
               }}
               options={watermarkModels.map((m) => ({ value: String(m.id), label: m.name }))}
-              notFoundContent={loadingWatermarkModels ? "加载中..." : "暂无可用图像去水印模型"}
+              notFoundContent={loadingWatermarkModels ? t("asset.loadingWatermarkModelPlaceholder") : t("asset.noWatermarkModel")}
             />
           ) : null}
-          {uploading ? <Text style={{ color: "var(--color-text-tertiary)" }}>上传处理中，请稍候...</Text> : null}
+          {uploading ? <Text style={{ color: "var(--color-text-tertiary)" }}>{t("asset.uploadProcessing")}</Text> : null}
         </div>
       </Modal>
 
@@ -726,7 +728,7 @@ export default function AssetLibraryPage() {
             </div>
           )}
           {previewAsset && normalizeAssetFileType(previewAsset.file_type) === "unknown" && (
-            <p className="text-yc-text-tertiary text-sm px-4">该素材类型不支持预览。</p>
+            <p className="text-yc-text-tertiary text-sm px-4">{t("asset.noPreviewType")}</p>
           )}
         </div>
       </Modal>

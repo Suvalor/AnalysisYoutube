@@ -82,16 +82,19 @@
     "retrospectiveFailed": "AI振り返り失敗",
     "noRetrospectiveData": "振り返りデータがありません",
     "aiConfigLoadFailed": "AIモデル/エージェント設定の読み込み失敗、設定センターを確認してください",
-    "needAiConfig": "先に設定センターでモデルとエージェントを設定し、このページで選択を完了してください"
+    "needAiConfig": "先に設定センターでモデルとエージェントを設定し、このページで選択を完了してください",
+    "applyFailed": "パラメータの適用に失敗しました",
+    "autoRetroSuccess": "自動振り返り完了、推奨パラメータ更新済み",
+    "autoRetroFailed": "自動振り返り失敗"
   },
   "card": {
     "scanConsole": "検索コンソール",
     "scanResults": "レーダースキャン結果",
     "categoryReport": "カテゴリ機会レポート",
     "crossCompare": "地域間比較",
-    "newChannels": "新規チャンネル数",
-    "successfulChannels": "成功チャンネル",
-    "successRate": "成功率",
+    "newChannels": "新規チャンネル数：",
+    "successfulChannels": "成功チャンネル数：",
+    "successRate": "成功率：",
     "topGrowth": "トップチャンネル成長",
     "contentGaps": "コンテンツギャップ",
     "newcomerStats": "新規参入者統計",
@@ -120,9 +123,22 @@
     "noKeywordSuggestions": "キーワード提案なし"
   },
   "label": {
-    "maxSubscribers": "登録者上限",
-    "outlierMultiplier": "バズル係数",
-    "suggestedAction": "推奨アクション",
+    "maxSubscribers": "登録者上限：",
+    "outlierMultiplier": "バズル係数：",
+    "suggestedAction": "推奨アクション：",
     "sampleCoverage": "サンプルカバー：過去{{lookbackDays}}日、高サンプル{{topCount}}件、低サンプル{{lowCount}}件"
+  },
+  "paramIteration": {
+    "title": "パラメータ反復履歴",
+    "retroNow": "今すぐ振り返り",
+    "noHistory": "反復記録がありません",
+    "applied": "適用済み",
+    "apply": "適用",
+    "auto": "自動",
+    "manual": "手動",
+    "scanParams": "スキャンパラメータ",
+    "recommendedParams": "推奨パラメータ",
+    "none": "なし",
+    "totalRecords": "全 {{total}} 件、最新10件を表示"
   }
 }

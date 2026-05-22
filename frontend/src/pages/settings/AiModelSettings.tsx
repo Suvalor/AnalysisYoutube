@@ -1,26 +1,9 @@
 import { useEffect, useState } from "react";
 import { Alert, Button, Form, Input, message, Spin } from "antd";
+import { useTranslation } from "react-i18next";
 import { getUserSettingsApi, updateUserSettingsApi } from "@/services/userApi";
 
 const { TextArea } = Input;
-
-const MODEL_JSON_PLACEHOLDER = `示例（JSON 数组）：
-[
-  { "value": "gpt-4o", "label": "GPT-4o" },
-  { "value": "my-endpoint-id", "label": "火山/自建模型 ID" }
-]`;
-
-const PROMPT_JSON_PLACEHOLDER = `示例（JSON 对象，value 需与创作页选项一致）：
-{
-  "prompts": [
-    { "value": "short-video", "label": "短视频脚本", "template": "你是专业编剧，请输出带分镜的脚本…" },
-    { "value": "talking-head", "label": "口播稿", "template": "单人出镜、信息密集…" }
-  ],
-  "styles": [
-    { "value": "humor", "label": "幽默搞笑", "hint": "轻松诙谐" },
-    { "value": "professional", "label": "专业权威", "hint": "数据与逻辑清晰" }
-  ]
-}`;
 
 type FormValues = {
   ai_api_base_url?: string;
@@ -29,7 +12,9 @@ type FormValues = {
   ai_prompt_config_json?: string;
 };
 
+/** AI 模型与 API 配置页面 */
 export default function AiModelSettings() {
+  const { t } = useTranslation("settings");
   const [form] = Form.useForm<FormValues>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -52,7 +37,7 @@ export default function AiModelSettings() {
       } catch (e: any) {
         if (!mounted) return;
         const msg =
-          e?.response?.data?.detail ?? e?.message ?? "加载模型设置失败，请稍后重试";
+          e?.response?.data?.detail ?? e?.message ?? t("aiModel.loadFailed");
         setError(String(msg));
       } finally {
         if (mounted) setLoading(false);
@@ -61,7 +46,7 @@ export default function AiModelSettings() {
     return () => {
       mounted = false;
     };
-  }, [form]);
+  }, [form, t]);
 
   const onFinish = async (values: FormValues) => {
     setSaving(true);
@@ -79,10 +64,10 @@ export default function AiModelSettings() {
       const data = await updateUserSettingsApi(payload as any);
       setHasKey(Boolean(data.has_ai_api_key));
       form.setFieldValue("ai_api_key", "");
-      message.success("模型设置已保存");
+      message.success(t("aiModel.saveSuccess"));
     } catch (e: any) {
       const msg =
-        e?.response?.data?.detail ?? e?.message ?? "保存失败，请检查 JSON 格式与网络";
+        e?.response?.data?.detail ?? e?.message ?? t("aiModel.saveFailed");
       setError(String(msg));
     } finally {
       setSaving(false);
@@ -100,9 +85,9 @@ export default function AiModelSettings() {
   return (
     <div className="h-full overflow-y-auto bg-yc-bg-layout p-4 md:p-8">
       <div className="max-w-3xl mx-auto bg-yc-bg-card border border-yc-border rounded-lg p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-yc-text-primary mb-1">模型与 API 配置</h2>
+        <h2 className="text-lg font-semibold text-yc-text-primary mb-1">{t("aiModel.title")}</h2>
         <p className="text-sm text-yc-text-secondary mb-6">
-          API Key 仅通过 HTTPS 提交，服务端加密后写入数据库；列表页永不回显明文。留空密钥表示不修改已保存的密钥。
+          {t("aiModel.subtitle")}
         </p>
 
         {error && (
@@ -111,39 +96,39 @@ export default function AiModelSettings() {
 
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item
-            label="API 根地址（OpenAI 兼容）"
+            label={t("aiModel.baseUrl")}
             name="ai_api_base_url"
-            rules={[{ max: 512, message: "过长" }]}
+            rules={[{ max: 512, message: t("aiModel.tooLong") }]}
           >
-            <Input placeholder="例如：https://ark.cn-beijing.volcesapi.com/api/v3" allowClear />
+            <Input placeholder="https://ark.cn-beijing.volcesapi.com/api/v3" allowClear />
           </Form.Item>
 
-          <Form.Item label="API Key" name="ai_api_key">
+          <Form.Item label={t("aiModel.apiKey")} name="ai_api_key">
             <Input.Password
-              placeholder={hasKey ? "已保存密钥，留空不修改；填写则覆盖" : "填写后保存即加密存储"}
+              placeholder={hasKey ? t("aiModel.keyHasSavedPlaceholder") : t("aiModel.keyNewPlaceholder")}
               autoComplete="new-password"
             />
           </Form.Item>
 
           <Form.Item
-            label="支持的模型（JSON）"
+            label={t("aiModel.modelsJson")}
             name="ai_models_json"
-            rules={[{ max: 100_000, message: "内容过长" }]}
+            rules={[{ max: 100_000, message: t("aiModel.contentTooLong") }]}
           >
-            <TextArea rows={8} placeholder={MODEL_JSON_PLACEHOLDER} />
+            <TextArea rows={8} placeholder={t("aiModel.modelJsonPlaceholder")} />
           </Form.Item>
 
           <Form.Item
-            label="提示词与风格（JSON）"
+            label={t("aiModel.promptConfigJson")}
             name="ai_prompt_config_json"
-            rules={[{ max: 100_000, message: "内容过长" }]}
+            rules={[{ max: 100_000, message: t("aiModel.contentTooLong") }]}
           >
-            <TextArea rows={12} placeholder={PROMPT_JSON_PLACEHOLDER} />
+            <TextArea rows={12} placeholder={t("aiModel.promptJsonPlaceholder")} />
           </Form.Item>
 
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={saving}>
-              保存设置
+              {t("aiModel.saveButton")}
             </Button>
           </Form.Item>
         </Form>

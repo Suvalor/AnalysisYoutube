@@ -41,5 +41,71 @@
   },
   "empty": {
     "noData": "キーワードデータがありません。キーワードを検索してください"
+  },
+  "research": {
+    "country": {
+      "US": "アメリカ",
+      "GB": "イギリス",
+      "JP": "日本",
+      "KR": "韓国",
+      "IN": "インド",
+      "DE": "ドイツ",
+      "FR": "フランス",
+      "BR": "ブラジル",
+      "AU": "オーストラリア",
+      "CA": "カナダ"
+    },
+    "message": {
+      "loadConfigFailed": "設定の読み込み失敗",
+      "topicRequired": "創作テーマ/素材のポイントを入力してください",
+      "configIncomplete": "設定センターで利用可能なエージェントとスタイルを維持してください",
+      "generateFailed": "生成リクエスト失敗",
+      "unnamedScript": "無題スクリプト",
+      "savedToLibrary": "スクリプトライブラリに保存しました",
+      "knowledgeBase": "ナレッジベース管理",
+      "loadKeywordsFailed": "キーワードの読み込み失敗",
+      "generateSuccess": "キーワード生成成功",
+      "noResult": "キーワードデータなし"
+    },
+    "action": {
+      "selectAgent": "エージェント選択",
+      "selectStyle": "スタイル選択",
+      "topicPlaceholder": "創作テーマ/素材のポイントを入力",
+      "generate": "生成開始",
+      "generating": "生成中...",
+      "selectCountry": "国/地域を選択"
+    },
+    "label": {
+      "keyword": "キーワード",
+      "searchVolume": "検索ボリューム",
+      "competition": "競合度",
+      "trend": "トレンド"
+    },
+    "region": "地域",
+    "language": "言語",
+    "searchPlaceholder": "キーワードを入力...",
+    "keywordRequired": "キーワードを入力してください",
+    "researchFailed": "キーワード研究に失敗しました",
+    "researchHistory": "研究履歴",
+    "searchVolume": "検索ボリューム",
+    "competition": "競合度",
+    "relatedKeywords": "関連キーワード",
+    "popularVideos": "人気動画",
+    "video": "動画",
+    "viewCount": "再生数",
+    "likeCount": "高評価",
+    "commentCount": "コメント",
+    "engagementRate": "エンゲージメント",
+    "loadMore": "もっと読み込み中...",
+    "allLoaded": "全{{count}}件、すべて読み込み完了",
+    "emptyHint": "キーワードを入力し、「検索」をクリックしてYouTubeキーワード分析を表示",
+    "langZh": "中国語",
+    "langEn": "英語",
+    "langJa": "日本語",
+    "langKo": "韓国語",
+    "langDe": "ドイツ語",
+    "langFr": "フランス語",
+    "langPt": "ポルトガル語",
+    "langHi": "ヒンディー語"
   }
 }

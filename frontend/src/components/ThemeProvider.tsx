@@ -8,7 +8,7 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { themes, isDarkTheme } from "@/themes";
 import { useThemeStore } from "@/store/useThemeStore";
 import { useI18nStore, type Locale } from "@/store/useI18nStore";
-import zhCNExtra from "@/locales/zh-CN.json";
+import i18n from "@/i18n";
 
 /** 合并中文文案：必填校验使用业务文案 */
 const antdZhLocale = {
@@ -17,7 +17,7 @@ const antdZhLocale = {
     ...zhCN.Form,
     defaultValidateMessages: {
       ...zhCN.Form?.defaultValidateMessages,
-      required: zhCNExtra.required_field_warning,
+      required: i18n.t("common:validation.requiredField"),
     },
   },
 };

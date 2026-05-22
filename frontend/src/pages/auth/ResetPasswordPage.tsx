@@ -1,5 +1,6 @@
 import { Alert, Button, Form, Input, Result } from "antd";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useSearchParams } from "react-router-dom";
 import AuthLayout from "@/components/Layout/AuthLayout";
 import { forgotPasswordApi, resetPasswordApi } from "@/services/authApi";
@@ -13,9 +14,11 @@ type ResetFormValues = {
   confirm_password: string;
 };
 
+/** 重置密码页面：有 token 时直接重置，无 token 时发送重置链接 */
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
+  const { t } = useTranslation("auth");
 
   // 忘记密码表单
   const [forgotLoading, setForgotLoading] = useState(false);
@@ -30,15 +33,15 @@ export default function ResetPasswordPage() {
   // 有 token → 重置密码；无 token → 输入邮箱发送重置链接
   if (token) {
     return (
-      <AuthLayout title="重置密码" subtitle="设置新的登录密码">
+      <AuthLayout title={t("resetPassword.title")} subtitle={t("resetPassword.subtitle")}>
         {resetSuccess ? (
           <Result
             status="success"
-            title="密码重置成功"
-            subTitle="请使用新密码登录"
+            title={t("resetPassword.success")}
+            subTitle={t("resetPassword.linkSent")}
             extra={
               <Link to="/login">
-                <Button type="primary" size="large">去登录</Button>
+                <Button type="primary" size="large">{t("resetPassword.goLogin")}</Button>
               </Link>
             }
           />
@@ -49,7 +52,7 @@ export default function ResetPasswordPage() {
             onErrorClear={() => setResetError(null)}
             onSubmit={async (values) => {
               if (values.new_password !== values.confirm_password) {
-                setResetError("两次输入的密码不一致");
+                setResetError(t("common:validation.passwordConfirm"));
                 return;
               }
               setResetLoading(true);
@@ -59,12 +62,12 @@ export default function ResetPasswordPage() {
                 setResetSuccess(true);
               } catch (e: any) {
                 const raw = e?.response?.data?.detail;
-                const message = typeof raw === "string"
+                const msg = typeof raw === "string"
                   ? raw
                   : Array.isArray(raw)
                     ? raw.map((err: any) => err?.msg ?? String(err)).join("; ")
-                    : e?.message ?? "重置失败，请重试";
-                setResetError(message);
+                    : e?.message ?? t("common:message.serverError");
+                setResetError(msg);
               } finally {
                 setResetLoading(false);
               }
@@ -76,15 +79,15 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <AuthLayout title="忘记密码" subtitle="输入注册邮箱，发送重置链接">
+    <AuthLayout title={t("resetPassword.forgotTitle")} subtitle={t("resetPassword.forgotSubtitle")}>
       {forgotSuccess ? (
         <Result
           status="success"
-          title="重置链接已发送"
-          subTitle="请检查您的邮箱，点击链接重置密码"
+          title={t("resetPassword.linkSent")}
+          subTitle={t("resetPassword.checkEmail")}
           extra={
             <Link to="/login">
-              <Button type="primary" size="large">返回登录</Button>
+              <Button type="primary" size="large">{t("resetPassword.backToLogin")}</Button>
             </Link>
           }
         />
@@ -105,12 +108,12 @@ export default function ResetPasswordPage() {
                 setForgotSuccess(true);
               } catch (e: any) {
                 const raw = e?.response?.data?.detail;
-                const message = typeof raw === "string"
+                const msg = typeof raw === "string"
                   ? raw
                   : Array.isArray(raw)
                     ? raw.map((err: any) => err?.msg ?? String(err)).join("; ")
-                    : e?.message ?? "发送失败，请重试";
-                setForgotError(message);
+                    : e?.message ?? t("common:message.serverError");
+                setForgotError(msg);
               } finally {
                 setForgotLoading(false);
               }
@@ -118,11 +121,11 @@ export default function ResetPasswordPage() {
             requiredMark={false}
           >
             <Form.Item
-              label="注册邮箱"
+              label={t("resetPassword.emailLabel")}
               name="email"
               rules={[
-                { required: true, message: "请输入邮箱" },
-                { type: "email", message: "邮箱格式不正确" }
+                { required: true, message: t("common:validation.email") },
+                { type: "email", message: t("common:validation.email") }
               ]}
             >
               <Input placeholder="you@example.com" size="large" autoComplete="email" />
@@ -135,13 +138,13 @@ export default function ResetPasswordPage() {
                 className="w-full"
                 loading={forgotLoading}
               >
-                发送重置链接
+                {t("resetPassword.sendResetLink")}
               </Button>
             </Form.Item>
           </Form>
           <div className="text-sm text-slate-300 flex justify-center">
             <Link to="/login" className="text-indigo-400 hover:text-indigo-300">
-              返回登录
+              {t("resetPassword.backToLogin")}
             </Link>
           </div>
         </>
@@ -150,8 +153,7 @@ export default function ResetPasswordPage() {
   );
 }
 
-// ── 重置密码子表单 ──
-
+/** 重置密码子表单 */
 function ResetForm({
   loading,
   error,
@@ -163,7 +165,7 @@ function ResetForm({
   onErrorClear: () => void;
   onSubmit: (values: ResetFormValues) => void;
 }) {
-  const [form] = Form.useForm<ResetFormValues>();
+  const { t } = useTranslation("auth");
 
   return (
     <>
@@ -176,26 +178,25 @@ function ResetForm({
         layout="vertical"
         onFinish={onSubmit}
         requiredMark={false}
-        form={form}
       >
         <Form.Item
-          label="新密码"
+          label={t("resetPassword.newPassword")}
           name="new_password"
           rules={[
-            { required: true, message: "请输入新密码" },
-            { min: 12, message: "密码至少 12 位" },
-            { pattern: /[a-zA-Z]/, message: "密码必须包含字母" },
-            { pattern: /[0-9]/, message: "密码必须包含数字" },
+            { required: true, message: t("resetPassword.enterNewPassword") },
+            { min: 12, message: t("resetPassword.passwordMinLength") },
+            { pattern: /[a-zA-Z]/, message: t("resetPassword.passwordMustContainLetter") },
+            { pattern: /[0-9]/, message: t("resetPassword.passwordMustContainNumber") },
           ]}
         >
-          <Input.Password placeholder="至少 12 位，含字母和数字" size="large" autoComplete="new-password" />
+          <Input.Password placeholder={t("resetPassword.newPasswordPlaceholder")} size="large" autoComplete="new-password" />
         </Form.Item>
         <Form.Item
-          label="确认新密码"
+          label={t("resetPassword.confirmPassword")}
           name="confirm_password"
-          rules={[{ required: true, message: "请再次输入密码" }]}
+          rules={[{ required: true, message: t("resetPassword.enterNewPassword") }]}
         >
-          <Input.Password placeholder="再次输入新密码" size="large" autoComplete="new-password" />
+          <Input.Password placeholder={t("resetPassword.confirmPasswordPlaceholder")} size="large" autoComplete="new-password" />
         </Form.Item>
         <Form.Item className="mt-6 mb-2">
           <Button
@@ -205,7 +206,7 @@ function ResetForm({
             className="w-full"
             loading={loading}
           >
-            重置密码
+            {t("resetPassword.submit")}
           </Button>
         </Form.Item>
       </Form>

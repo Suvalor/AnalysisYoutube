@@ -34,7 +34,11 @@
     "expand": "펼치기",
     "collapse": "접기",
     "selectAll": "전체선택",
-    "deselectAll": "전체해제"
+    "deselectAll": "전체해제",
+    "ariaOpenSidebar": "사이드바 열기",
+    "ariaUserMenu": "사용자 메뉴",
+    "ariaCloseTab": "탭 닫기",
+    "keyword": "키워드"
   },
   "status": {
     "success": "성공",
@@ -83,7 +87,8 @@
     "filterConfirm": "확인",
     "filterReset": "재설정",
     "selectAll": "전체 선택",
-    "selectInvert": "선택 반전"
+    "selectInvert": "선택 반전",
+    "action": "작업"
   },
   "time": {
     "justNow": "방금",
@@ -95,5 +100,53 @@
     "delete": "삭제 확인? 이 작업은 취소할 수 없습니다",
     "leavePage": "저장하지 않은 변경이 있습니다. 페이지를 떠나시겠습니까?",
     "clearData": "초기화 확인? 이 작업은 취소할 수 없습니다"
+  },
+  "mixConfig": {
+    "title": "AI 믹스 설정",
+    "cancel": "취소",
+    "submit": "믹스 제출",
+    "selectedAssets": "선택된 에셋",
+    "audioSource": "음성 소스",
+    "audioText": "텍스트 입력 (TTS)",
+    "audioFile": "음성 파일 업로드",
+    "narrationText": "나레이션 텍스트",
+    "narrationPlaceholder": "나레이션 텍스트를 입력하세요. 시스템이 TTS 음성을 자동 생성합니다...",
+    "selectAudioFile": "음성 파일 선택",
+    "audioFormatHint": "MP3, WAV 등 음성 형식 지원",
+    "aspectRatio": "화면 비율",
+    "vertical": "세로 9:16",
+    "horizontal": "가로 16:9",
+    "highlightsPriority": "하이라이트 우선",
+    "backgroundTaskHint": "믹스는 백그라운드 작업입니다. 제출 후 작업 센터에서 진행 상황을 확인하세요.",
+    "message": {
+      "noVideo": "선택된 에셋에 영상이 없습니다. 믹스할 수 없습니다.",
+      "narrationRequired": "나레이션 텍스트를 입력하세요",
+      "audioFileRequired": "음성 파일을 업로드하세요",
+      "audioUploadFailed": "음성 파일 업로드 실패",
+      "submitted": "믹스 작업 제출됨. 작업 센터에서 진행 상황을 확인하세요.",
+      "submitFailed": "믹스 제출 실패"
+    }
+  },
+  "guestLimit": {
+    "title": "일일 할당량 소진",
+    "description": "게스트 할당량은 제한적입니다. 등록하면 더 많은 사용량을 얻을 수 있습니다.",
+    "register": "등록하여 더 많은 할당량 얻기",
+    "later": "나중에"
+  },
+  "markdownEditor": {
+    "edit": "편집",
+    "preview": "미리보기",
+    "split": "분할"
+  },
+  "quotaProgress": {
+    "unlimited": "무제한",
+    "refresh": "할당량 새로고침"
+  },
+  "scriptPreview": {
+    "title": "스크립트 미리보기",
+    "sourceCode": "Markdown 소스",
+    "preview": "Markdown 미리보기",
+    "saveToLibrary": "스크립트 라이브러리에 저장",
+    "emptyHint": "\"생성 시작\"을 클릭하면 여기에 실시간으로 스크립트 내용이 표시됩니다."
   }
 }

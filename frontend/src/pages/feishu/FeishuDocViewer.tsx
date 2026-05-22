@@ -1,5 +1,6 @@
 import { Alert, Segmented, Spin } from "antd";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation, useParams } from "react-router-dom";
 import { getFeishuDocApi } from "@/services/feishuDocsApi";
 
@@ -35,6 +36,7 @@ function resolveDocId(docIdFromTab: number | undefined, params: { id?: string },
 export default function FeishuDocViewer({ docId: docIdFromTab }: FeishuDocViewerProps) {
   const params = useParams();
   const location = useLocation();
+  const { t } = useTranslation("feishu");
   const docId = useMemo(
     () => resolveDocId(docIdFromTab, params, location.pathname),
     [docIdFromTab, params, location.pathname]
@@ -52,7 +54,7 @@ export default function FeishuDocViewer({ docId: docIdFromTab }: FeishuDocViewer
     let mounted = true;
     (async () => {
       if (!Number.isFinite(docId) || docId <= 0) {
-        setError("文档 ID 不合法");
+        setError(t("docViewer.message.invalidId"));
         setLoading(false);
         return;
       }
@@ -69,7 +71,7 @@ export default function FeishuDocViewer({ docId: docIdFromTab }: FeishuDocViewer
       } catch (e: unknown) {
         if (!mounted) return;
         const err = e as { response?: { data?: { detail?: string } } };
-        setError(err?.response?.data?.detail ?? "加载文档失败");
+        setError(err?.response?.data?.detail ?? t("docViewer.message.loadFailed"));
       } finally {
         if (mounted) setLoading(false);
       }
@@ -77,7 +79,7 @@ export default function FeishuDocViewer({ docId: docIdFromTab }: FeishuDocViewer
     return () => {
       mounted = false;
     };
-  }, [docId]);
+  }, [docId, t]);
 
   const showArchiveToggle = archiveStatus === "SUCCESS" && Boolean(archiveFileUrl?.trim());
   const iframeSrc = useMemo(() => {
@@ -106,7 +108,7 @@ export default function FeishuDocViewer({ docId: docIdFromTab }: FeishuDocViewer
   if (!iframeSrc) {
     return (
       <div className="p-4">
-        <Alert type="warning" showIcon message="文档链接为空" />
+        <Alert type="warning" showIcon message={t("docViewer.message.emptyUrl")} />
       </div>
     );
   }
@@ -114,22 +116,22 @@ export default function FeishuDocViewer({ docId: docIdFromTab }: FeishuDocViewer
   return (
     <div className="h-full flex flex-col">
       <div className="px-4 py-2 border-b border-yc-border bg-yc-bg-card text-sm text-yc-text-primary flex flex-wrap items-center gap-3 min-h-[44px]">
-        <span className="truncate flex-1 min-w-0">{title || "飞书云文档"}</span>
+        <span className="truncate flex-1 min-w-0">{title || t("docViewer.label.defaultTitle")}</span>
         {showArchiveToggle ? (
           <Segmented<PreviewSource>
             size="small"
             value={previewSource}
             onChange={setPreviewSource}
             options={[
-              { label: "原链接预览", value: "original" },
-              { label: "离线备份预览", value: "archive" },
+              { label: t("docViewer.label.originalPreview"), value: "original" },
+              { label: t("docViewer.label.archivePreview"), value: "archive" },
             ]}
           />
         ) : null}
       </div>
       <div className="flex-1 bg-yc-bg-secondary">
         <iframe
-          title={showArchiveToggle && previewSource === "archive" ? "离线归档预览" : "飞书原链预览"}
+          title={showArchiveToggle && previewSource === "archive" ? t("docViewer.label.archiveIframe") : t("docViewer.label.originalIframe")}
           src={iframeSrc}
           className="w-full h-[calc(100vh-120px)] border-0"
           sandbox="allow-scripts allow-same-origin allow-popups allow-forms"

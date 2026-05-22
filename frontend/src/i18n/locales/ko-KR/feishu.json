@@ -28,5 +28,89 @@
   "empty": {
     "noData": "Feishu 문서 데이터가 없습니다",
     "noDocs": "문서 없음"
+  },
+  "docList": {
+    "message": {
+      "loadFailed": "Feishu 문서 목록 로드 실패",
+      "alreadyArchived": "이 문서는 이미 아카이브되었습니다",
+      "archiveSubmitted": "아카이브 작업이 제출되었습니다. 백그라운드에서 PDF를 검증합니다.",
+      "archiving": "문서를 아카이브하는 중입니다",
+      "archiveFailed": "아카이브 제출 실패",
+      "deleteSuccess": "삭제됨",
+      "deleteFailed": "삭제 실패",
+      "createSuccess": "문서가 추가되었습니다",
+      "createFailed": "추가 실패"
+    },
+    "label": {
+      "docId": "Feishu 문서 #{{id}}",
+      "docName": "문서 이름",
+      "addTime": "추가 시간",
+      "archiveStatus": "아카이브 상태",
+      "statusSuccess": "성공",
+      "statusArchiving": "저장 중",
+      "statusFailed": "저장 실패",
+      "statusUnarchived": "미아카이브"
+    },
+    "action": {
+      "view": "보기",
+      "archive": "오프라인 저장",
+      "reArchive": "재저장",
+      "archiving": "아카이브 중...",
+      "delete": "삭제",
+      "confirmDelete": "이 문서를 삭제하시겠습니까?"
+    },
+    "title": "Feishu 문서 관리",
+    "loadFailed": "Feishu 문서 목록 로드 실패",
+    "searchPlaceholder": "이름으로 검색",
+    "search": "검색",
+    "addDoc": "+ 문서 추가",
+    "docNameColumn": "문서 이름",
+    "addedAtColumn": "추가 시간",
+    "archiveStatusColumn": "아카이브 상태",
+    "actionColumn": "작업",
+    "view": "보기",
+    "archiving": "아카이브 중...",
+    "resave": "재저장",
+    "offlineSave": "오프라인 저장",
+    "confirmDelete": "이 문서를 삭제하시겠습니까?",
+    "delete": "삭제",
+    "cancel": "취소",
+    "deleteSuccess": "삭제됨",
+    "alreadyArchived": "문서가 이미 아카이브됨",
+    "archiveSubmitted": "아카이브 작업 제출됨, 백엔드에서 PDF 검증, 목록 상태 확인",
+    "archivingWarning": "문서가 아카이브 중",
+    "archiveFailed": "아카이브 제출 실패",
+    "titleRequired": "문서 이름을 입력하세요",
+    "urlRequired": "Feishu 링크를 입력하세요",
+    "createSuccess": "문서 추가됨",
+    "createFailed": "추가 실패",
+    "addTitle": "Feishu 문서 추가",
+    "submit": "제출",
+    "docNameLabel": "문서 이름",
+    "docNamePlaceholder": "예: 주제 라이브러리 / 스크립트 템플릿 라이브러리",
+    "urlLabel": "Feishu 링크 (URL)",
+    "urlPlaceholder": "Feishu 공유 링크 입력",
+    "feishuDocPrefix": "Feishu 문서 #",
+    "success": "성공",
+    "saving": "저장 중",
+    "saveFailed": "저장 실패",
+    "unarchived": "미아카이브"
+  },
+  "docViewer": {
+    "message": {
+      "invalidId": "유효하지 않은 문서 ID",
+      "loadFailed": "문서 로드 실패",
+      "emptyUrl": "문서 URL이 비어 있습니다"
+    },
+    "label": {
+      "defaultTitle": "Feishu 클라우드 문서",
+      "originalPreview": "원본 링크 미리보기",
+      "archivePreview": "오프라인 백업 미리보기",
+      "archiveIframe": "오프라인 아카이브 미리보기",
+      "originalIframe": "Feishu 원본 링크 미리보기"
+    },
+    "loadFailed": "문서 내용 로드 실패",
+    "backToList": "문서 목록으로 돌아가기",
+    "docListTitle": "Feishu 문서 관리"
   }
 }

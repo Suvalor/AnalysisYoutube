@@ -81,7 +81,8 @@
     "FR": "France",
     "BR": "Brazil",
     "IN": "India",
-    "TW": "Taiwan"
+    "TW": "Taiwan",
+    "HK": "Hong Kong"
   },
   "message": {
     "noResults": "No recommendations found, please adjust your input and retry",
@@ -134,7 +135,8 @@
     "matchScore": "Match Score",
     "categoryCount": "niches",
     "confirmDelete": "Confirm delete this record?",
-    "empty": "No recommendation records"
+    "empty": "No recommendation records",
+    "listSeparator": ", "
   },
   "quota": {
     "title": "API Quota Dashboard",

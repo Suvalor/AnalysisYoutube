@@ -21,6 +21,7 @@ import type { RcFile } from "antd/es/upload";
 import dayjs from "dayjs";
 import { Image as ImageIcon, Lightbulb, Trash2, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
   INSPIRATION_IMAGE_PLACEHOLDER,
@@ -51,17 +52,20 @@ function bubbleWeight(row: InspirationItem) {
 }
 
 function isPlotDone(row: InspirationItem) {
-  return row.status === "已生成剧情" || (row.plot_id != null && row.plot_id > 0);
+  return row.plot_id != null && row.plot_id > 0;
 }
 
+/** 判断灵感内容是否仅为图片占位符文本（兼容旧中文值和新英文值） */
 function isPlaceholderOnlyText(row: InspirationItem) {
+  const content = (row.content || "").trim();
   return (
-    (row.content || "").trim() === INSPIRATION_IMAGE_PLACEHOLDER &&
+    (content === INSPIRATION_IMAGE_PLACEHOLDER || content === "（图片灵感）") &&
     !!(row.image_access_url || row.image_url || "").trim()
   );
 }
 
 export default function InspirationPool() {
+  const { t } = useTranslation("inspiration");
   const navigate = useNavigate();
   const openTab = useTabStore((s) => s.openTab);
   const [view, setView] = useState<"bubble" | "list">("bubble");
@@ -93,7 +97,7 @@ export default function InspirationPool() {
         e && typeof e === "object" && "response" in e
           ? (e as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : undefined;
-      message.error(typeof d === "string" ? d : "加载灵感列表失败");
+      message.error(typeof d === "string" ? d : t("pool.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -105,7 +109,7 @@ export default function InspirationPool() {
 
   const runImageUpload = async (file: File, mode: "create" | "edit") => {
     if (!file.type.startsWith("image/")) {
-      message.error("仅支持上传图片文件");
+      message.error(t("pool.imageOnly"));
       return;
     }
     const setBusy = mode === "create" ? setUploading : setEditUploading;
@@ -114,7 +118,7 @@ export default function InspirationPool() {
       const res = await uploadMaterialImageApi(file, false);
       const show = (res.access_url || res.file_url || "").trim();
       if (!show) {
-        message.error("上传未返回可访问地址");
+        message.error(t("pool.uploadNoUrl"));
         return;
       }
       if (mode === "create") {
@@ -126,13 +130,13 @@ export default function InspirationPool() {
         setEditImageAssetId(res.id);
         editForm.setFieldsValue({ content: "" });
       }
-      message.success("图片已上传");
+      message.success(t("pool.imageUploaded"));
     } catch (e: unknown) {
       const d =
         e && typeof e === "object" && "response" in e
           ? (e as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : undefined;
-      message.error(typeof d === "string" ? d : "图片上传失败");
+      message.error(typeof d === "string" ? d : t("pool.imageUploadFailed"));
     } finally {
       setBusy(false);
     }
@@ -142,21 +146,21 @@ export default function InspirationPool() {
     try {
       const outline = buildScriptOutlineFromInspiration(row);
       const script = await createScriptApi({
-        title: `灵感 #${row.id}`,
+        title: `${t("pool.inspirationPrefix")}${row.id}`,
         content: outline,
       });
       localStorage.setItem("sop_current_script_id", String(script.id));
       localStorage.setItem("sop_current_script_title", script.title);
       const sopPath = `/sop-workflow?inspirationId=${row.id}`;
-      openTab({ id: "sop-workflow", title: "SOP 工作流", path: sopPath, type: "sop-workflow" });
+      openTab({ id: "sop-workflow", title: t("pool.sopWorkflow", { defaultValue: "SOP Workflow" }), path: sopPath, type: "sop-workflow" });
       navigate(sopPath);
-      message.success("已跳转剧情拆解，大纲已填入文字与图片链接");
+      message.success(t("pool.jumpToPlot"));
     } catch (e: unknown) {
       const d =
         e && typeof e === "object" && "response" in e
           ? (e as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : undefined;
-      message.error(typeof d === "string" ? d : "创建剧本并跳转失败");
+      message.error(typeof d === "string" ? d : t("pool.createScriptFailed"));
     }
   };
 
@@ -164,11 +168,11 @@ export default function InspirationPool() {
     const text = String(form.getFieldValue("content") || "").trim();
     const hasImg = Boolean(draftImageUrl?.trim());
     if (!text && !hasImg) {
-      message.warning("请填写文字灵感或上传图片（二选一）");
+      message.warning(t("pool.fillTextOrImage"));
       return;
     }
     if (text && hasImg) {
-      message.warning("请只选择一种：清空文字后再传图，或移除图片后再写文字");
+      message.warning(t("pool.chooseOneOnly"));
       return;
     }
     try {
@@ -181,7 +185,7 @@ export default function InspirationPool() {
         source: String(v.source || "").trim(),
         recorded_at: recorded ? recorded.toISOString() : undefined,
       });
-      message.success("灵感已保存");
+      message.success(t("pool.saveSuccess"));
       form.resetFields();
       form.setFieldsValue({ recorded_at: dayjs() });
       setDraftImageUrl(null);
@@ -193,7 +197,7 @@ export default function InspirationPool() {
         e && typeof e === "object" && "response" in e
           ? (e as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : undefined;
-      message.error(typeof d === "string" ? d : "保存失败");
+      message.error(typeof d === "string" ? d : t("pool.saveFailed"));
     }
   };
 
@@ -215,11 +219,11 @@ export default function InspirationPool() {
     const text = String(editForm.getFieldValue("content") || "").trim();
     const hasImg = Boolean(editImageUrl?.trim());
     if (!text && !hasImg) {
-      message.warning("请填写文字灵感或保留/上传图片");
+      message.warning(t("pool.fillTextOrKeepImage"));
       return;
     }
     if (text && hasImg) {
-      message.warning("请只选择一种：清空文字后再传图，或移除图片后再写文字");
+      message.warning(t("pool.chooseOneOnly"));
       return;
     }
     try {
@@ -243,7 +247,7 @@ export default function InspirationPool() {
         patch.image_asset_id = null;
       }
       await updateInspirationApi(editing.id, patch);
-      message.success("已更新");
+      message.success(t("pool.updateSuccess"));
       setEditOpen(false);
       setEditing(null);
       setEditImageUrl(null);
@@ -255,13 +259,13 @@ export default function InspirationPool() {
         e && typeof e === "object" && "response" in e
           ? (e as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : undefined;
-      message.error(typeof d === "string" ? d : "更新失败");
+      message.error(typeof d === "string" ? d : t("pool.updateFailed"));
     }
   };
 
   const columns: ColumnsType<InspirationItem> = [
     {
-      title: "预览",
+      title: t("pool.preview"),
       key: "preview",
       width: 72,
       render: (_, row) =>
@@ -273,17 +277,17 @@ export default function InspirationPool() {
           />
         ) : (
           <div className="w-11 h-11 rounded-md bg-yc-bg-secondary border border-yc-border flex items-center justify-center text-yc-text-tertiary text-xs">
-            文
+            {t("pool.textIcon")}
           </div>
         ),
     },
     {
-      title: "内容摘要",
+      title: t("pool.contentSummary"),
       dataIndex: "content",
       key: "content",
       ellipsis: true,
       render: (_, row) => {
-        const label = isPlaceholderOnlyText(row) ? "（图片灵感）" : row.content;
+        const label = isPlaceholderOnlyText(row) ? t("pool.imageInspiration") : row.content;
         return (
           <Text ellipsis={{ tooltip: label }} className="max-w-[240px]">
             {label}
@@ -291,16 +295,16 @@ export default function InspirationPool() {
         );
       },
     },
-    { title: "来源", dataIndex: "source", key: "source", width: 120, ellipsis: true },
+    { title: t("pool.sourceColumn"), dataIndex: "source", key: "source", width: 120, ellipsis: true },
     {
-      title: "记录时间",
+      title: t("pool.recordedAtLabel"),
       dataIndex: "recorded_at",
       key: "recorded_at",
       width: 160,
       render: (v: string) => dayjs(v).format("YYYY-MM-DD HH:mm"),
     },
     {
-      title: "状态",
+      title: t("pool.statusColumn"),
       key: "status",
       width: 110,
       render: (_, row) => (
@@ -308,27 +312,27 @@ export default function InspirationPool() {
       ),
     },
     {
-      title: "剧情 ID",
+      title: t("pool.plotIdColumn"),
       dataIndex: "plot_id",
       key: "plot_id",
       width: 80,
       render: (v: number | null) => v ?? "—",
     },
     {
-      title: "操作",
+      title: t("pool.actionColumn"),
       key: "op",
       width: 260,
       render: (_, row) => (
         <Space size={6} wrap>
           <Button type="primary" size="small" onClick={() => void goToPlotWorkflow(row)}>
-            一键生成剧情
+            {t("pool.generatePlot")}
           </Button>
           <Button size="small" onClick={() => openEdit(row)}>
-            编辑
+            {t("pool.edit")}
           </Button>
-          <Popconfirm title="确定删除该灵感？" onConfirm={() => void handleDelete(row.id)}>
+          <Popconfirm title={t("pool.confirmDelete")} onConfirm={() => void handleDelete(row.id)}>
             <Button danger size="small">
-              删除
+              {t("pool.delete")}
             </Button>
           </Popconfirm>
         </Space>
@@ -339,14 +343,14 @@ export default function InspirationPool() {
   const handleDelete = async (id: number) => {
     try {
       await deleteInspirationApi(id);
-      message.success("已删除");
+      message.success(t("pool.deleteSuccess"));
       await reload();
     } catch (e: unknown) {
       const d =
         e && typeof e === "object" && "response" in e
           ? (e as { response?: { data?: { detail?: string } } }).response?.data?.detail
           : undefined;
-      message.error(typeof d === "string" ? d : "删除失败");
+      message.error(typeof d === "string" ? d : t("pool.deleteFailed"));
     }
   };
 
@@ -365,14 +369,14 @@ export default function InspirationPool() {
         <Paragraph className="!mb-2 whitespace-pre-wrap">{row.content}</Paragraph>
       ) : null}
       <Text type="secondary" className="text-xs">
-        来源：{row.source || "未填写"} · {dayjs(row.recorded_at).format("YYYY-MM-DD HH:mm")}
+        {t("pool.sourcePrefix")}{row.source || t("pool.sourceEmpty")} · {dayjs(row.recorded_at).format("YYYY-MM-DD HH:mm")}
       </Text>
       <div className="mt-3 flex gap-2 flex-wrap">
         <Button type="primary" size="small" onClick={() => void goToPlotWorkflow(row)}>
-          去生成剧情
+          {t("pool.goToPlot")}
         </Button>
         <Button size="small" onClick={() => openEdit(row)}>
-          编辑
+          {t("pool.edit")}
         </Button>
       </div>
     </div>
@@ -384,32 +388,32 @@ export default function InspirationPool() {
         <div className="flex items-center gap-2">
           <Lightbulb className="text-amber-500" size={26} />
           <div>
-            <h2 className="text-xl font-semibold text-yc-text-primary">灵感中心</h2>
-            <p className="text-sm text-yc-text-secondary">记录灵感，一键进入 SOP 剧情拆解并自动关联。</p>
+            <h2 className="text-xl font-semibold text-yc-text-primary">{t("pool.title")}</h2>
+            <p className="text-sm text-yc-text-secondary">{t("pool.subtitle")}</p>
           </div>
         </div>
         <Segmented
           value={view}
           onChange={(v) => setView(v as "bubble" | "list")}
           options={[
-            { label: "球形视图", value: "bubble" },
-            { label: "列表视图", value: "list" },
+            { label: t("pool.bubbleView"), value: "bubble" },
+            { label: t("pool.listView"), value: "list" },
           ]}
         />
       </div>
 
-      <Card title="录入灵感" size="small" className="shadow-sm">
+      <Card title={t("pool.addTitle")} size="small" className="shadow-sm">
         <Alert
           type="info"
           showIcon
           className="mb-4"
-          message="输入文字灵感 或 上传灵感图片（二选一，不可同时使用）"
+          message={t("pool.textOrImageOnly")}
         />
         <Form form={form} layout="vertical" initialValues={{ recorded_at: dayjs() }} className="max-w-3xl">
-          <Form.Item name="content" label="灵感内容（think）">
+          <Form.Item name="content" label={t("pool.contentLabel")}>
             <TextArea
               rows={4}
-              placeholder={draftImageUrl ? "已选择图片模式，请先移除图片再输入文字" : "写下你的想法…"}
+              placeholder={draftImageUrl ? t("pool.contentImageMode") : t("pool.contentPlaceholder")}
               disabled={!!draftImageUrl}
               onChange={(e) => {
                 if (e.target.value.trim()) {
@@ -420,7 +424,7 @@ export default function InspirationPool() {
             />
           </Form.Item>
 
-          <Form.Item label="灵感图片">
+          <Form.Item label={t("pool.imageLabel")}>
             <div className="space-y-3">
               <Upload
                 accept="image/*"
@@ -428,7 +432,7 @@ export default function InspirationPool() {
                 disabled={hasTextDraft || uploading}
                 beforeUpload={(file: RcFile) => {
                   if (hasTextDraft) {
-                    message.warning("已填写文字灵感，请先清空文字再上传图片");
+                    message.warning(t("pool.textExistsUploadWarning"));
                     return Upload.LIST_IGNORE;
                   }
                   void runImageUpload(file, "create");
@@ -436,19 +440,19 @@ export default function InspirationPool() {
                 }}
               >
                 <Button icon={<UploadCloud size={16} />} loading={uploading} disabled={hasTextDraft}>
-                  {hasTextDraft ? "请先清空文字以启用上传" : "点击上传图片"}
+                  {hasTextDraft ? t("pool.clearTextFirst") : t("pool.uploadImage")}
                 </Button>
               </Upload>
               {draftImageUrl ? (
                 <div className="flex items-start gap-3 p-3 rounded-lg border border-yc-border bg-yc-bg-secondary w-fit max-w-full">
                   <img
                     src={draftImageUrl}
-                    alt="预览"
+                    alt={t("pool.previewAlt")}
                     className="h-24 w-24 rounded-md object-cover border border-white shadow-sm"
                   />
                   <div className="flex flex-col gap-2">
                     <Text type="secondary" className="text-xs">
-                      已选择图片灵感，保存时将只提交图片。
+                      {t("pool.imageSelected")}
                     </Text>
                     <Button
                       danger
@@ -460,7 +464,7 @@ export default function InspirationPool() {
                         setDraftImageAssetId(null);
                       }}
                     >
-                      移除图片
+                      {t("pool.removeImage")}
                     </Button>
                   </div>
                 </div>
@@ -468,14 +472,14 @@ export default function InspirationPool() {
             </div>
           </Form.Item>
 
-          <Form.Item name="source" label="灵感来源">
-            <Input placeholder="例如：通勤、对标视频、梦境…" />
+          <Form.Item name="source" label={t("pool.sourceLabel")}>
+            <Input placeholder={t("pool.sourcePlaceholder")} />
           </Form.Item>
-          <Form.Item name="recorded_at" label="记录时间">
+          <Form.Item name="recorded_at" label={t("pool.recordedAtLabel")}>
             <DatePicker showTime className="w-full max-w-md" format="YYYY-MM-DD HH:mm" />
           </Form.Item>
           <Button type="primary" onClick={() => void onCreate()}>
-            保存灵感
+            {t("pool.save")}
           </Button>
         </Form>
       </Card>
@@ -484,7 +488,7 @@ export default function InspirationPool() {
         <Card size="small" className="shadow-sm">
           <div className="mb-2 flex justify-end">
             <Button onClick={() => void reload()} loading={loading}>
-              刷新
+              {t("pool.refresh")}
             </Button>
           </div>
           <Table<InspirationItem>
@@ -496,10 +500,10 @@ export default function InspirationPool() {
           />
         </Card>
       ) : (
-        <Card size="small" className="shadow-sm" title="灵感星系">
+        <Card size="small" className="shadow-sm" title={t("pool.galaxyTitle")}>
           <div className="mb-2 flex justify-end">
             <Button onClick={() => void reload()} loading={loading}>
-              刷新
+              {t("pool.refresh")}
             </Button>
           </div>
           <div
@@ -508,7 +512,7 @@ export default function InspirationPool() {
           >
             {rows.length === 0 && !loading ? (
               <div className="absolute inset-0 flex items-center justify-center text-yc-text-tertiary text-sm">
-                暂无灵感，先在上方录入一条吧
+                {t("pool.noInspiration")}
               </div>
             ) : null}
             {rows.map((row) => {
@@ -516,7 +520,7 @@ export default function InspirationPool() {
               const done = isPlotDone(row);
               const img = (row.image_access_url || row.image_url || "").trim();
               return (
-                <Popover key={row.id} title={`灵感 #${row.id}`} content={bubbleContent(row)} trigger="click">
+                <Popover key={row.id} title={`${t("pool.inspirationPrefix")}${row.id}`} content={bubbleContent(row)} trigger="click">
                   <button
                     type="button"
                     className={`absolute rounded-full shadow-md border-2 overflow-hidden flex items-center justify-center text-white text-xs font-medium cursor-pointer transition-transform hover:scale-110 hover:z-10 focus:outline-none focus:ring-2 focus:ring-violet-400 ${
@@ -531,7 +535,7 @@ export default function InspirationPool() {
                       height: size,
                       transform: "translate(-50%, -50%)",
                     }}
-                    aria-label={`灵感 ${row.id}`}
+                    aria-label={t("pool.inspirationLabel") + " " + row.id}
                   >
                     {img ? (
                       <img src={img} alt="" className="w-full h-full object-cover opacity-95" />
@@ -550,14 +554,14 @@ export default function InspirationPool() {
           </div>
           {rows.some(isPlotDone) ? (
             <div className="mt-2 text-xs text-yc-text-secondary">
-              灰色球体或带 ✓ 表示已关联剧情拆解；球内为缩略图时表示图片灵感。
+              {t("pool.grayBubbleHint")}
             </div>
           ) : null}
         </Card>
       )}
 
       <Modal
-        title="编辑灵感"
+        title={t("pool.editTitle")}
         open={editOpen}
         onCancel={() => {
           setEditOpen(false);
@@ -569,12 +573,12 @@ export default function InspirationPool() {
         destroyOnClose
         width={560}
       >
-        <Alert type="info" showIcon className="mb-3" message="文字与图片二选一；与录入规则相同。" />
+        <Alert type="info" showIcon className="mb-3" message={t("pool.textOrImageEdit")} />
         <Form form={editForm} layout="vertical">
-          <Form.Item name="content" label="灵感内容">
+          <Form.Item name="content" label={t("pool.contentLabel")}>
             <TextArea
               rows={4}
-              placeholder={editImageUrl ? "已选择图片模式，请先移除图片" : ""}
+              placeholder={editImageUrl ? t("pool.contentImageMode") : ""}
               disabled={!!editImageUrl}
               onChange={(e) => {
                 if (e.target.value.trim()) {
@@ -584,7 +588,7 @@ export default function InspirationPool() {
               }}
             />
           </Form.Item>
-          <Form.Item label="灵感图片">
+          <Form.Item label={t("pool.imageLabel")}>
             <Space direction="vertical" size="small" className="w-full">
               <Upload
                 accept="image/*"
@@ -592,7 +596,7 @@ export default function InspirationPool() {
                 disabled={hasTextEdit || editUploading}
                 beforeUpload={(file: RcFile) => {
                   if (hasTextEdit) {
-                    message.warning("请先清空文字再上传图片");
+                    message.warning(t("pool.clearTextUploadWarning"));
                     return Upload.LIST_IGNORE;
                   }
                   void runImageUpload(file, "edit");
@@ -600,7 +604,7 @@ export default function InspirationPool() {
                 }}
               >
                 <Button icon={<ImageIcon size={16} />} loading={editUploading} disabled={hasTextEdit}>
-                  {hasTextEdit ? "请先清空文字以启用上传" : "重新上传图片"}
+                  {hasTextEdit ? t("pool.clearTextFirst") : t("pool.editUploadImage")}
                 </Button>
               </Upload>
               {editImageUrl ? (
@@ -614,16 +618,16 @@ export default function InspirationPool() {
                       setEditImageAssetId(null);
                     }}
                   >
-                    移除图片
+                    {t("pool.removeImage")}
                   </Button>
                 </div>
               ) : null}
             </Space>
           </Form.Item>
-          <Form.Item name="source" label="来源">
+          <Form.Item name="source" label={t("pool.editSourceLabel")}>
             <Input />
           </Form.Item>
-          <Form.Item name="recorded_at" label="记录时间">
+          <Form.Item name="recorded_at" label={t("pool.recordedAtLabel")}>
             <DatePicker showTime className="w-full" format="YYYY-MM-DD HH:mm" />
           </Form.Item>
         </Form>

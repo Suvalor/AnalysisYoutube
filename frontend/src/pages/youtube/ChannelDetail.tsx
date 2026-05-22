@@ -12,6 +12,7 @@ import {
   Youtube,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
   analyzeYouTubeChannelAiApi,
@@ -63,6 +64,7 @@ function axiosDetail(err: unknown): string {
 type Props = { channelId: number };
 
 export default function ChannelDetail({ channelId }: Props) {
+  const { t } = useTranslation("youtube");
   const navigate = useNavigate();
   const openTab = useTabStore((s) => s.openTab);
   const setActiveTab = useTabStore((s) => s.setActiveTab);
@@ -101,19 +103,19 @@ export default function ChannelDetail({ channelId }: Props) {
 
   const handleDownloadVideo = async (ytVideoId: string) => {
     if (!ytVideoId?.trim()) {
-      message.warning('该视频缺少有效的 YouTube 视频 ID');
+      message.warning(t('channelDetail.video.noValidVideoId'));
       return;
     }
     if (downloadingVideoIds.has(ytVideoId)) return;
     setDownloadingVideoIds((prev) => new Set(prev).add(ytVideoId));
     try {
       const res = await submitDownload({ video_ids: [ytVideoId] });
-      message.success(res.message || '下载任务已提交');
+      message.success(res.message || t('channelDetail.video.downloadSubmitted'));
     } catch (err: unknown) {
       const d = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
         : undefined;
-      message.error(typeof d === 'string' ? d : '下载提交失败');
+      message.error(typeof d === 'string' ? d : t('channelDetail.video.downloadFailed'));
     } finally {
       setDownloadingVideoIds((prev) => {
         const next = new Set(prev);
@@ -194,7 +196,7 @@ export default function ChannelDetail({ channelId }: Props) {
         }
       }
     } catch {
-      message.error("加载视频失败");
+      message.error(t('channelDetail.video.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -215,14 +217,14 @@ export default function ChannelDetail({ channelId }: Props) {
         setPromptAgents(prompts);
         useTabStore.getState().openTab({
           id: `channel-detail-${channelId}`,
-          title: c.title || "博主详情",
+          title: c.title || t('channelDetail.title'),
           path: `/youtube/channel/${channelId}`,
           type: "channel-detail",
           channelId,
         });
         await loadVideos(1, 20, filters);
       } catch {
-        if (!cancelled) message.error("加载频道失败");
+        if (!cancelled) message.error(t('channelDetail.video.loadChannelFailed'));
       }
     })();
     return () => {
@@ -278,12 +280,12 @@ export default function ChannelDetail({ channelId }: Props) {
 
   const runAiDeepAnalysis = async () => {
     if (selectedModelLibId === undefined) {
-      message.warning("请选择模型配置（来自设置中心 - 模型管理）");
+      message.warning(t('channelDetail.aiInsight.selectModelConfig'));
       return;
     }
     const name = llmModelName.trim();
     if (!name) {
-      message.warning("请选择或填写要调用的 LLM 模型名称");
+      message.warning(t('channelDetail.aiInsight.selectLlmModel'));
       return;
     }
     setAiAnalyzing(true);
@@ -308,9 +310,9 @@ export default function ChannelDetail({ channelId }: Props) {
             }
           : prev
       );
-      message.success("AI 深度分析完成并已保存");
+      message.success(t('channelDetail.aiInsight.analysisComplete'));
     } catch (e) {
-      message.error(axiosDetail(e) || "AI 深度分析失败");
+      message.error(axiosDetail(e) || t('channelDetail.aiInsight.analysisFailed'));
     } finally {
       setAiAnalyzing(false);
     }
@@ -333,7 +335,7 @@ export default function ChannelDetail({ channelId }: Props) {
       const d = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
         : undefined;
-      message.error(typeof d === 'string' ? d : "获取视频分析失败");
+      message.error(typeof d === 'string' ? d : t('channelDetail.video.getAnalysisFailed'));
     }
   };
 
@@ -342,7 +344,7 @@ export default function ChannelDetail({ channelId }: Props) {
     const defaultModelId = videoModelOptions[0]?.value ?? "";
     const modelId = selectedModelByVideoId[videoId] ?? defaultModelId;
     if (!modelId) {
-      message.warning("请先在「设置中心 → 模型管理」维护可用模型，并为当前视频选择 Model ID");
+      message.warning(t('channelDetail.video.modelConfigFirst'));
       return;
     }
 
@@ -361,14 +363,14 @@ export default function ChannelDetail({ channelId }: Props) {
       const d = err && typeof err === 'object' && 'response' in err
         ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
         : undefined;
-      message.error(typeof d === 'string' ? d : "视频 AI 深度分析失败");
+      message.error(typeof d === 'string' ? d : t('channelDetail.video.videoAnalysisFailed'));
     } finally {
       setVideoAnalysisLoadingById((prev) => ({ ...prev, [videoId]: false }));
     }
   };
 
   const backToList = () => {
-    openTab({ id: "channel-list", title: "频道管理", path: "/youtube/channels", type: "channel-list" });
+    openTab({ id: "channel-list", title: t('channelDetail.channelList'), path: "/youtube/channels", type: "channel-list" });
     setActiveTab("channel-list");
     navigate("/youtube/channels");
   };
@@ -389,7 +391,7 @@ export default function ChannelDetail({ channelId }: Props) {
         <div className="flex-1 space-y-3">
           <div className="flex items-center gap-3 flex-wrap">
             <Button icon={<ArrowLeft size={16} />} onClick={backToList}>
-              返回频道列表
+              {t('channelDetail.backToList')}
             </Button>
             <div className="flex items-center gap-2">
               <Youtube className="text-red-600" size={28} />
@@ -400,20 +402,20 @@ export default function ChannelDetail({ channelId }: Props) {
           <div className="border-2 border-red-500 rounded-lg p-4 bg-yc-bg-card shadow-sm max-w-3xl">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
               <div>
-                <div className="text-xs text-yc-text-secondary">订阅数</div>
+                <div className="text-xs text-yc-text-secondary">{t('channelDetail.stat.subscribers')}</div>
                 <div className="text-xl font-semibold text-yc-text-primary">{formatNumber(channel?.subscriber_count ?? 0)}</div>
               </div>
               <div>
-                <div className="text-xs text-yc-text-secondary">总视频数</div>
+                <div className="text-xs text-yc-text-secondary">{t('channelDetail.stat.totalVideos')}</div>
                 <div className="text-xl font-semibold text-yc-text-primary">{formatNumber(channel?.video_count ?? 0)}</div>
               </div>
               <div>
-                <div className="text-xs text-yc-text-secondary">总播放量</div>
+                <div className="text-xs text-yc-text-secondary">{t('channelDetail.stat.totalViews')}</div>
                 <div className="text-xl font-semibold text-yc-text-primary">{formatNumber(channel?.total_views ?? 0)}</div>
               </div>
             </div>
             <div className="text-center text-xs text-yc-text-tertiary mt-3">
-              数据更新：{hoursAgo !== null ? `${hoursAgo} 小时前` : "—"}
+              {t('channelDetail.stat.dataUpdated')}{hoursAgo !== null ? t('channelDetail.stat.hoursAgo', { count: hoursAgo }) : "—"}
             </div>
           </div>
         </div>
@@ -425,20 +427,20 @@ export default function ChannelDetail({ channelId }: Props) {
                 const c = await getYouTubeChannelDetailApi(channelId);
                 setChannel(c);
                 await loadVideos(page, pageSize, filters);
-                message.success("已刷新");
+                message.success(t('channelDetail.action.refreshed'));
               } catch {
-                message.error("刷新失败");
+                message.error(t('channelDetail.action.refreshFailed'));
               }
             }}
           >
-            刷新
+            {t('channelDetail.action.refresh')}
           </Button>
           <Button
             onClick={() => {
-              message.info("导出功能开发中");
+              message.info(t('channelDetail.action.exportDeveloping'));
             }}
           >
-            导出数据
+            {t('channelDetail.action.exportData')}
           </Button>
         </div>
       </div>
@@ -446,16 +448,16 @@ export default function ChannelDetail({ channelId }: Props) {
       <div className="bg-yc-bg-card border border-yc-border rounded-lg p-3 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
           <Input
-            placeholder="搜索标题"
+            placeholder={t('channelDetail.filter.searchTitle')}
             value={filters.keyword}
             onChange={(e) => setFilters((s) => ({ ...s, keyword: e.target.value }))}
           />
           <DatePicker.RangePicker value={filters.dateRange as any} onChange={(v) => setFilters((s) => ({ ...s, dateRange: v as any }))} />
-          <InputNumber className="w-full" placeholder="最小时长(秒)" value={filters.min_duration} onChange={(v) => setFilters((s) => ({ ...s, min_duration: Number(v) || undefined }))} />
-          <InputNumber className="w-full" placeholder="最大时长(秒)" value={filters.max_duration} onChange={(v) => setFilters((s) => ({ ...s, max_duration: Number(v) || undefined }))} />
+          <InputNumber className="w-full" placeholder={t('channelDetail.filter.minDuration')} value={filters.min_duration} onChange={(v) => setFilters((s) => ({ ...s, min_duration: Number(v) || undefined }))} />
+          <InputNumber className="w-full" placeholder={t('channelDetail.filter.maxDuration')} value={filters.max_duration} onChange={(v) => setFilters((s) => ({ ...s, max_duration: Number(v) || undefined }))} />
           <Select
             allowClear
-            placeholder="清晰度"
+            placeholder={t('channelDetail.filter.definition')}
             value={filters.definition}
             onChange={(v) => setFilters((s) => ({ ...s, definition: v }))}
             options={[
@@ -465,13 +467,13 @@ export default function ChannelDetail({ channelId }: Props) {
           />
           <Select
             allowClear
-            placeholder="隐私"
+            placeholder={t('channelDetail.filter.privacy')}
             value={filters.privacy_status}
             onChange={(v) => setFilters((s) => ({ ...s, privacy_status: v }))}
             options={[
-              { label: "公开", value: "public" },
-              { label: "不公开", value: "unlisted" },
-              { label: "私密", value: "private" },
+              { label: t('channelDetail.filter.public'), value: "public" },
+              { label: t('channelDetail.filter.unlisted'), value: "unlisted" },
+              { label: t('channelDetail.filter.private'), value: "private" },
             ]}
           />
           <Select
@@ -484,15 +486,15 @@ export default function ChannelDetail({ channelId }: Props) {
               });
             }}
             options={[
-              { label: "发布时间 ↓", value: "publish_time_desc" },
-              { label: "发布时间 ↑", value: "publish_time_asc" },
-              { label: "播放量 ↓", value: "view_count_desc" },
-              { label: "点赞 ↓", value: "like_count_desc" },
-              { label: "评论 ↓", value: "comment_count_desc" },
+              { label: t('channelDetail.filter.sortPublishDesc'), value: "publish_time_desc" },
+              { label: t('channelDetail.filter.sortPublishAsc'), value: "publish_time_asc" },
+              { label: t('channelDetail.filter.sortViewDesc'), value: "view_count_desc" },
+              { label: t('channelDetail.filter.sortLikeDesc'), value: "like_count_desc" },
+              { label: t('channelDetail.filter.sortCommentDesc'), value: "comment_count_desc" },
             ]}
           />
           <Button type="primary" onClick={() => void loadVideos(1, pageSize, filters)}>
-            筛选
+            {t('channelDetail.filter.screen')}
           </Button>
         </div>
       </div>
@@ -500,20 +502,20 @@ export default function ChannelDetail({ channelId }: Props) {
       <div className="bg-yc-bg-card border border-yc-border rounded-lg p-4 shadow-sm">
         <div className="flex items-center gap-2 mb-3">
           <Sparkles size={18} className="text-yc-accent" />
-          <div className="text-base font-semibold text-yc-text-primary">AI 深度洞察 (AI Insight)</div>
+          <div className="text-base font-semibold text-yc-text-primary">{t('channelDetail.aiInsight.title')}</div>
         </div>
         {channel?.ai_analyzed_at ? (
           <div className="text-xs text-yc-text-secondary mb-3">
-            最近分析时间：
+            {t('channelDetail.aiInsight.lastAnalysis')}
             {dayjs(channel.ai_analyzed_at).format("YYYY-MM-DD HH:mm")}
-            {channel.ai_source_llm_model_name ? ` · 模型：${channel.ai_source_llm_model_name}` : ""}
+            {channel.ai_source_llm_model_name ? ` · ${t('channelDetail.aiInsight.modelLabel')}${channel.ai_source_llm_model_name}` : ""}
           </div>
         ) : null}
 
         {hasAiInsight ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
             <div className="rounded-lg border border-yc-border p-3">
-              <div className="text-sm font-medium text-yc-text-secondary mb-2">核心标签</div>
+              <div className="text-sm font-medium text-yc-text-secondary mb-2">{t('channelDetail.aiInsight.coreTags')}</div>
               <div className="flex flex-wrap gap-2">
                 {aiTags.length ? (
                   aiTags.map((tag, idx) => (
@@ -526,26 +528,26 @@ export default function ChannelDetail({ channelId }: Props) {
                     </Tag>
                   ))
                 ) : (
-                  <div className="text-yc-text-tertiary text-sm">暂无标签</div>
+                  <div className="text-yc-text-tertiary text-sm">{t('channelDetail.aiInsight.noTags')}</div>
                 )}
               </div>
             </div>
             <div className="rounded-lg border border-yc-warning-bg p-3 bg-yc-warning-bg">
-              <div className="text-sm font-medium text-yc-text-secondary mb-2">擅长内容</div>
-              <div className="text-sm text-yc-text-primary leading-6">{channel?.ai_expertise?.trim() || "暂无"}</div>
+              <div className="text-sm font-medium text-yc-text-secondary mb-2">{t('channelDetail.aiInsight.expertise')}</div>
+              <div className="text-sm text-yc-text-primary leading-6">{channel?.ai_expertise?.trim() || t('channelDetail.aiInsight.noExpertise')}</div>
             </div>
             <div className="rounded-lg border border-yc-border p-3 bg-yc-info-bg">
               <div className="flex items-center gap-2 text-sm font-medium text-yc-text-secondary mb-2">
                 <Users size={16} className="text-yc-info" />
-                受众画像
+                {t('channelDetail.aiInsight.audience')}
               </div>
               <div className="text-yc-text-primary text-sm leading-6">
-                受众推断：{channel?.ai_audience_age || "暂无推断结果"}
+                {t('channelDetail.aiInsight.audienceInference')}{channel?.ai_audience_age || t('channelDetail.aiInsight.noAudience')}
               </div>
             </div>
             <div className="rounded-lg border border-yc-border p-3 bg-yc-bg-inset">
-              <div className="text-sm font-medium text-yc-text-secondary mb-2">内容定位与套路</div>
-              <div className="text-sm text-yc-text-secondary leading-6">{channel?.ai_summary || "暂无分析总结"}</div>
+              <div className="text-sm font-medium text-yc-text-secondary mb-2">{t('channelDetail.aiInsight.contentPosition')}</div>
+              <div className="text-sm text-yc-text-secondary leading-6">{channel?.ai_summary || t('channelDetail.aiInsight.noSummary')}</div>
             </div>
           </div>
         ) : null}
@@ -558,14 +560,14 @@ export default function ChannelDetail({ channelId }: Props) {
           }
         >
           {!hasAiInsight ? (
-            <div className="text-sm text-yc-text-secondary text-center mb-2">选择模型与智能体后运行分析（结果会写入数据库并与频道列表同步）</div>
+            <div className="text-sm text-yc-text-secondary text-center mb-2">{t('channelDetail.aiInsight.selectModelAgent')}</div>
           ) : (
-            <div className="text-sm font-medium text-yc-text-secondary">重新分析</div>
+            <div className="text-sm font-medium text-yc-text-secondary">{t('channelDetail.aiInsight.reanalyze')}</div>
           )}
           <Space wrap className="w-full" size="middle">
             <Select
               showSearch
-              placeholder="选择模型名"
+              placeholder={t('channelDetail.aiInsight.selectModel')}
               className="min-w-[220px]"
               value={
                 selectedModelLibId !== undefined && llmModelName
@@ -585,7 +587,7 @@ export default function ChannelDetail({ channelId }: Props) {
             />
             <Select
               allowClear
-              placeholder="选择智能体 (Agent，可选)"
+              placeholder={t('channelDetail.aiInsight.selectAgent')}
               className="min-w-[200px]"
               value={selectedAgentId}
               onChange={(v) => setSelectedAgentId(v)}
@@ -599,18 +601,18 @@ export default function ChannelDetail({ channelId }: Props) {
               className="!bg-yc-primary !border-yc-primary hover:!bg-yc-primary-hover hover:!border-yc-primary-hover"
               onClick={() => void runAiDeepAnalysis()}
             >
-              {hasAiInsight ? "重新运行 AI 深度分析" : "运行 AI 深度分析"}
+              {hasAiInsight ? t('channelDetail.aiInsight.rerunAnalysis') : t('channelDetail.aiInsight.runAnalysis')}
             </Button>
           </Space>
           {!libraryModels.some((m) => m.has_api_key) ? (
-            <div className="text-xs text-yc-warning">请先在「设置中心 → 模型管理」添加至少一条带 API Key 的模型配置。</div>
+            <div className="text-xs text-yc-warning">{t('channelDetail.aiInsight.modelConfigRequired')}</div>
           ) : null}
         </div>
       </div>
 
       <div className="space-y-2">
         {loading && !videos.length ? (
-          <div className="text-yc-text-secondary">加载中...</div>
+          <div className="text-yc-text-secondary">{t('channelDetail.video.loading')}</div>
         ) : (
           videos.map((video) => {
             const hasAnalyzed = video.has_analysis || !!videoAnalysisStatusOverride[video.id]?.has_analysis;
@@ -619,7 +621,7 @@ export default function ChannelDetail({ channelId }: Props) {
             const openYouTube = (e: MouseEvent) => {
               e.stopPropagation();
               if (!watchUrl) {
-                message.warning("该视频缺少有效的 YouTube 视频 ID，无法跳转");
+                message.warning(t('channelDetail.video.noValidVideoIdNav'));
                 return;
               }
               window.open(watchUrl, "_blank", "noopener,noreferrer");
@@ -638,7 +640,7 @@ export default function ChannelDetail({ channelId }: Props) {
                         type="button"
                         onClick={openYouTube}
                         className="block w-full p-0 border-0 bg-transparent cursor-pointer rounded overflow-hidden"
-                        aria-label="在 YouTube 打开视频"
+                        aria-label={t('channelDetail.video.openVideo')}
                       >
                         <img src={video.thumbnail_url || ""} alt="" className="w-full h-36 object-cover rounded" />
                       </button>
@@ -672,19 +674,19 @@ export default function ChannelDetail({ channelId }: Props) {
                           className="cursor-pointer"
                           onClick={(e) => { e.stopPropagation(); void handleViewVideoAnalysis(video.id); }}
                         >
-                          已分析{analyzedAt ? ` ${dayjs(analyzedAt).fromNow()}` : ''}
+                          {t('channelDetail.video.analyzed')}{analyzedAt ? ` ${dayjs(analyzedAt).fromNow()}` : ''}
                         </Tag>
                       )}
                     </div>
                     <div className="text-yc-text-secondary text-sm mt-2">
-                      发布于 {video.published_at ? dayjs(video.published_at).format("YYYY-MM-DD HH:mm") : "-"} ·{" "}
+                      {t('channelDetail.video.publishedAt')} {video.published_at ? dayjs(video.published_at).format("YYYY-MM-DD HH:mm") : "-"} ·{" "}
                       {video.published_at ? dayjs(video.published_at).fromNow() : ""}
                     </div>
                     {/* 统计数据 */}
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm">
-                      <span className="text-yc-text-link flex items-center gap-1"><Eye className="h-4 w-4 shrink-0" aria-hidden />播放量：{formatNumber(video.view_count)}</span>
-                      <span className="text-yc-stat-positive flex items-center gap-1"><ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />点赞：{formatNumber(video.like_count)}</span>
-                      <span className="text-yc-accent flex items-center gap-1"><MessageCircle className="h-4 w-4 shrink-0" aria-hidden />评论：{formatNumber(video.comment_count)}</span>
+                      <span className="text-yc-text-link flex items-center gap-1"><Eye className="h-4 w-4 shrink-0" aria-hidden />{t('channelDetail.video.viewsLabel')}{formatNumber(video.view_count)}</span>
+                      <span className="text-yc-stat-positive flex items-center gap-1"><ThumbsUp className="h-4 w-4 shrink-0" aria-hidden />{t('channelDetail.video.likesLabel')}{formatNumber(video.like_count)}</span>
+                      <span className="text-yc-accent flex items-center gap-1"><MessageCircle className="h-4 w-4 shrink-0" aria-hidden />{t('channelDetail.video.commentsLabel')}{formatNumber(video.comment_count)}</span>
                     </div>
                   </div>
                 </div>
@@ -693,7 +695,7 @@ export default function ChannelDetail({ channelId }: Props) {
                 <div className="mt-3 flex flex-wrap gap-2 items-center">
                   <Select
                     showSearch
-                    placeholder="选择模型"
+                    placeholder={t('channelDetail.video.selectModel')}
                     style={{ minWidth: 160 }}
                     value={modelIdForVideo || undefined}
                     options={videoModelOptions.map((o) => ({ value: o.value, label: o.label }))}
@@ -701,7 +703,7 @@ export default function ChannelDetail({ channelId }: Props) {
                   />
                   <Select
                     allowClear
-                    placeholder="选择智能体（可选）"
+                    placeholder={t('channelDetail.video.selectAgent')}
                     style={{ minWidth: 160 }}
                     value={agentIdForVideo ?? undefined}
                     options={promptAgents.map((p) => ({ value: p.id, label: p.title }))}
@@ -715,7 +717,7 @@ export default function ChannelDetail({ channelId }: Props) {
                     onClick={() => void handleAnalyzeVideo(video)}
                     loading={Boolean(videoAnalysisLoadingById[video.id])}
                   >
-                    {hasAnalyzed ? "重新分析" : "一键 AI 深度分析"}
+                    {hasAnalyzed ? t('channelDetail.aiInsight.reanalyze') : t('channelDetail.video.oneClickAnalysis')}
                   </Button>
                   <Button
                     size="small"
@@ -723,7 +725,7 @@ export default function ChannelDetail({ channelId }: Props) {
                     loading={downloadingVideoIds.has(video.yt_video_id)}
                     onClick={() => void handleDownloadVideo(video.yt_video_id)}
                   >
-                    下载
+                    {t('channelDetail.video.download')}
                   </Button>
                   {hasAnalyzed && (
                     <Button
@@ -734,7 +736,7 @@ export default function ChannelDetail({ channelId }: Props) {
                       disabled={Boolean(videoAnalysisLoadingById[video.id])}
                       className={videoAnalysisPanelOpenId !== video.id ? "!bg-yc-success !border-yc-success" : undefined}
                     >
-                      查看结果{analyzedAt ? `(${dayjs(analyzedAt).fromNow()})` : ''}
+                      {t('channelDetail.video.viewResult')}{analyzedAt ? `(${dayjs(analyzedAt).fromNow()})` : ''}
                     </Button>
                   )}
                 </div>
@@ -744,15 +746,15 @@ export default function ChannelDetail({ channelId }: Props) {
                     {videoAnalysisLoadingById[video.id] ? (
                       <div className="flex items-center gap-2 text-yc-text-secondary">
                         <Spin size="small" />
-                        分析中…
+                        {t('channelDetail.video.analyzing')}
                       </div>
                     ) : videoAnalysisContentById[video.id] ? (
                       <MarkdownPreview>{videoAnalysisContentById[video.id]}</MarkdownPreview>
                     ) : (
                       <div className="text-yc-text-secondary text-sm">
                         {hasAnalyzed
-                          ? "暂无缓存展示。请点击「查看结果」拉取已保存的分析内容。"
-                          : "暂无分析结果。点击「一键 AI 深度分析」生成内容。"}
+                          ? t('channelDetail.video.noCacheResult')
+                          : t('channelDetail.video.noAnalysisResult')}
                       </div>
                     )}
                   </div>

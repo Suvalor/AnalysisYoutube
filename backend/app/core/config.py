@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     field_encryption_secret: str = Field("", alias="FIELD_ENCRYPTION_SECRET")
     algorithm: str = Field("HS256", alias="ALGORITHM")
     access_token_expire_minutes: int = Field(1440, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
+    # 游客调用 YouTube 相关公共功能时读取该组织的设置中心配置。
+    guest_default_org_id: int | None = Field(None, alias="GUEST_DEFAULT_ORG_ID")
     # 智能视觉 CV（图像修补 Inpaint）：AccessKey + SecretKey
     volc_cv_access_key_id: str = Field("", alias="VOLC_CV_ACCESS_KEY_ID")
     volc_cv_secret_access_key: str = Field("", alias="VOLC_CV_SECRET_ACCESS_KEY")
@@ -128,4 +130,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-

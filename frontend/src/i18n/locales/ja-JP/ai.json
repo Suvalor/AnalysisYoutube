@@ -40,5 +40,43 @@
   },
   "empty": {
     "noData": "スクリプトがありません。テーマを入力して生成を開始してください"
+  },
+  "creator": {
+    "message": {
+      "loadConfigFailed": "設定の読み込み失敗",
+      "topicRequired": "創作テーマ/素材のポイントを入力してください",
+      "configIncomplete": "設定センターで利用可能なエージェントとスタイルを維持してください",
+      "generateFailed": "生成リクエスト失敗",
+      "generateError": "生成エラー",
+      "generateFail": "生成失敗",
+      "unnamedScript": "無題スクリプト",
+      "savedToLibrary": "スクリプトライブラリに保存しました",
+      "saveFailed": "保存失敗",
+      "noContent": "保存するコンテンツがありません"
+    },
+    "label": {
+      "knowledgeBase": "ナレッジベース管理",
+      "scriptPreview": "スクリプトプレビュー（リアルタイムストリーム）"
+    },
+    "title": "AIスクリプト工房",
+    "selectModel": "モデル選択",
+    "selectPrompt": "プロンプト選択",
+    "selectStyle": "スタイル選択",
+    "coreIdea": "創作テーマ / 素材核心点",
+    "coreIdeaPlaceholder": "例：2026 AI Agent 生産性ツールについて90秒ショート動画スクリプトを書く",
+    "startGenerate": "生成開始",
+    "loadModelPlaceholder": "モデルリスト読み込み中…",
+    "selectAgentPlaceholder": "智能体を選択",
+    "selectStylePlaceholder": "スタイルを選択",
+    "loadConfigFailed": "設定の読み込みに失敗しました",
+    "topicRequired": "創作テーマ/素材核心点を入力してください",
+    "configIncomplete": "設定センターで利用可能な智能体とスタイルを維持してください",
+    "generateFailed": "生成リクエストに失敗しました",
+    "generateError": "生成エラー",
+    "noContent": "保存するコンテンツがありません",
+    "unnamedScript": "無名スクリプト",
+    "savedToLibrary": "スクリプトライブラリに保存しました",
+    "saveFailed": "保存に失敗しました",
+    "knowledgeBase": "知識ベース管理"
   }
 }

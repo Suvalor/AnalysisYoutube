@@ -34,7 +34,11 @@
     "expand": "展開",
     "collapse": "折りたたむ",
     "selectAll": "全選択",
-    "deselectAll": "全解除"
+    "deselectAll": "全解除",
+    "ariaOpenSidebar": "サイドバーを開く",
+    "ariaUserMenu": "ユーザーメニュー",
+    "ariaCloseTab": "タブを閉じる",
+    "keyword": "キーワード"
   },
   "status": {
     "success": "成功",
@@ -83,7 +87,8 @@
     "filterConfirm": "確定",
     "filterReset": "リセット",
     "selectAll": "全選択",
-    "selectInvert": "反転選択"
+    "selectInvert": "反転選択",
+    "action": "操作"
   },
   "time": {
     "justNow": "たった今",
@@ -95,5 +100,53 @@
     "delete": "削除確認？この操作は取り消せません",
     "leavePage": "未保存の変更があります。ページを離れますか？",
     "clearData": "クリア確認？この操作は取り消せません"
+  },
+  "mixConfig": {
+    "title": "AI ミックス設定",
+    "cancel": "キャンセル",
+    "submit": "ミックス送信",
+    "selectedAssets": "選択素材",
+    "audioSource": "音声ソース",
+    "audioText": "テキスト入力 (TTS)",
+    "audioFile": "音声ファイルアップロード",
+    "narrationText": "ナレーションテキスト",
+    "narrationPlaceholder": "ナレーションテキストを入力。システムがTTS音声を自動生成します...",
+    "selectAudioFile": "音声ファイル選択",
+    "audioFormatHint": "MP3、WAVなどの音声形式をサポート",
+    "aspectRatio": "画面比率",
+    "vertical": "縦画面 9:16",
+    "horizontal": "横画面 16:9",
+    "highlightsPriority": "ハイライト優先",
+    "backgroundTaskHint": "ミックスはバックグラウンドタスクです。送信後、タスクセンターで進捗を確認できます。",
+    "message": {
+      "noVideo": "選択素材に動画がありません。ミックスできません。",
+      "narrationRequired": "ナレーションテキストを入力してください",
+      "audioFileRequired": "音声ファイルをアップロードしてください",
+      "audioUploadFailed": "音声ファイルのアップロード失敗",
+      "submitted": "ミックスタスク送信済み。タスクセンターで進捗を確認できます。",
+      "submitFailed": "ミックス送信失敗"
+    }
+  },
+  "guestLimit": {
+    "title": "本日の配信を使い切りました",
+    "description": "ゲストの毎日の配信は限られています。登録するとより多くの使用量が得られます。",
+    "register": "登録してより多くの配信を取得",
+    "later": "後で"
+  },
+  "markdownEditor": {
+    "edit": "編集",
+    "preview": "プレビュー",
+    "split": "分割"
+  },
+  "quotaProgress": {
+    "unlimited": "無制限",
+    "refresh": "配信を更新"
+  },
+  "scriptPreview": {
+    "title": "スクリプトプレビュー",
+    "sourceCode": "Markdownソース",
+    "preview": "Markdownプレビュー",
+    "saveToLibrary": "スクリプトライブラリに保存",
+    "emptyHint": "「生成開始」をクリック後、ここにリアルタイムでスクリプト内容が表示されます。"
   }
 }

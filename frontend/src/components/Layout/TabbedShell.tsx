@@ -562,7 +562,7 @@ export default function TabbedShell() {
               onClick={() => setMobileOpen(true)}
               className="lg:hidden p-2 rounded-md"
               style={{ color: "var(--color-text-secondary)" }}
-              aria-label="打开侧边栏"
+              aria-label={t("common:action.ariaOpenSidebar")}
             >
               <MenuIcon size={18} />
             </button>
@@ -613,7 +613,7 @@ export default function TabbedShell() {
                     backgroundColor: "var(--color-bg-inset)",
                     color: "var(--color-text-secondary)",
                   }}
-                  aria-label="用户菜单"
+                  aria-label={t("common:action.ariaUserMenu")}
                 >
                   U
                 </button>
@@ -700,7 +700,7 @@ export default function TabbedShell() {
                     type="button"
                     className="p-0.5 rounded opacity-70 hover:opacity-100"
                     style={{ backgroundColor: "var(--color-bg-inset)" }}
-                    aria-label="关闭标签"
+                    aria-label={t("common:action.ariaCloseTab")}
                     onClick={(e) => {
                       e.stopPropagation();
                       closeTab(tab.id);

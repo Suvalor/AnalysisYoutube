@@ -429,7 +429,7 @@ export default function ConfigCenter() {
             <Space size={[6, 6]} wrap>
               {items.map((item) => (
                 <Tag key={`${item.value}-${item.label}`}>
-                  {item.label}（{item.value}）
+                  {t("configCenter.supportedModelTag", { label: item.label, value: item.value })}
                 </Tag>
               ))}
             </Space>
@@ -726,9 +726,9 @@ export default function ConfigCenter() {
                 children: (
                   <Spin spinning={integrationLoading}>
                     <p className="text-yc-text-secondary text-sm mb-3">
-                      {t("configCenter.orgInfo")}：<strong>{integrationMeta?.org_name || "—"}</strong>
-                      （{t("configCenter.orgId")}：{integrationMeta?.org_id ?? "—"}）。<strong>{t("configCenter.orgPriority")}</strong>
-                      ；{t("configCenter.orgShared")}。{t("configCenter.secretMaskPrefix")}{" "}
+                      {t("configCenter.orgInfo")}<strong>{integrationMeta?.org_name || "—"}</strong>
+                      {t("configCenter.orgId")}{integrationMeta?.org_id ?? "—"}{t("configCenter.orgIdClose")}<strong>{t("configCenter.orgPriority")}</strong>
+                      {t("configCenter.orgShared")}{t("configCenter.secretMaskPrefix")}{" "}
                       <code className="text-xs">{SECRET_MASK}</code> {t("configCenter.secretMaskSuffix")}
                     </p>
                     <div className="mb-3 flex flex-wrap gap-2">
@@ -800,7 +800,7 @@ export default function ConfigCenter() {
                                       autoComplete="new-password"
                                     />
                                   </Form.Item>
-                                  <Form.Item name="aliyun_role_arn" label="Role ARN（STS）">
+                                  <Form.Item name="aliyun_role_arn" label={t("configCenter.roleArnLabel")}>
                                     <Input placeholder="acs:ram::..." />
                                   </Form.Item>
                                   <Form.Item name="aliyun_region_id" label="Region ID">
@@ -1098,7 +1098,7 @@ export default function ConfigCenter() {
                         danger
                         icon={<MinusCircleOutlined />}
                         onClick={() => remove(name)}
-                        aria-label="删除模型"
+                        aria-label={t("configCenter.deleteModelAriaLabel")}
                       />
                     </Space>
                   ))}

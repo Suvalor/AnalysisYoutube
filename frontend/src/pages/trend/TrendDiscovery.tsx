@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { buildYouTubeWatchUrl } from "@/utils/youtubeLinks";
 import {
   Card,
@@ -41,35 +42,9 @@ import { useAuth } from "@/store/authStore";
 
 const { Title, Text } = Typography;
 
-const REGION_OPTIONS = [
-  { value: "US", label: "🇺🇸 美国" },
-  { value: "GB", label: "🇬🇧 英国" },
-  { value: "JP", label: "🇯🇵 日本" },
-  { value: "KR", label: "🇰🇷 韩国" },
-  { value: "DE", label: "🇩🇪 德国" },
-  { value: "FR", label: "🇫🇷 法国" },
-  { value: "BR", label: "🇧🇷 巴西" },
-  { value: "IN", label: "🇮🇳 印度" },
-  { value: "CA", label: "🇨🇦 加拿大" },
-  { value: "AU", label: "🇦🇺 澳大利亚" },
-];
+// REGION_OPTIONS moved to component-level useMemo
 
-const CATEGORY_OPTIONS = [
-  { value: "", label: "全部品类" },
-  { value: "1", label: "电影与动画" },
-  { value: "2", label: "汽车与车辆" },
-  { value: "10", label: "音乐" },
-  { value: "15", label: "宠物与动物" },
-  { value: "17", label: "体育" },
-  { value: "20", label: "游戏" },
-  { value: "22", label: "人物与博客" },
-  { value: "23", label: "喜剧" },
-  { value: "24", label: "娱乐" },
-  { value: "25", label: "新闻与政治" },
-  { value: "26", label: "操作指南与风格" },
-  { value: "27", label: "教育" },
-  { value: "28", label: "科学与技术" },
-];
+// CATEGORY_OPTIONS moved to component-level useMemo
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -77,14 +52,25 @@ function formatNumber(n: number): string {
   return String(n);
 }
 
+/** 根据{t('discovery.region')}代码获取{t('discovery.region')}标签 */
 function getRegionLabel(region: string): string {
-  const found = REGION_OPTIONS.find((o) => o.value === region);
-  return found ? found.label.replace(/^🇺🇸|^🇬🇧|^🇯🇵|^🇰🇷|^🇩🇪|^🇫🇷|^🇧🇷|^🇮🇳|^🇨🇦|^🇦🇺/, "").trim() : region;
+  const map: Record<string, string> = {
+    US: "discovery.regionUS", GB: "discovery.regionGB", JP: "discovery.regionJP", KR: "discovery.regionKR",
+    DE: "discovery.regionDE", FR: "discovery.regionFR", BR: "discovery.regionBR", IN: "discovery.regionIN",
+    CA: "discovery.regionCA", AU: "discovery.regionAU",
+  };
+  return map[region] || region;
 }
 
+/** 根据{t('discovery.category')} ID 获取{t('discovery.category')}标签 */
 function getCategoryLabel(categoryId: string): string {
-  const found = CATEGORY_OPTIONS.find((o) => o.value === categoryId);
-  return found ? found.label : categoryId || "全部品类";
+  const map: Record<string, string> = {
+    "": "discovery.allCategories", "1": "discovery.catFilm", "2": "discovery.catAutos", "10": "discovery.catMusic",
+    "15": "discovery.catAnimals", "17": "discovery.catSports", "20": "discovery.catGaming", "22": "discovery.catPeople",
+    "23": "discovery.catComedy", "24": "discovery.catEntertainment", "25": "discovery.catNews", "26": "discovery.catHowto",
+    "27": "discovery.catEducation", "28": "discovery.catScience",
+  };
+  return map[categoryId] || categoryId || "discovery.allCategories";
 }
 
 function SortHeader({
@@ -116,7 +102,40 @@ function SortHeader({
 }
 
 export default function TrendDiscovery() {
+  const { t } = useTranslation("trend");
   const { token } = useAuth();
+
+  /** {t('discovery.region')}选项（i18n） */
+  const REGION_OPTIONS = useMemo(() => [
+    { value: "US", label: `🇺🇸 ${t('discovery.regionUS')}` },
+    { value: "GB", label: `🇬🇧 ${t('discovery.regionGB')}` },
+    { value: "JP", label: `🇯🇵 ${t('discovery.regionJP')}` },
+    { value: "KR", label: `🇰🇷 ${t('discovery.regionKR')}` },
+    { value: "DE", label: `🇩🇪 ${t('discovery.regionDE')}` },
+    { value: "FR", label: `🇫🇷 ${t('discovery.regionFR')}` },
+    { value: "BR", label: `🇧🇷 ${t('discovery.regionBR')}` },
+    { value: "IN", label: `🇮🇳 ${t('discovery.regionIN')}` },
+    { value: "CA", label: `🇨🇦 ${t('discovery.regionCA')}` },
+    { value: "AU", label: `🇦🇺 ${t('discovery.regionAU')}` },
+  ], [t]);
+
+  /** {t('discovery.category')}选项（i18n） */
+  const CATEGORY_OPTIONS = useMemo(() => [
+    { value: "", label: t('discovery.allCategories') },
+    { value: "1", label: t('discovery.catFilm') },
+    { value: "2", label: t('discovery.catAutos') },
+    { value: "10", label: t('discovery.catMusic') },
+    { value: "15", label: t('discovery.catAnimals') },
+    { value: "17", label: t('discovery.catSports') },
+    { value: "20", label: t('discovery.catGaming') },
+    { value: "22", label: t('discovery.catPeople') },
+    { value: "23", label: t('discovery.catComedy') },
+    { value: "24", label: t('discovery.catEntertainment') },
+    { value: "25", label: t('discovery.catNews') },
+    { value: "26", label: t('discovery.catHowto') },
+    { value: "27", label: t('discovery.catEducation') },
+    { value: "28", label: t('discovery.catScience') },
+  ], [t]);
   const [region, setRegion] = useState("US");
   const [categoryId, setCategoryId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -144,7 +163,7 @@ export default function TrendDiscovery() {
     }
   };
 
-  /** 获取趋势查阅历史（仅已登录用户，游客无历史记录） */
+  /** {t('discovery.fetchTrend')}查阅历史（仅已登录用户，游客无历史记录） */
   const fetchHistory = useCallback(async () => {
     if (!token) return;
     setHistoryLoading(true);
@@ -169,15 +188,15 @@ export default function TrendDiscovery() {
         region,
         category_id: categoryId || undefined,
         max_results: 50,
-        region_label: getRegionLabel(region),
-        category_label: getCategoryLabel(categoryId),
+        region_label: t(getRegionLabel(region)),
+        category_label: t(getCategoryLabel(categoryId)),
       });
       setResult(res);
       setDisplayCount(20);
       // 刷新历史
       await fetchHistory();
     } catch (e: any) {
-      message.error(e?.response?.data?.detail || "获取趋势数据失败");
+      message.error(e?.response?.data?.detail || t("discovery.fetchFailed"));
     } finally {
       setLoading(false);
     }
@@ -186,10 +205,10 @@ export default function TrendDiscovery() {
   // 入库确认
   const handleAddChannel = (record: any) => {
     Modal.confirm({
-      title: `将「${record.channel_title}」入库到频道管理？`,
-      content: `频道ID: ${record.channel_id}，订阅数: ${formatNumber(record.channel_subscribers)}`,
-      okText: "确认入库",
-      cancelText: "取消",
+      title: t("discovery.importChannel", { title: record.channel_title }),
+      content: t("discovery.importChannelContent", { channelId: record.channel_id, subscribers: formatNumber(record.channel_subscribers) }),
+      okText: t("discovery.confirmImport"),
+      cancelText: t("discovery.cancel"),
       okButtonProps: { style: { background: "var(--color-danger)", borderColor: "var(--color-danger)" } },
       onOk: async () => {
         try {
@@ -201,7 +220,7 @@ export default function TrendDiscovery() {
           });
           message.success(res.message);
         } catch (e: any) {
-          message.error(e?.response?.data?.detail || "入库失败");
+          message.error(e?.response?.data?.detail || t("discovery.importFailed"));
         }
       },
     });
@@ -250,12 +269,12 @@ export default function TrendDiscovery() {
           region: item.region,
           category_id: item.category_id || undefined,
           max_results: 50,
-          region_label: getRegionLabel(item.region),
-          category_label: getCategoryLabel(item.category_id),
+          region_label: t(getRegionLabel(item.region)),
+          category_label: t(getCategoryLabel(item.category_id)),
         });
         setResult(res);
       } catch (e: any) {
-        message.error(e?.response?.data?.detail || "获取趋势数据失败");
+        message.error(e?.response?.data?.detail || t("discovery.fetchFailed"));
       }
     } finally {
       setRegion(item.region);
@@ -269,7 +288,7 @@ export default function TrendDiscovery() {
     <div className="p-6 max-w-[1200px] mx-auto">
       <Title level={3} style={{ marginBottom: 24 }}>
         <FireOutlined style={{ marginRight: 8, color: "var(--color-danger)" }} />
-        热门趋势
+        {t('title')}
       </Title>
 
       {/* 搜索区 */}
@@ -278,7 +297,7 @@ export default function TrendDiscovery() {
           <Col>
             <Space>
               <GlobalOutlined />
-              <Text strong>地区</Text>
+              <Text strong>{t('discovery.region')}</Text>
             </Space>
             <Select
               value={region}
@@ -290,7 +309,7 @@ export default function TrendDiscovery() {
           <Col>
             <Space>
               <RiseOutlined />
-              <Text strong>品类</Text>
+              <Text strong>{t('discovery.category')}</Text>
             </Space>
             <Select
               value={categoryId}
@@ -307,7 +326,7 @@ export default function TrendDiscovery() {
               onClick={handleFetch}
               size="large"
             >
-              获取趋势
+              {t('discovery.fetchTrend')}
             </Button>
           </Col>
         </Row>
@@ -316,7 +335,7 @@ export default function TrendDiscovery() {
       {/* 趋势历史 */}
       {history.length > 0 && (
         <Card
-          title={<><HistoryOutlined style={{ marginRight: 8 }} />最近查阅</>}
+          title={<><HistoryOutlined style={{ marginRight: 8 }} />{t('discovery.recentHistory')}</>}
           style={{ marginBottom: 24 }}
           size="small"
           loading={historyLoading}
@@ -346,7 +365,7 @@ export default function TrendDiscovery() {
             <Col span={6}>
               <Card>
                 <Statistic
-                  title="趋势视频数"
+                  title={t('discovery.trendVideoCount')}
                   value={result.stats.total_videos}
                   prefix={<FireOutlined />}
                 />
@@ -355,7 +374,7 @@ export default function TrendDiscovery() {
             <Col span={6}>
               <Card>
                 <Statistic
-                  title="平均播放量"
+                  title={t('discovery.avgViews')}
                   value={result.stats.avg_views}
                   prefix={<EyeOutlined />}
                 />
@@ -364,7 +383,7 @@ export default function TrendDiscovery() {
             <Col span={6}>
               <Card>
                 <Statistic
-                  title="平均点赞"
+                  title={t('discovery.avgLikes')}
                   value={result.stats.avg_likes}
                   prefix={<LikeOutlined />}
                 />
@@ -373,7 +392,7 @@ export default function TrendDiscovery() {
             <Col span={6}>
               <Card>
                 <Statistic
-                  title="平均互动率"
+                  title={t('discovery.avgEngagementRate')}
                   value={result.stats.avg_engagement_rate}
                   suffix="%"
                   precision={2}
@@ -383,10 +402,10 @@ export default function TrendDiscovery() {
             </Col>
           </Row>
 
-          {/* 品类分布 */}
+          {/* {t('discovery.category')}分布 */}
           {result.category_distribution?.length > 0 && (
             <Card
-              title="品类分布"
+              title={t('discovery.categoryDistribution')}
               style={{ marginBottom: 24 }}
               size="small"
             >
@@ -403,15 +422,15 @@ export default function TrendDiscovery() {
                     }
                     style={{ fontSize: 13, padding: "4px 10px" }}
                   >
-                    {cat.category_name}：{cat.video_count}个 ({cat.percentage}%)
+                    {cat.category_name}: {cat.video_count} ({cat.percentage}%)
                   </Tag>
                 ))}
               </Space>
             </Card>
           )}
 
-          {/* 趋势视频排行 - 无限滚动 */}
-          <Card title="趋势视频排行" size="small">
+          {/* {t('discovery.trendVideoRanking')} - 无限滚动 */}
+          <Card title={t('discovery.trendVideoRanking')} size="small">
             <div ref={scrollContainerRef} style={{ maxHeight: "70vh", overflowY: "auto" }}>
               {/* 表头 */}
               <div
@@ -427,13 +446,13 @@ export default function TrendDiscovery() {
                 }}
               >
                 <div>#</div>
-                <div>视频</div>
-                <SortHeader label="播放量" field="view_count" current={sortField} order={sortOrder} onSort={handleSort} />
-                <SortHeader label="点赞" field="like_count" current={sortField} order={sortOrder} onSort={handleSort} />
-                <SortHeader label="评论" field="comment_count" current={sortField} order={sortOrder} onSort={handleSort} />
-                <SortHeader label="互动率" field="engagement_rate" current={sortField} order={sortOrder} onSort={handleSort} />
-                <SortHeader label="频道订阅" field="channel_subscribers" current={sortField} order={sortOrder} onSort={handleSort} />
-                <div>操作</div>
+                <div>{t('discovery.video')}</div>
+                <SortHeader label={t("discovery.viewCount")} field="view_count" current={sortField} order={sortOrder} onSort={handleSort} />
+                <SortHeader label={t("discovery.likeCount")} field="like_count" current={sortField} order={sortOrder} onSort={handleSort} />
+                <SortHeader label={t("discovery.commentCount")} field="comment_count" current={sortField} order={sortOrder} onSort={handleSort} />
+                <SortHeader label={t("discovery.engagementRate")} field="engagement_rate" current={sortField} order={sortOrder} onSort={handleSort} />
+                <SortHeader label={t("discovery.channelSubscribers")} field="channel_subscribers" current={sortField} order={sortOrder} onSort={handleSort} />
+                <div>{t('discovery.action')}</div>
               </div>
 
               {/* 视频行 */}
@@ -496,7 +515,7 @@ export default function TrendDiscovery() {
                       }}
                       style={{ background: "var(--color-danger)", borderColor: "var(--color-danger)" }}
                     >
-                      入库
+                      {t('discovery.import')}
                     </Button>
                     )}
                   </div>
@@ -507,13 +526,13 @@ export default function TrendDiscovery() {
               {sortedVideos.length > displayCount && (
                 <div ref={sentinelRef} style={{ textAlign: "center", padding: "16px 0" }}>
                   <Spin size="small" />
-                  <Text type="secondary" style={{ marginLeft: 8 }}>加载更多...</Text>
+                  <Text type="secondary" style={{ marginLeft: 8 }}>{t("discovery.loadMore")}</Text>
                 </div>
               )}
 
               {displayCount >= sortedVideos.length && sortedVideos.length > 0 && (
                 <div style={{ textAlign: "center", padding: "16px 0", color: "var(--color-text-tertiary)" }}>
-                  共 {sortedVideos.length} 条，已全部加载
+                  {t("discovery.allLoaded", { count: sortedVideos.length })}
                 </div>
               )}
             </div>
@@ -524,7 +543,7 @@ export default function TrendDiscovery() {
       {!result && !loading && (
         <Card>
           <Empty
-            description="选择地区和品类，点击「获取趋势」查看 YouTube 热门视频"
+            description={t('discovery.emptyHint')}
             image={Empty.PRESENTED_IMAGE_SIMPLE}
           />
         </Card>

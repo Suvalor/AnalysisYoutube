@@ -6,7 +6,7 @@ export type InspirationItem = {
   content: string;
   image_url: string | null;
   image_asset_id: number | null;
-  /** 后端签名 URL，私有桶展示用 */
+  /** Signed URL for private bucket display */
   image_access_url: string | null;
   source: string;
   recorded_at: string;
@@ -16,23 +16,23 @@ export type InspirationItem = {
   updated_at: string;
 };
 
-/** 与后端纯图片灵感占位正文一致 */
-export const INSPIRATION_IMAGE_PLACEHOLDER = "（图片灵感）";
+/** Placeholder text for pure-image inspiration, consistent with backend */
+export const INSPIRATION_IMAGE_PLACEHOLDER = "(Image Inspiration)";
 
-/** 生成进入 SOP 剧情拆解用的剧本大纲：包含正文与 Markdown 图片语法及 URL 文本，便于模型理解 */
+/** Generate script outline from inspiration item: includes text content and Markdown image syntax for model comprehension */
 export function buildScriptOutlineFromInspiration(row: InspirationItem): string {
   const url = (row.image_access_url || row.image_url || "").trim();
   const textRaw = (row.content || "").trim();
-  const text = textRaw === INSPIRATION_IMAGE_PLACEHOLDER ? "" : textRaw;
+  const text = textRaw === INSPIRATION_IMAGE_PLACEHOLDER || textRaw === "(Image Inspiration)" || textRaw === "（图片灵感）" ? "" : textRaw;
   const parts: string[] = [];
   if (text) parts.push(text);
   if (url) {
     if (parts.length) parts.push("");
-    parts.push(`![灵感参考图](${url})`);
+    parts.push(`![Inspiration Image](${url})`);
     parts.push("");
-    parts.push(`（图片地址：${url}）`);
+    parts.push(`(Image URL: ${url})`);
   }
-  return parts.join("\n").trim() || (url ? `![灵感参考图](${url})` : "");
+  return parts.join("\n").trim() || (url ? `![Inspiration Image](${url})` : "");
 }
 
 export type InspirationCreatePayload = {

@@ -41,5 +41,71 @@
   },
   "empty": {
     "noData": "키워드 데이터가 없습니다. 키워드를 검색하세요"
+  },
+  "research": {
+    "country": {
+      "US": "미국",
+      "GB": "영국",
+      "JP": "일본",
+      "KR": "한국",
+      "IN": "인도",
+      "DE": "독일",
+      "FR": "프랑스",
+      "BR": "브라질",
+      "AU": "호주",
+      "CA": "캐나다"
+    },
+    "message": {
+      "loadConfigFailed": "설정 로드 실패",
+      "topicRequired": "창작 주제/핵심 포인트를 먼저 입력하세요",
+      "configIncomplete": "설정 센터에서 사용 가능한 에이전트와 스타일을 먼저 유지하세요",
+      "generateFailed": "생성 요청 실패",
+      "unnamedScript": "이름 없는 스크립트",
+      "savedToLibrary": "스크립트 라이브러리에 저장됨",
+      "knowledgeBase": "지식 베이스 관리",
+      "loadKeywordsFailed": "키워드 로드 실패",
+      "generateSuccess": "키워드 생성 성공",
+      "noResult": "키워드 데이터 없음"
+    },
+    "action": {
+      "selectAgent": "에이전트 선택",
+      "selectStyle": "스타일 선택",
+      "topicPlaceholder": "창작 주제/핵심 포인트 입력",
+      "generate": "생성 시작",
+      "generating": "생성 중...",
+      "selectCountry": "국가/지역 선택"
+    },
+    "label": {
+      "keyword": "키워드",
+      "searchVolume": "검색량",
+      "competition": "경쟁도",
+      "trend": "트렌드"
+    },
+    "region": "지역",
+    "language": "언어",
+    "searchPlaceholder": "키워드 입력...",
+    "keywordRequired": "키워드를 입력해 주세요",
+    "researchFailed": "키워드 연구 실패",
+    "researchHistory": "연구 기록",
+    "searchVolume": "검색량",
+    "competition": "경쟁도",
+    "relatedKeywords": "관련 키워드",
+    "popularVideos": "인기 동영상",
+    "video": "동영상",
+    "viewCount": "조회수",
+    "likeCount": "좋아요",
+    "commentCount": "댓글",
+    "engagementRate": "참여율",
+    "loadMore": "더 불러오는 중...",
+    "allLoaded": "총 {{count}}건, 모두 로드됨",
+    "emptyHint": "키워드를 입력하고 '검색'을 클릭하여 YouTube 키워드 분석을 확인하세요",
+    "langZh": "중국어",
+    "langEn": "영어",
+    "langJa": "일본어",
+    "langKo": "한국어",
+    "langDe": "독일어",
+    "langFr": "프랑스어",
+    "langPt": "포르투갈어",
+    "langHi": "힌디어"
   }
 }

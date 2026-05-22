@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   Input,
@@ -56,15 +57,17 @@ const SEO_STROKE_COLORS: Record<string, string> = {
   poor: "var(--color-danger)",
 };
 
-function getSeoLevel(score: number, max: number): { label: string; tagColor: string; strokeColor: string } {
+/** 根据评分比例返回等级标签 key、标签颜色和进度条颜色 */
+function getSeoLevel(score: number, max: number): { labelKey: string; tagColor: string; strokeColor: string } {
   const pct = score / max;
-  if (pct >= 0.8) return { label: "优秀", tagColor: SEO_TAG_COLORS.excellent, strokeColor: SEO_STROKE_COLORS.excellent };
-  if (pct >= 0.6) return { label: "良好", tagColor: SEO_TAG_COLORS.good, strokeColor: SEO_STROKE_COLORS.good };
-  if (pct >= 0.4) return { label: "一般", tagColor: SEO_TAG_COLORS.fair, strokeColor: SEO_STROKE_COLORS.fair };
-  return { label: "需优化", tagColor: SEO_TAG_COLORS.poor, strokeColor: SEO_STROKE_COLORS.poor };
+  if (pct >= 0.8) return { labelKey: "scoring.grade.excellent", tagColor: SEO_TAG_COLORS.excellent, strokeColor: SEO_STROKE_COLORS.excellent };
+  if (pct >= 0.6) return { labelKey: "scoring.grade.good", tagColor: SEO_TAG_COLORS.good, strokeColor: SEO_STROKE_COLORS.good };
+  if (pct >= 0.4) return { labelKey: "scoring.grade.average", tagColor: SEO_TAG_COLORS.fair, strokeColor: SEO_STROKE_COLORS.fair };
+  return { labelKey: "scoring.grade.needsOptimization", tagColor: SEO_TAG_COLORS.poor, strokeColor: SEO_STROKE_COLORS.poor };
 }
 
 export default function SeoScoring() {
+  const { t } = useTranslation("seo");
   const { token } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -104,7 +107,7 @@ export default function SeoScoring() {
     }
   };
 
-  /** 加载 SEO 评分历史（仅已登录用户，游客无历史记录） */
+  /** 加载 {t('scoring.scoringTitle')}历史（仅已登录用户，游客无历史记录） */
   const loadHistory = async (page = 1) => {
     if (!token) return;
     setHistoryLoading(true);
@@ -123,10 +126,10 @@ export default function SeoScoring() {
   const deleteRecord = async (id: number) => {
     try {
       await deleteSeoScoreRecordApi(id);
-      message.success("删除成功");
+      message.success(t("scoring.deleteSuccess"));
       loadHistory(historyPage);
     } catch {
-      message.error("删除失败");
+      message.error(t("scoring.deleteFailed"));
     }
   };
 
@@ -140,10 +143,10 @@ export default function SeoScoring() {
 
   const dimensions = result
     ? [
-        { key: "title", label: "标题", score: result.title_score, max: result.title_max },
-        { key: "desc", label: "描述", score: result.description_score, max: result.description_max },
-        { key: "tags", label: "标签", score: result.tags_score, max: result.tags_max },
-        { key: "thumb", label: "缩略图", score: result.thumbnail_score, max: result.thumbnail_max },
+        { key: "title", label: t("scoring.dimension.title"), score: result.title_score, max: result.title_max },
+        { key: "desc", label: t("scoring.dimension.description"), score: result.description_score, max: result.description_max },
+        { key: "tags", label: t("scoring.dimension.tags"), score: result.tags_score, max: result.tags_max },
+        { key: "thumb", label: t('scoring.thumbnail'), score: result.thumbnail_score, max: result.thumbnail_max },
       ]
     : [];
 
@@ -152,15 +155,15 @@ export default function SeoScoring() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <Title level={3} style={{ margin: 0 }}>
           <SearchOutlined style={{ marginRight: 8 }} />
-          SEO 评分
+          {t('scoring.scoringTitle')}
         </Title>
-        {/* 评分历史按钮（仅已登录用户显示） */}
+        {/* {t('scoring.scoreHistory')}按钮（仅已登录用户显示） */}
         {token && (
           <Button
             icon={<HistoryOutlined />}
             onClick={() => setHistoryVisible(true)}
           >
-            评分历史
+            {t('scoring.scoreHistory')}
           </Button>
         )}
       </div>
@@ -169,9 +172,9 @@ export default function SeoScoring() {
       <Card style={{ marginBottom: 24 }}>
         <Space direction="vertical" style={{ width: "100%" }} size="middle">
           <div>
-            <Text strong>视频标题 *</Text>
+            <Text strong>{t('scoring.videoTitleLabel')}</Text>
             <Input
-              placeholder="输入视频标题"
+              placeholder={t('scoring.videoTitlePlaceholder')}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               maxLength={500}
@@ -181,9 +184,9 @@ export default function SeoScoring() {
           </div>
 
           <div>
-            <Text strong>视频描述</Text>
+            <Text strong>{t('scoring.videoDescLabel')}</Text>
             <TextArea
-              placeholder="输入视频描述（可选）"
+              placeholder={t('scoring.videoDescPlaceholder')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               maxLength={5000}
@@ -195,18 +198,18 @@ export default function SeoScoring() {
 
           <Row gutter={16}>
             <Col span={12}>
-              <Text strong>标签（逗号分隔）</Text>
+              <Text strong>{t('scoring.tagsLabel')}</Text>
               <Input
-                placeholder="标签1, 标签2, 标签3"
+                placeholder={t('scoring.tagsPlaceholder')}
                 value={tagsText}
                 onChange={(e) => setTagsText(e.target.value)}
                 style={{ marginTop: 4 }}
               />
             </Col>
             <Col span={12}>
-              <Text strong>目标关键词</Text>
+              <Text strong>{t('scoring.targetKeywordLabel')}</Text>
               <Input
-                placeholder="如：Python 教程"
+                placeholder={t('scoring.targetKeywordPlaceholder')}
                 value={targetKeyword}
                 onChange={(e) => setTargetKeyword(e.target.value)}
                 style={{ marginTop: 4 }}
@@ -215,9 +218,9 @@ export default function SeoScoring() {
           </Row>
 
           <div>
-            <Text strong>缩略图 URL</Text>
+            <Text strong>{t('scoring.thumbnailUrlLabel')}</Text>
             <Input
-              placeholder="输入缩略图图片 URL（可选，用于缩略图评分）"
+              placeholder={t('scoring.thumbnailUrlPlaceholder')}
               value={thumbnailUrl}
               onChange={(e) => setThumbnailUrl(e.target.value)}
               style={{ marginTop: 4 }}
@@ -232,7 +235,7 @@ export default function SeoScoring() {
             disabled={!title.trim()}
             size="large"
           >
-            开始评分
+            {t('scoring.startScoring')}
           </Button>
         </Space>
       </Card>
@@ -240,7 +243,7 @@ export default function SeoScoring() {
       {/* 结果区 */}
       {result && (
         <>
-          {/* 总分 + 维度环形图 */}
+          {/* {t('scoring.totalScore')} + 维度环形图 */}
           <Card style={{ marginBottom: 24, textAlign: "center" }}>
             <Row justify="center" align="middle" gutter={48}>
               <Col>
@@ -255,7 +258,7 @@ export default function SeoScoring() {
                 />
                 <div style={{ marginTop: 8 }}>
                   <Tag color={totalLevel?.tagColor} style={{ fontSize: 14, padding: "2px 12px" }}>
-                    {totalLevel?.label}
+                    {t(totalLevel?.labelKey ?? '')}
                   </Tag>
                 </div>
               </Col>
@@ -280,13 +283,13 @@ export default function SeoScoring() {
             </Row>
           </Card>
 
-          {/* 评分明细（基础分 + AI 加分） */}
+          {/* {t('scoring.scoreDetail')}（{t('scoring.baseScore')}分 + AI 加分） */}
           {result.score_breakdown && (
             <Card
               title={
                 <Space>
                   <TrophyOutlined />
-                  <span>评分明细</span>
+                  <span>{t('scoring.scoreDetail')}</span>
                 </Space>
               }
               style={{ marginBottom: 24 }}
@@ -294,17 +297,17 @@ export default function SeoScoring() {
             >
               <Row gutter={16}>
                 {[
-                  { label: "标题", base: result.score_breakdown.title_base, bonus: result.score_breakdown.title_ai_bonus, total: result.title_score },
-                  { label: "描述", base: result.score_breakdown.description_base, bonus: result.score_breakdown.description_ai_bonus, total: result.description_score },
-                  { label: "标签", base: result.score_breakdown.tags_base, bonus: result.score_breakdown.tags_ai_bonus, total: result.tags_score },
-                  { label: "缩略图", base: result.score_breakdown.thumbnail_base, bonus: result.score_breakdown.thumbnail_ai_bonus, total: result.thumbnail_score },
+                  { label: t("scoring.dimension.title"), base: result.score_breakdown.title_base, bonus: result.score_breakdown.title_ai_bonus, total: result.title_score },
+                  { label: t("scoring.dimension.description"), base: result.score_breakdown.description_base, bonus: result.score_breakdown.description_ai_bonus, total: result.description_score },
+                  { label: t("scoring.dimension.tags"), base: result.score_breakdown.tags_base, bonus: result.score_breakdown.tags_ai_bonus, total: result.tags_score },
+                  { label: t('scoring.thumbnail'), base: result.score_breakdown.thumbnail_base, bonus: result.score_breakdown.thumbnail_ai_bonus, total: result.thumbnail_score },
                 ].map((item) => (
                   <Col span={6} key={item.label}>
                     <div style={{ textAlign: "center", padding: "8px 0" }}>
                       <Text type="secondary" style={{ fontSize: 12 }}>{item.label}</Text>
                       <div style={{ fontSize: 20, fontWeight: 700 }}>{item.total}/25</div>
                       <Text type="secondary" style={{ fontSize: 11 }}>
-                        基础 {item.base} + AI {item.bonus}
+                        {t('scoring.baseScore')} {item.base} + AI {item.bonus}
                       </Text>
                     </div>
                   </Col>
@@ -313,13 +316,13 @@ export default function SeoScoring() {
             </Card>
           )}
 
-          {/* AI 竞品对标分析 */}
+          {/* {t('scoring.aiBenchmark')} */}
           {result.ai_benchmark && (
             <Card
               title={
                 <Space>
                   <TrophyOutlined />
-                  <span>AI 竞品对标分析</span>
+                  <span>{t('scoring.aiBenchmark')}</span>
                 </Space>
               }
               style={{ marginBottom: 24 }}
@@ -328,23 +331,23 @@ export default function SeoScoring() {
                 items={[
                   {
                     key: "title",
-                    label: "标题对标",
-                    children: result.ai_benchmark.title_benchmark || "暂无分析",
+                    label: t('scoring.titleBenchmark'),
+                    children: result.ai_benchmark.title_benchmark || t('scoring.noAnalysis'),
                   },
                   {
                     key: "desc",
-                    label: "描述对标",
-                    children: result.ai_benchmark.description_benchmark || "暂无分析",
+                    label: t('scoring.descBenchmark'),
+                    children: result.ai_benchmark.description_benchmark || t('scoring.noAnalysis'),
                   },
                   {
                     key: "tags",
-                    label: "标签对标",
-                    children: result.ai_benchmark.tags_benchmark || "暂无分析",
+                    label: t('scoring.tagsBenchmark'),
+                    children: result.ai_benchmark.tags_benchmark || t('scoring.noAnalysis'),
                   },
                   {
                     key: "thumb",
-                    label: "缩略图对标",
-                    children: result.ai_benchmark.thumbnail_benchmark || "暂无分析",
+                    label: t("scoring.thumbBenchmark"),
+                    children: result.ai_benchmark.thumbnail_benchmark || t("scoring.noAnalysis"),
                   },
                 ]}
                 defaultActiveKey={["title"]}
@@ -355,7 +358,7 @@ export default function SeoScoring() {
           {/* 竞品视频摘要 */}
           {result.competitor_summary && result.competitor_summary.length > 0 && (
             <Card
-              title="竞品视频参考"
+              title={t('scoring.competitorRef')}
               size="small"
               style={{ marginBottom: 24 }}
             >
@@ -371,13 +374,13 @@ export default function SeoScoring() {
             </Card>
           )}
 
-          {/* 优化建议 */}
+          {/* {t('scoring.optimizationSuggestions')} */}
           {result.suggestions?.length > 0 && (
             <Card
               title={
                 <Space>
                   <BulbOutlined />
-                  <span>优化建议</span>
+                  <span>{t('scoring.optimizationSuggestions')}</span>
                 </Space>
               }
               style={{ marginBottom: 24 }}
@@ -401,7 +404,7 @@ export default function SeoScoring() {
 
       {/* 历史记录弹窗 */}
       <Modal
-        title="SEO 评分历史"
+        title={t("scoring.historyTitle")}
         open={historyVisible}
         onCancel={() => setHistoryVisible(false)}
         footer={null}
@@ -416,19 +419,19 @@ export default function SeoScoring() {
               total: historyTotal,
               pageSize: 20,
               onChange: (page) => loadHistory(page),
-              showTotal: (t) => `共 ${t} 条`,
+              showTotal: (total) => t("scoring.totalRecords", { total }),
             }}
             size="small"
             columns={[
               {
-                title: "标题",
+                title: t("scoring.dimension.title"),
                 dataIndex: "title",
                 key: "title",
                 ellipsis: true,
                 width: 200,
               },
               {
-                title: "总分",
+                title: t('scoring.totalScore'),
                 dataIndex: "total_score",
                 key: "total_score",
                 width: 80,
@@ -437,35 +440,35 @@ export default function SeoScoring() {
                 ),
               },
               {
-                title: "标题",
+                title: t("scoring.dimension.title"),
                 dataIndex: "title_score",
                 key: "title_score",
                 width: 60,
                 render: (v: number) => `${v}/25`,
               },
               {
-                title: "描述",
+                title: t("scoring.dimension.description"),
                 dataIndex: "description_score",
                 key: "description_score",
                 width: 60,
                 render: (v: number) => `${v}/25`,
               },
               {
-                title: "标签",
+                title: t("scoring.dimension.tags"),
                 dataIndex: "tags_score",
                 key: "tags_score",
                 width: 60,
                 render: (v: number) => `${v}/25`,
               },
               {
-                title: "缩略图",
+                title: t('scoring.thumbnail'),
                 dataIndex: "thumbnail_score",
                 key: "thumbnail_score",
                 width: 70,
                 render: (v: number) => `${v}/25`,
               },
               {
-                title: "关键词",
+                title: t('scoring.keyword'),
                 dataIndex: "target_keyword",
                 key: "target_keyword",
                 width: 100,
@@ -473,19 +476,19 @@ export default function SeoScoring() {
                 render: (v: string | null) => v || "-",
               },
               {
-                title: "时间",
+                title: t('scoring.time'),
                 dataIndex: "created_at",
                 key: "created_at",
                 width: 140,
                 render: (v: string) => new Date(v).toLocaleString("zh-CN"),
               },
               {
-                title: "操作",
+                title: t('scoring.action'),
                 key: "action",
                 width: 60,
                 render: (_: any, record: SeoScoreRecordItem) => (
                   <Popconfirm
-                    title="确定删除此记录？"
+                    title={t("scoring.confirmDeleteRecord")}
                     onConfirm={() => deleteRecord(record.id)}
                   >
                     <Button type="link" danger size="small" icon={<DeleteOutlined />} />

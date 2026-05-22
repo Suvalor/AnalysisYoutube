@@ -11,6 +11,7 @@
 import ast
 import importlib
 import inspect
+from pathlib import Path
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -19,10 +20,12 @@ import pytest
 
 # ── 辅助：读取源码文本 ──
 
+_BACKEND_ROOT = Path(__file__).resolve().parents[1]
+
+
 def _read_source(relative_path: str) -> str:
     """读取 backend 下的源码文件内容。"""
-    with open(f"/workspace/backend/{relative_path}") as f:
-        return f.read()
+    return (_BACKEND_ROOT / relative_path).read_text()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -132,6 +135,20 @@ class TestGuestQuotaCookieBypass:
 
 class TestQuotaOrderingFix:
     """验证配额扣减顺序：先检查后消费，失败不扣减。"""
+
+    def test_guest_youtube_routes_use_default_org_settings(self):
+        """游客 YouTube 功能应读取默认组织的设置中心配置，而不是 org_id=None。"""
+        keyword_source = _read_source("app/api/v1/keyword.py")
+        seo_source = _read_source("app/api/v1/seo.py")
+
+        assert "get_settings().guest_default_org_id" in keyword_source, (
+            "keyword/research 游客路径应使用 GUEST_DEFAULT_ORG_ID 读取设置中心配置"
+        )
+        assert seo_source.count("get_settings().guest_default_org_id") >= 2, (
+            "seo-score 和 trending 游客路径应使用 GUEST_DEFAULT_ORG_ID 读取设置中心配置"
+        )
+        assert "current_user.org_id if current_user else None" not in keyword_source
+        assert "current_user.org_id if current_user else None" not in seo_source
 
     # QO-ACC-01：API Key 未配置时不扣配额（返回503）
     def test_qo_acc_01_seo_no_quota_on_missing_api_key(self):
@@ -446,9 +463,8 @@ class TestKeywordHistoryRoute:
     # 验证数据库迁移存在
     def test_keyword_history_migration_exists(self):
         """keyword_history 表的 alembic 迁移存在。"""
-        import os
-        migration_dir = "/workspace/backend/alembic/versions"
-        files = os.listdir(migration_dir)
+        migration_dir = _BACKEND_ROOT / "alembic/versions"
+        files = [path.name for path in migration_dir.iterdir()]
         keyword_history_migrations = [f for f in files if "keyword_history" in f]
         assert len(keyword_history_migrations) > 0, (
             "KH: keyword_history 表的 alembic 迁移不存在"

@@ -1,71 +1,117 @@
-import { Input, Segmented } from "antd";
-import { useMemo, useState } from "react";
-import MarkdownPreview from "@/components/MarkdownPreview";
+import { Input } from "antd";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
-type EditorMode = "edit" | "preview" | "split";
+const { TextArea } = Input;
 
-type Props = {
+interface MarkdownEditorToggleProps {
+  /** 当前 Markdown 内容 */
   value: string;
-  onChange: (next: string) => void;
+  /** 内容变更回调 */
+  onChange: (val: string) => void;
+  /** 失焦回调 */
   onBlur?: () => void;
+  /** 最小行数 */
   minRows?: number;
+  /** 最大行数 */
+  maxRows?: number;
+  /** 占位文本 */
   placeholder?: string;
+  /** 额外 CSS 类名 */
   className?: string;
-};
+}
 
 /**
- * Markdown 编辑 + 预览切换，与 SOP / 脚本预览共用样式（MarkdownPreview → .markdown-body）。
- * 支持：仅编辑、仅预览、左右分栏实时对照。
+ * Markdown 编辑器切换组件：支持编辑/预览两种模式。
+ * 编辑模式使用 TextArea，预览模式渲染 Markdown HTML。
  */
 export default function MarkdownEditorToggle({
   value,
   onChange,
   onBlur,
-  minRows = 10,
+  minRows = 6,
+  maxRows = 20,
   placeholder,
   className,
-}: Props) {
-  const [mode, setMode] = useState<EditorMode>("edit");
-  const options = useMemo(
-    () => [
-      { label: "编辑", value: "edit" as const },
-      { label: "预览", value: "preview" as const },
-      { label: "分栏", value: "split" as const },
-    ],
-    []
-  );
+}: MarkdownEditorToggleProps) {
+  const { t } = useTranslation("common");
+  const [mode, setMode] = useState<"edit" | "preview">("edit");
 
-  const textArea = (
-    <Input.TextArea
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={onBlur}
-      autoSize={mode === "split" ? false : { minRows }}
-      placeholder={placeholder}
-      className={mode === "split" ? "min-h-[280px] font-mono text-sm" : "font-mono text-sm"}
-      style={mode === "split" ? { minHeight: 280, resize: "vertical" as const } : undefined}
-    />
-  );
+  /** 切换编辑/预览模式 */
+  const toggleMode = () => {
+    setMode((prev) => (prev === "edit" ? "preview" : "edit"));
+  };
 
-  const previewBox = (
-    <div className="min-h-[220px] md:min-h-[280px] rounded-lg border border-yc-border bg-yc-bg-secondary p-3 max-w-none overflow-x-auto overflow-y-auto">
-      <MarkdownPreview>{value || "_暂无内容_"}</MarkdownPreview>
-    </div>
-  );
+  if (mode === "preview") {
+    return (
+      <div className="border border-yc-border rounded-lg p-4 min-h-[120px]">
+        <div className="flex justify-end mb-2">
+          <button
+            type="button"
+            className="text-xs text-yc-text-tertiary hover:text-yc-text-primary transition-colors"
+            onClick={toggleMode}
+          >
+            {t('markdownEditor.switchToEdit')}
+          </button>
+        </div>
+        <div
+          className="prose prose-sm max-w-none text-yc-text-primary"
+          dangerouslySetInnerHTML={{ __html: simpleMarkdownToHtml(value || t('markdownEditor.noContent')) }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={className}>
-      <div className="mb-2">
-        <Segmented value={mode} onChange={(v) => setMode(v as EditorMode)} options={options} />
+      <div className="flex justify-end mb-1">
+        <button
+          type="button"
+          className="text-xs text-yc-text-tertiary hover:text-yc-text-primary transition-colors"
+          onClick={toggleMode}
+        >
+          {t('markdownEditor.switchToPreview')}
+        </button>
       </div>
-      {mode === "edit" ? textArea : null}
-      {mode === "preview" ? previewBox : null}
-      {mode === "split" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch">
-          <div className="min-w-0 flex flex-col">{textArea}</div>
-          <div className="min-w-0 flex flex-col">{previewBox}</div>
-        </div>
-      ) : null}
+      <TextArea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        autoSize={{ minRows, maxRows }}
+        placeholder={placeholder}
+      />
     </div>
   );
+}
+
+/**
+ * 简易 Markdown 转 HTML：支持标题、粗体、斜体、代码块、行内代码、列表。
+ * 不依赖第三方库，仅用于预览。
+ */
+function simpleMarkdownToHtml(md: string): string {
+  let html = md
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  // Code blocks
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="language-$1">$2</code></pre>');
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+  // Bold
+  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  // Italic
+  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  // Headers
+  html = html.replace(/^### (.+)$/gm, "<h4>$1</h4>");
+  html = html.replace(/^## (.+)$/gm, "<h3>$1</h3>");
+  html = html.replace(/^# (.+)$/gm, "<h2>$1</h2>");
+  // Unordered list
+  html = html.replace(/^- (.+)$/gm, "<li>$1</li>");
+  // Paragraphs (double newline)
+  html = html.replace(/\n\n/g, "</p><p>");
+  // Single newline
+  html = html.replace(/\n/g, "<br/>");
+
+  return `<p>${html}</p>`;
 }

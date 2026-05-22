@@ -82,16 +82,19 @@
     "retrospectiveFailed": "AI 회고 실패",
     "noRetrospectiveData": "회고 데이터 없음",
     "aiConfigLoadFailed": "AI 모델/에이전트 구성 로드 실패, 설정 센터를 확인하세요",
-    "needAiConfig": "먼저 설정 센터에서 모델과 에이전트를 설정하고 이 페이지에서 선택을 완료하세요"
+    "needAiConfig": "먼저 설정 센터에서 모델과 에이전트를 설정하고 이 페이지에서 선택을 완료하세요",
+    "applyFailed": "매개변수 적용 실패",
+    "autoRetroSuccess": "자동 회고 완료, 추천 매개변수 업데이트됨",
+    "autoRetroFailed": "자동 회고 실패"
   },
   "card": {
     "scanConsole": "검색 콘솔",
     "scanResults": "레이더 스캔 결과",
     "categoryReport": "카테고리 기회 보고서",
     "crossCompare": "지역간 비교",
-    "newChannels": "신규 채널 수",
-    "successfulChannels": "성공 채널",
-    "successRate": "성공률",
+    "newChannels": "신규 채널 수: ",
+    "successfulChannels": "성공 채널 수: ",
+    "successRate": "성공률: ",
     "topGrowth": "Top 채널 성장",
     "contentGaps": "콘텐츠 갭",
     "newcomerStats": "신규 진입자 통계",
@@ -120,9 +123,22 @@
     "noKeywordSuggestions": "키워드 제안 없음"
   },
   "label": {
-    "maxSubscribers": "구독자 상한",
-    "outlierMultiplier": "바이럴 계수",
-    "suggestedAction": "제안 동작",
+    "maxSubscribers": "구독자 상한: ",
+    "outlierMultiplier": "바이럴 계수: ",
+    "suggestedAction": "제안 동작: ",
     "sampleCoverage": "샘플 범위: 최근 {{lookbackDays}}일, 상위 샘플 {{topCount}}건, 하위 샘플 {{lowCount}}건"
+  },
+  "paramIteration": {
+    "title": "매개변수 반복 기록",
+    "retroNow": "지금 회고",
+    "noHistory": "반복 기록 없음",
+    "applied": "적용됨",
+    "apply": "적용",
+    "auto": "자동",
+    "manual": "수동",
+    "scanParams": "스캔 매개변수",
+    "recommendedParams": "추천 매개변수",
+    "none": "없음",
+    "totalRecords": "총 {{total}}건, 최근 10건 표시"
   }
 }

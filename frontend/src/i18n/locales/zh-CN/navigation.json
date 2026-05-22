@@ -81,7 +81,8 @@
     "FR": "法国",
     "BR": "巴西",
     "IN": "印度",
-    "TW": "台湾"
+    "TW": "台湾",
+    "HK": "香港"
   },
   "message": {
     "noResults": "暂无推荐结果，请调整输入后重试",
@@ -134,7 +135,8 @@
     "matchScore": "匹配度",
     "categoryCount": "个品类",
     "confirmDelete": "确认删除此记录？",
-    "empty": "暂无推荐记录"
+    "empty": "暂无推荐记录",
+    "listSeparator": "、"
   },
   "quota": {
     "title": "API 配额仪表盘",
