@@ -11,13 +11,14 @@ from app.db.base_class import Base
 
 
 class GuestSession(Base):
-    """游客会话表：通过 Cookie guest_id 识别游客并记录每日配额使用量。"""
+    """游客会话表：通过 Cookie、浏览器指纹、IP 识别游客并记录每日配额使用量。"""
 
     __tablename__ = "guest_sessions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
     guest_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, index=True)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True, index=True)
+    browser_fingerprint: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     daily_quotas: Mapped[dict | None] = mapped_column(
         JSON,
         nullable=True,

@@ -93,20 +93,24 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[misc]
     @property
     def cors_origins(self) -> list[str]:
-        """将 CORS 配置解析为 URL 列表。"""
+        """将 CORS 配置解析为 URL 列表，并自动包含 FRONTEND_BASE_URL。"""
         raw_value = self.backend_cors_origins.strip()
-        if not raw_value:
-            return []
+        origins: list[str] = []
 
         if raw_value.startswith("["):
             try:
                 parsed = json.loads(raw_value)
                 if isinstance(parsed, list):
-                    return [str(item).strip() for item in parsed if str(item).strip()]
+                    origins = [str(item).strip().rstrip("/") for item in parsed if str(item).strip()]
             except json.JSONDecodeError:
                 pass
+        elif raw_value:
+            origins = [item.strip().rstrip("/") for item in raw_value.split(",") if item.strip()]
 
-        return [item.strip() for item in raw_value.split(",") if item.strip()]
+        frontend_origin = self.frontend_base_url.strip().rstrip("/")
+        if frontend_origin and frontend_origin not in origins:
+            origins.append(frontend_origin)
+        return origins
 
     class Config:
         env_file = ".env"

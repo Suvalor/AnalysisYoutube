@@ -163,9 +163,9 @@ class TestAC1UserTiering:
 class TestAC2QuotaLimits:
     """AC-2 验收标准：API 分层限额管控"""
 
-    def test_guest_youtube_api_limit_is_5(self):
-        """AC-2: 游客每日 YouTube API 调用上限 5 次"""
-        assert DEFAULT_QUOTAS[UserRole.GUEST]["youtube_api"] == 5
+    def test_guest_youtube_api_limit_is_1(self):
+        """AC-2: 游客每日 YouTube API 调用上限 1 次"""
+        assert DEFAULT_QUOTAS[UserRole.GUEST]["youtube_api"] == 1
 
     def test_guest_llm_api_limit_is_0(self):
         """AC-2: 游客 LLM API 配额为 0"""
@@ -208,7 +208,7 @@ class TestAC2QuotaLimits:
     def test_get_role_limits_guest(self):
         """AC-2: get_role_limits 返回游客配额"""
         limits = get_role_limits(UserRole.GUEST)
-        assert limits["youtube_api"] == 5
+        assert limits["youtube_api"] == 1
         assert limits["llm_api"] == 0
         assert limits["cv_api"] == 0
 
@@ -242,7 +242,7 @@ class TestAC2QuotaLimits:
         """AC-2: 游客配额内允许调用"""
         mock_session = AsyncMock()
         mock_guest = MagicMock()
-        mock_guest.daily_quotas = {"youtube_api": 3, "llm_api": 0, "cv_api": 0, "date": "2026-05-19"}
+        mock_guest.daily_quotas = {"youtube_api": 0, "llm_api": 0, "cv_api": 0, "date": "2026-05-19"}
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_guest
         mock_session.execute.return_value = mock_result
@@ -254,15 +254,15 @@ class TestAC2QuotaLimits:
             api_type="youtube_api",
         )
         assert allowed is True
-        assert used == 3
-        assert limit == 5
+        assert used == 0
+        assert limit == 1
 
     @pytest.mark.asyncio
     async def test_check_quota_guest_at_limit(self):
         """AC-2: 游客达到配额上限时不允许调用"""
         mock_session = AsyncMock()
         mock_guest = MagicMock()
-        mock_guest.daily_quotas = {"youtube_api": 5, "llm_api": 0, "cv_api": 0, "date": "2026-05-19"}
+        mock_guest.daily_quotas = {"youtube_api": 1, "llm_api": 0, "cv_api": 0, "date": "2026-05-19"}
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_guest
         mock_session.execute.return_value = mock_result
@@ -274,8 +274,8 @@ class TestAC2QuotaLimits:
             api_type="youtube_api",
         )
         assert allowed is False
-        assert used == 5
-        assert limit == 5
+        assert used == 1
+        assert limit == 1
 
     @pytest.mark.asyncio
     async def test_check_quota_user_within_limit(self):
@@ -973,8 +973,8 @@ class TestRequirementsTraceability:
         assert "role" not in _ALLOWED_SETTINGS_FIELDS
 
     def test_ac2_guest_youtube_limit(self):
-        """AC-2[1]: 游客每日 YouTube API 调用上限 5 次"""
-        assert DEFAULT_QUOTAS[UserRole.GUEST]["youtube_api"] == 5
+        """AC-2[1]: 游客每日 YouTube API 调用上限 1 次"""
+        assert DEFAULT_QUOTAS[UserRole.GUEST]["youtube_api"] == 1
 
     def test_ac2_user_youtube_limit(self):
         """AC-2[2]: 普通用户每日 YouTube API 调用上限 20 次"""

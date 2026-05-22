@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.guest_session import GuestSession
 
@@ -27,12 +28,14 @@ async def create_guest_session(
     *,
     guest_id: str,
     ip_address: str | None = None,
+    browser_fingerprint: str | None = None,
 ) -> GuestSession:
     """创建游客会话记录，初始化当日配额。"""
     today_str = date.today().isoformat()
     guest = GuestSession(
         guest_id=guest_id,
         ip_address=ip_address,
+        browser_fingerprint=browser_fingerprint,
         daily_quotas={
             "youtube_api": 0,
             "llm_api": 0,
@@ -55,7 +58,7 @@ async def increment_guest_quota(
 ) -> GuestSession:
     """增加游客指定 API 类型的当日使用计数，如果日期变更则重置。"""
     today_str = date.today().isoformat()
-    quotas = guest.daily_quotas or {}
+    quotas = dict(guest.daily_quotas or {})
 
     # 日期变更时重置所有计数
     if quotas.get("date") != today_str:
@@ -68,6 +71,7 @@ async def increment_guest_quota(
 
     quotas[api_type] = quotas.get(api_type, 0) + count
     guest.daily_quotas = quotas
+    flag_modified(guest, "daily_quotas")
     guest.last_active_at = datetime.now(timezone.utc)
     await session.flush()
     await session.refresh(guest)
@@ -94,6 +98,28 @@ async def get_guest_session_by_ip(
     if row is None:
         return None
     # 仅复用当日记录，日期不匹配视为过期
+    quotas = row.daily_quotas or {}
+    if quotas.get("date") != today_str:
+        return None
+    return row
+
+
+async def get_guest_session_by_fingerprint(
+    session: AsyncSession,
+    browser_fingerprint: str,
+) -> GuestSession | None:
+    """按浏览器指纹查找当日游客会话，用于 Cookie 缺失或被重置时关联配额。"""
+    today_str = date.today().isoformat()
+    stmt = (
+        select(GuestSession)
+        .where(GuestSession.browser_fingerprint == browser_fingerprint)
+        .order_by(GuestSession.last_active_at.desc())
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    row = result.scalar_one_or_none()
+    if row is None:
+        return None
     quotas = row.daily_quotas or {}
     if quotas.get("date") != today_str:
         return None

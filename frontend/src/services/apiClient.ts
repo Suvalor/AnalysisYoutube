@@ -12,6 +12,38 @@ function normalizeBackendBaseURL(raw: string | undefined): string {
   return base || "http://localhost:8000";
 }
 
+function hashFingerprint(input: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `fp_${(hash >>> 0).toString(16)}`;
+}
+
+function getBrowserFingerprint(): string | null {
+  if (typeof window === "undefined") return null;
+
+  const storageKey = "ytc_browser_fingerprint";
+  const existing = localStorage.getItem(storageKey);
+  if (existing) return existing;
+
+  const nav = window.navigator;
+  const screenInfo = window.screen;
+  const source = [
+    nav.userAgent,
+    nav.language,
+    nav.platform,
+    String(nav.hardwareConcurrency ?? ""),
+    String((nav as Navigator & { deviceMemory?: number }).deviceMemory ?? ""),
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+    `${screenInfo.width}x${screenInfo.height}x${screenInfo.colorDepth}`,
+  ].join("|");
+  const fingerprint = hashFingerprint(source);
+  localStorage.setItem(storageKey, fingerprint);
+  return fingerprint;
+}
+
 const apiClient = axios.create({
   baseURL: normalizeBackendBaseURL(import.meta.env.VITE_API_BASE_URL),
   // YouTube 批量拉取（尤其 /api/youtube/analyze/batch 与 /channels/batch-update）可能耗时较长，
@@ -25,6 +57,11 @@ apiClient.interceptors.request.use((config) => {
     if (token) {
       config.headers = config.headers ?? {};
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    const fingerprint = getBrowserFingerprint();
+    if (fingerprint) {
+      config.headers = config.headers ?? {};
+      config.headers["X-Browser-Fingerprint"] = fingerprint;
     }
   }
   return config;
@@ -72,6 +109,8 @@ export async function authFetch(url: string, init: RequestInit = {}): Promise<Re
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
   const headers = new Headers(init.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  const fingerprint = getBrowserFingerprint();
+  if (fingerprint) headers.set("X-Browser-Fingerprint", fingerprint);
   const resp = await fetch(url, { ...init, headers });
   if (resp.status === 401 && typeof window !== "undefined") {
     /* M-02: 实时读取 localStorage，避免并发请求时误删新 token */
@@ -85,4 +124,3 @@ export async function authFetch(url: string, init: RequestInit = {}): Promise<Re
   }
   return resp;
 }
-

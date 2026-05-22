@@ -42,10 +42,10 @@ export default function GuestLimitModal({ open, onClose, usage }: GuestLimitModa
       <Space direction="vertical" size="middle" className="w-full text-center py-4">
         <LockOutlined style={{ fontSize: 40, color: "#faad14" }} />
 
-        <Title level={4}>{t('guestLimit.quotaExhausted')}</Title>
+        <Title level={4}>{t('guestLimit.title')}</Title>
 
         <Text type="secondary">
-          {t('guestLimit.quotaHint')}
+          {t('guestLimit.description')}
         </Text>
 
         {usage && <QuotaProgress usage={usage} />}

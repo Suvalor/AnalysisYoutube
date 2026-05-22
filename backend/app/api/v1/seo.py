@@ -330,6 +330,9 @@ async def trend_discovery_endpoint(
     # 检查缓存
     cached = await get_cached_trend(db, region=body.region, category_id=category_id)
     if cached is not None:
+        # 游客一天只能使用一次 YouTube 相关功能；即使命中缓存，也计为一次功能调用。
+        if not current_user:
+            await consume_guest_quota(db, guest_info.guest_id, "youtube_api")
         # 缓存命中，仅已登录用户记录历史
         if current_user:
             await add_trend_history(

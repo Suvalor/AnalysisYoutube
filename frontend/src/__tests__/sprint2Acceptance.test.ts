@@ -102,10 +102,10 @@ describe("[AC-5] hasRole 角色层级判断 — 导航过滤核心逻辑", () =>
 describe("[AC-3] 游客配额耗尽判断 — isGuestQuotaExhausted", () => {
   /** 构造配额对象的辅助函数 */
   function makeUsage(overrides: Partial<QuotaUsage> = {}): QuotaUsage {
-    return {
-      role: "guest",
-      youtube_api_used: 0,
-      youtube_api_limit: 5,
+      return {
+        role: "guest",
+        youtube_api_used: 0,
+        youtube_api_limit: 1,
       llm_api_used: 0,
       llm_api_limit: 0,
       cv_api_used: 0,
@@ -115,24 +115,24 @@ describe("[AC-3] 游客配额耗尽判断 — isGuestQuotaExhausted", () => {
   }
 
   it("配额未用完时返回 false", () => {
-    const usage = makeUsage({ youtube_api_used: 3, youtube_api_limit: 5 });
+    const usage = makeUsage({ youtube_api_used: 0, youtube_api_limit: 1 });
     expect(isGuestQuotaExhausted(usage)).toBe(false);
   });
 
   it("YouTube API 配额恰好用完时返回 true", () => {
-    const usage = makeUsage({ youtube_api_used: 5, youtube_api_limit: 5 });
+    const usage = makeUsage({ youtube_api_used: 1, youtube_api_limit: 1 });
     expect(isGuestQuotaExhausted(usage)).toBe(true);
   });
 
   it("YouTube API 配额超出时返回 true", () => {
-    const usage = makeUsage({ youtube_api_used: 8, youtube_api_limit: 5 });
+    const usage = makeUsage({ youtube_api_used: 2, youtube_api_limit: 1 });
     expect(isGuestQuotaExhausted(usage)).toBe(true);
   });
 
   it("LLM API 配额用完时返回 true", () => {
     const usage = makeUsage({
       youtube_api_used: 0,
-      youtube_api_limit: 5,
+      youtube_api_limit: 1,
       llm_api_used: 10,
       llm_api_limit: 10,
     });
@@ -142,7 +142,7 @@ describe("[AC-3] 游客配额耗尽判断 — isGuestQuotaExhausted", () => {
   it("CV API 配额用完时返回 true", () => {
     const usage = makeUsage({
       youtube_api_used: 0,
-      youtube_api_limit: 5,
+      youtube_api_limit: 1,
       llm_api_used: 0,
       llm_api_limit: 10,
       cv_api_used: 5,
@@ -154,7 +154,7 @@ describe("[AC-3] 游客配额耗尽判断 — isGuestQuotaExhausted", () => {
   it("游客 LLM/CV 配额为 0 时，used=0 不算耗尽", () => {
     const usage = makeUsage({
       youtube_api_used: 0,
-      youtube_api_limit: 5,
+      youtube_api_limit: 1,
       llm_api_used: 0,
       llm_api_limit: 0,
       cv_api_used: 0,
@@ -165,8 +165,8 @@ describe("[AC-3] 游客配额耗尽判断 — isGuestQuotaExhausted", () => {
 
   it("所有配额都用完时返回 true", () => {
     const usage = makeUsage({
-      youtube_api_used: 5,
-      youtube_api_limit: 5,
+      youtube_api_used: 1,
+      youtube_api_limit: 1,
       llm_api_used: 10,
       llm_api_limit: 10,
       cv_api_used: 5,
@@ -311,8 +311,8 @@ describe("[AC-3/AC-6] QuotaUsage 类型与后端 QuotaUsageRead 一致", () => {
   it("QuotaUsage 包含 role + 三类 API used/limit 字段", () => {
     const usage: QuotaUsage = {
       role: "guest",
-      youtube_api_used: 3,
-      youtube_api_limit: 5,
+      youtube_api_used: 0,
+      youtube_api_limit: 1,
       llm_api_used: 0,
       llm_api_limit: 0,
       cv_api_used: 0,
@@ -328,17 +328,17 @@ describe("[AC-3/AC-6] QuotaUsage 类型与后端 QuotaUsageRead 一致", () => {
     expect(typeof usage.cv_api_limit).toBe("number");
   });
 
-  it("游客默认配额与 PRD 一致：YouTube=5, LLM=0, CV=0", () => {
+  it("游客默认配额与 PRD 一致：YouTube=1, LLM=0, CV=0", () => {
     const guestUsage: QuotaUsage = {
       role: "guest",
       youtube_api_used: 0,
-      youtube_api_limit: 5,
+      youtube_api_limit: 1,
       llm_api_used: 0,
       llm_api_limit: 0,
       cv_api_used: 0,
       cv_api_limit: 0,
     };
-    expect(guestUsage.youtube_api_limit).toBe(5);
+    expect(guestUsage.youtube_api_limit).toBe(1);
     expect(guestUsage.llm_api_limit).toBe(0);
     expect(guestUsage.cv_api_limit).toBe(0);
   });

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # 各角色默认每日配额上限
 DEFAULT_QUOTAS: dict[str, dict[str, int]] = {
-    UserRole.GUEST: {"youtube_api": 5, "llm_api": 0, "cv_api": 0},
+    UserRole.GUEST: {"youtube_api": 1, "llm_api": 0, "cv_api": 0},
     UserRole.USER: {"youtube_api": 20, "llm_api": 10, "cv_api": 5},
     UserRole.SUBSCRIBER: {"youtube_api": 100, "llm_api": 50, "cv_api": 20},
     UserRole.ADMIN: {"youtube_api": -1, "llm_api": -1, "cv_api": -1},  # -1 表示无限制

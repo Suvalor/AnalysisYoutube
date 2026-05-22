@@ -260,15 +260,15 @@ describe("GuestLimitModal open 状态控制逻辑", () => {
   it("GuestLimitModal 接收 usage 属性后应能渲染 QuotaProgress", () => {
     const usage: QuotaUsage = {
       role: "guest",
-      youtube_api_used: 5,
-      youtube_api_limit: 5,
+      youtube_api_used: 1,
+      youtube_api_limit: 1,
       llm_api_used: 0,
       llm_api_limit: 3,
       cv_api_used: 0,
       cv_api_limit: 0,
     };
     // 验证 usage 数据结构完整，组件可正常消费
-    expect(usage.youtube_api_limit).toBe(5);
+    expect(usage.youtube_api_limit).toBe(1);
     expect(isUnlimited(usage.youtube_api_limit)).toBe(false);
     expect(calcDisplayPercent(usage.youtube_api_used, usage.youtube_api_limit)).toBe(100);
   });

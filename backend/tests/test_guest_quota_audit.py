@@ -36,6 +36,40 @@ def _read_source(relative_path: str) -> str:
 class TestGuestQuotaCookieBypass:
     """验证 IP 关联配额逻辑，防止清除 Cookie 绕过配额。"""
 
+    def test_guest_youtube_daily_limit_is_one(self):
+        """游客每天只能调用一次 YouTube 相关接口。"""
+        source = _read_source("app/services/rate_limit_service.py")
+        assert 'UserRole.GUEST: {"youtube_api": 1' in source, (
+            "游客 youtube_api 每日限额应为 1"
+        )
+
+    def test_browser_fingerprint_is_part_of_guest_identity(self):
+        """游客识别必须包含浏览器指纹，并按 Cookie -> 指纹 -> IP 匹配。"""
+        source = _read_source("app/services/guest_service.py")
+        assert "browser_fingerprint" in source, "GuestInfo 应包含 browser_fingerprint"
+        assert "x-browser-fingerprint" in source, "应从 X-Browser-Fingerprint 请求头读取指纹"
+        assert "get_guest_session_by_fingerprint" in source, "应支持按浏览器指纹查找游客会话"
+        tree = ast.parse(source)
+        identify_func = next(
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.AsyncFunctionDef) and node.name == "identify_guest"
+        )
+        func_source = ast.get_source_segment(source, identify_func)
+        assert func_source.find("get_guest_session(session, guest_id)") < func_source.find("get_guest_session_by_fingerprint"), (
+            "游客匹配顺序应先 Cookie，再浏览器指纹"
+        )
+        assert func_source.find("get_guest_session_by_fingerprint") < func_source.find("get_guest_session_by_ip"), (
+            "游客匹配顺序应先浏览器指纹，再 IP"
+        )
+
+    def test_guest_session_model_and_migration_have_browser_fingerprint(self):
+        """guest_sessions 表应持久化浏览器指纹并建立索引。"""
+        model_source = _read_source("app/models/guest_session.py")
+        migration_source = _read_source("alembic/versions/20260522_000001_add_browser_fingerprint_to_guest_sessions.py")
+        assert "browser_fingerprint" in model_source
+        assert "browser_fingerprint" in migration_source
+        assert "ix_guest_sessions_browser_fingerprint" in migration_source
+
     # GQ-ACC-01：清除 Cookie 后配额不归零（IP关联生效）
     def test_gq_acc_01_ip_association_prevents_cookie_bypass(self):
         """identify_guest 无 Cookie 时按 IP 查找已有 session，配额不归零。"""
@@ -71,10 +105,15 @@ class TestGuestQuotaCookieBypass:
         assert "get_guest_session_by_ip" in source, (
             "GQ-ACC-02 FAIL: 缺少 IP 查找逻辑，隐身窗口无法共享配额"
         )
-        # 验证查找顺序：先 Cookie，后 IP，最后新建
-        cookie_block_end = source.find("# 无 Cookie")
-        ip_lookup = source.find("get_guest_session_by_ip", cookie_block_end)
-        new_session = source.find("generate_guest_id()", cookie_block_end)
+        # 验证查找顺序：先复用已有 session，最后新建
+        tree = ast.parse(source)
+        identify_func = next(
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.AsyncFunctionDef) and node.name == "identify_guest"
+        )
+        func_source = ast.get_source_segment(source, identify_func)
+        ip_lookup = func_source.find("get_guest_session_by_ip")
+        new_session = func_source.find("generate_guest_id()")
         assert ip_lookup < new_session, (
             "GQ-ACC-02 FAIL: IP 查找应在创建新 session 之前"
         )
@@ -171,7 +210,7 @@ class TestQuotaOrderingFix:
         cache_pos = func_source.find("get_cached_trend")
         api_key_check_pos = func_source.find("icfg.youtube_api_key")
         fetch_pos = func_source.find("fetch_trending")
-        consume_pos = func_source.find("consume_guest_quota")
+        consume_pos = func_source.find("consume_guest_quota", fetch_pos)
 
         # reserve 在最前面（仅检查不扣减）
         assert reserve_pos < api_key_check_pos, (
@@ -224,9 +263,9 @@ class TestQuotaOrderingFix:
             "QO-ACC-02 FAIL: API Key 未配置时未返回 503"
         )
 
-    # QO-ACC-03：缓存命中时不扣配额
-    def test_qo_acc_03_cache_hit_no_quota_consumed(self):
-        """seo.py /trending: 缓存命中时直接返回，不扣配额。"""
+    # QO-ACC-03：缓存命中时游客仍扣一次功能配额
+    def test_qo_acc_03_cache_hit_consumes_guest_quota(self):
+        """seo.py /trending: 游客缓存命中也计为一次 YouTube 相关功能调用。"""
         source = _read_source("app/api/v1/seo.py")
 
         tree = ast.parse(source)
@@ -238,21 +277,17 @@ class TestQuotaOrderingFix:
 
         func_source = ast.get_source_segment(source, trend_func)
 
-        # 缓存命中时直接 return，不执行 consume_guest_quota
         cache_check_pos = func_source.find("get_cached_trend")
+        cache_branch_pos = func_source.find("if cached is not None:", cache_check_pos)
+        consume_pos = func_source.find("consume_guest_quota", cache_branch_pos)
         cache_return_pos = func_source.find("return TrendDiscoveryResponse(**cached)")
-        consume_pos = func_source.find("consume_guest_quota")
 
         assert cache_return_pos > 0, (
             "QO-ACC-03 FAIL: 缓存命中时未直接返回"
         )
-        assert cache_return_pos < consume_pos, (
-            "QO-ACC-03 FAIL: 缓存命中 return 应在 consume_guest_quota 之前"
+        assert cache_branch_pos < consume_pos < cache_return_pos, (
+            "QO-ACC-03 FAIL: 游客缓存命中应在返回前 consume_guest_quota"
         )
-        # 缓存命中 return 后不应继续执行到 consume
-        # 验证 cache 命中分支是一个 early return
-        cache_block_start = func_source.find("if cached is not None:", cache_check_pos)
-        assert cache_block_start > 0, "QO-ACC-03: 缓存命中检查不存在"
 
     # QO-ACC-04：正常调用仍扣配额
     def test_qo_acc_04_normal_call_consumes_quota(self):
@@ -291,6 +326,16 @@ class TestQuotaOrderingFix:
         )
         assert "increment_usage" not in reserve_source, (
             "reserve_guest_quota 不应调用 increment_usage"
+        )
+
+    def test_guest_quota_json_mutation_is_persisted(self):
+        """daily_quotas 是 JSON 字段，递增时必须显式标记修改，避免用量不落库。"""
+        source = _read_source("app/crud/guest_session_crud.py")
+        assert "flag_modified" in source, (
+            "increment_guest_quota 应对 daily_quotas 调用 flag_modified，确保 JSON 变更落库"
+        )
+        assert "dict(guest.daily_quotas or {})" in source, (
+            "increment_guest_quota 应复制 daily_quotas 后再修改，避免原地改 JSON 不被追踪"
         )
 
 

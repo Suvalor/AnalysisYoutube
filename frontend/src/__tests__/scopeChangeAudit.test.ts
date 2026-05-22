@@ -72,8 +72,8 @@ describe("[PRD-S2] 四层用户体系定义", () => {
 //   订阅等级1: YouTube=10, LLM=20, CV=10
 //   管理员: 无限制
 //
-// 审计发现：后端 DEFAULT_QUOTAS 与 PRD 不一致
-//   实际: guest={youtube:5, llm:0, cv:0}, user={youtube:20, llm:10, cv:5}
+// 审计发现：后端 DEFAULT_QUOTAS 与 PRD 仍有部分不一致
+//   实际: guest={youtube:1, llm:0, cv:0}, user={youtube:20, llm:10, cv:5}
 // ────────────────────────────────────────────────────────────
 
 describe("[PRD-S3] API 调用限额矩阵审计", () => {
@@ -147,16 +147,15 @@ describe("[PRD-S3] API 调用限额矩阵审计", () => {
   /**
    * 审计标记测试：记录后端 DEFAULT_QUOTAS 与 PRD 的偏差。
    * 此测试始终通过，但通过断言值记录偏差事实。
-   * 后端实际值: guest={5,0,0}, user={20,10,5}, subscriber={100,50,20}
+   * 后端实际值: guest={1,0,0}, user={20,10,5}, subscriber={100,50,20}
    * PRD 期望值: guest={1,1,1}, user={1,3,3}, subscriber_tier1={10,20,10}
    */
   it("审计标记：后端 DEFAULT_QUOTAS 与 PRD Section III 存在偏差", () => {
     // 这些是后端 rate_limit_service.py 中的实际值（非前端代码）
     // 记录偏差供 Developer 确认是否有意为之
-    const backendGuestQuotas = { youtube_api: 5, llm_api: 0, cv_api: 0 };
+    const backendGuestQuotas = { youtube_api: 1, llm_api: 0, cv_api: 0 };
     const prdGuestQuotas = { youtube_api: 1, llm_api: 1, cv_api: 1 };
-    // 偏差：YouTube 5 vs 1, LLM 0 vs 1, CV 0 vs 1
-    expect(backendGuestQuotas.youtube_api).not.toBe(prdGuestQuotas.youtube_api);
+    expect(backendGuestQuotas.youtube_api).toBe(prdGuestQuotas.youtube_api);
     expect(backendGuestQuotas.llm_api).not.toBe(prdGuestQuotas.llm_api);
     expect(backendGuestQuotas.cv_api).not.toBe(prdGuestQuotas.cv_api);
 
@@ -609,8 +608,8 @@ describe("[PRD-S4.4] 超限行为审计", () => {
   it("isGuestQuotaExhausted 应正确判断配额耗尽", () => {
     const exhaustedUsage: import("@/types/auth").QuotaUsage = {
       role: "guest",
-      youtube_api_used: 5,
-      youtube_api_limit: 5,
+      youtube_api_used: 1,
+      youtube_api_limit: 1,
       llm_api_used: 0,
       llm_api_limit: 0,
       cv_api_used: 0,
@@ -622,8 +621,8 @@ describe("[PRD-S4.4] 超限行为审计", () => {
   it("isGuestQuotaExhausted 配额未耗尽时应返回 false", () => {
     const normalUsage: import("@/types/auth").QuotaUsage = {
       role: "guest",
-      youtube_api_used: 2,
-      youtube_api_limit: 5,
+      youtube_api_used: 0,
+      youtube_api_limit: 1,
       llm_api_used: 0,
       llm_api_limit: 0,
       cv_api_used: 0,

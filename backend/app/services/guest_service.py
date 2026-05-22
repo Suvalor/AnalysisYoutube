@@ -1,6 +1,6 @@
-"""游客识别服务：通过 IP 地址 + Cookie guest_id 识别游客，MySQL 存储配额。
+"""游客识别服务：通过 Cookie、浏览器指纹、IP 识别游客，MySQL 存储配额。
 
-核心策略：IP 优先于 Cookie。无 Cookie 时先按 IP 查找已有会话，防止清除 Cookie 绕过配额。
+核心策略：Cookie -> 浏览器指纹 -> IP。无 Cookie 时先按指纹/IP 查找已有会话，防止清除 Cookie 绕过配额。
 IP 提取策略：根据 TRUSTED_PROXY_COUNT 配置决定是否信任 X-Forwarded-For 头，
 防止攻击者伪造 IP 绕过配额。
 """
@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.crud.guest_session_crud import (
     create_guest_session,
     get_guest_session,
+    get_guest_session_by_fingerprint,
     get_guest_session_by_ip,
 )
 
@@ -31,6 +32,7 @@ class GuestInfo:
 
     guest_id: str
     ip_address: str | None
+    browser_fingerprint: str | None
     is_new: bool
 
 
@@ -89,6 +91,16 @@ def _extract_client_ip(request: Request) -> str | None:
     return None
 
 
+def _extract_browser_fingerprint(request: Request) -> str | None:
+    """读取前端生成的浏览器指纹，只接受短的安全字符值。"""
+    raw = (request.headers.get("x-browser-fingerprint") or "").strip()
+    if not raw or len(raw) > 128:
+        return None
+    if not all(c.isalnum() or c in "-_:" for c in raw):
+        return None
+    return raw
+
+
 def generate_guest_id() -> str:
     """生成唯一游客标识 UUID。"""
     return str(uuid.uuid4())
@@ -98,39 +110,75 @@ async def identify_guest(
     request: Request,
     session: AsyncSession,
 ) -> GuestInfo:
-    """识别游客：IP 优先策略，防止清除 Cookie 绕过配额。
+    """识别游客：Cookie、浏览器指纹、IP 组合匹配，防止清除 Cookie 绕过配额。
 
     查找顺序：
     1. Cookie 有效 -> 查 DB 复用已有会话
-    2. 无 Cookie -> 按 IP 查找当日已有会话（核心防绕过逻辑）
-    3. 均未找到 -> 创建新会话
+    2. Cookie 缺失或失效 -> 按浏览器指纹查找当日已有会话
+    3. 仍未找到 -> 按 IP 查找当日已有会话
+    4. 均未找到 -> 创建新会话
     """
     guest_id = request.cookies.get(_GUEST_COOKIE_NAME)
     ip_address = _extract_client_ip(request)
+    browser_fingerprint = _extract_browser_fingerprint(request)
 
     if guest_id:
         # 已有 Cookie，检查数据库中是否存在
         existing = await get_guest_session(session, guest_id)
         if existing:
-            return GuestInfo(guest_id=guest_id, ip_address=ip_address, is_new=False)
-        # Cookie 存在但数据库无记录，复用 guest_id 创建新记录
-        await create_guest_session(session, guest_id=guest_id, ip_address=ip_address)
-        await session.commit()
-        return GuestInfo(guest_id=guest_id, ip_address=ip_address, is_new=True)
+            changed = False
+            if ip_address and existing.ip_address != ip_address:
+                existing.ip_address = ip_address
+                changed = True
+            if browser_fingerprint and existing.browser_fingerprint != browser_fingerprint:
+                existing.browser_fingerprint = browser_fingerprint
+                changed = True
+            if changed:
+                await session.commit()
+            return GuestInfo(
+                guest_id=guest_id,
+                ip_address=ip_address,
+                browser_fingerprint=browser_fingerprint,
+                is_new=False,
+            )
 
-    # 无 Cookie：先按 IP 查找当日已有会话（防止清除 Cookie 绕过配额）
+    # Cookie 缺失或失效：先按浏览器指纹查找当日已有会话。
+    if browser_fingerprint:
+        fp_session = await get_guest_session_by_fingerprint(session, browser_fingerprint)
+        if fp_session:
+            return GuestInfo(
+                guest_id=fp_session.guest_id,
+                ip_address=ip_address,
+                browser_fingerprint=browser_fingerprint,
+                is_new=False,
+            )
+
+    # 仍未找到：按 IP 查找当日已有会话（防止清除 Cookie 或隐身窗口绕过配额）
     if ip_address:
         ip_session = await get_guest_session_by_ip(session, ip_address)
         if ip_session:
             return GuestInfo(
-                guest_id=ip_session.guest_id, ip_address=ip_address, is_new=False,
+                guest_id=ip_session.guest_id,
+                ip_address=ip_address,
+                browser_fingerprint=browser_fingerprint,
+                is_new=False,
             )
 
     # 未找到 -> 创建新会话
-    new_guest_id = generate_guest_id()
-    await create_guest_session(session, guest_id=new_guest_id, ip_address=ip_address)
+    new_guest_id = guest_id or generate_guest_id()
+    await create_guest_session(
+        session,
+        guest_id=new_guest_id,
+        ip_address=ip_address,
+        browser_fingerprint=browser_fingerprint,
+    )
     await session.commit()
-    return GuestInfo(guest_id=new_guest_id, ip_address=ip_address, is_new=True)
+    return GuestInfo(
+        guest_id=new_guest_id,
+        ip_address=ip_address,
+        browser_fingerprint=browser_fingerprint,
+        is_new=True,
+    )
 
 
 def set_guest_cookie(response, guest_id: str) -> None:

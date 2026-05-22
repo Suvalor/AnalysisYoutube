@@ -50,6 +50,7 @@ export interface QuotaUsage {
 export interface GuestInfo {
   guest_id: string;
   ip_address: string | null;
+  browser_fingerprint?: string | null;
   is_new: boolean;
 }
 

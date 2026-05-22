@@ -34,6 +34,21 @@ class TestConfigSecurity:
         field_info = Settings.model_fields["mysql_password"]
         assert field_info.default == "", "mysql_password Field 默认值应为空字符串"
 
+    def test_frontend_base_url_is_included_in_cors_origins(self):
+        """FRONTEND_BASE_URL 应自动并入 CORS，避免部署时漏配 BACKEND_CORS_ORIGINS。"""
+        from app.core.config import Settings
+
+        s = Settings(
+            MYSQL_PASSWORD="test",
+            SECRET_KEY=self._VALID_SECRET_KEY,
+            DATABASE_URL="mysql+asyncmy://test:test@localhost/test",
+            FRONTEND_BASE_URL="https://frontend.example.com/",
+            BACKEND_CORS_ORIGINS="http://localhost:5175",
+        )
+
+        assert "http://localhost:5175" in s.cors_origins
+        assert "https://frontend.example.com" in s.cors_origins
+
 
 class TestDockerComposeSecurity:
     """docker-compose.yml 密钥外移验证。"""
