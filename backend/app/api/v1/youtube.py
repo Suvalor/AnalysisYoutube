@@ -6,11 +6,11 @@ import tempfile
 from urllib.parse import urlencode
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 import httpx
 from sqlalchemy import select
 
-from app.api.deps import CurrentUserDep, DBSessionDep
+from app.api.deps import CurrentUserDep, DBSessionDep, create_quota_guard
 from app.db.session import AsyncSessionLocal
 from app.core.config import settings
 from app.crud.youtube import (
@@ -681,6 +681,7 @@ async def analyze_channel_ai(
     body: YouTubeChannelAiAnalyzeRequest,
     db: DBSessionDep,
     current_user: CurrentUserDep,
+    _quota: bool = Depends(create_quota_guard("llm_api")),
 ) -> YouTubeChannelAIAnalyzeResponse:
     channel = await get_channel_for_user(db, user_id=current_user.id, channel_id=channel_id)
     if channel is None:
@@ -851,6 +852,7 @@ async def competitors_ai_insight(
     body: CompetitorAiInsightRequest,
     db: DBSessionDep,
     current_user: CurrentUserDep,
+    _quota: bool = Depends(create_quota_guard("llm_api")),
 ) -> dict:
     """基于选中的频道数据，调用 LLM 生成竞争格局分析。"""
     from app.services.competitor_ai_service import generate_competitor_ai_insight
@@ -1122,4 +1124,3 @@ async def _get_valid_youtube_access_token(db: DBSessionDep, current_user: Curren
     await db.commit()
     await db.refresh(current_user)
     return new_access
-

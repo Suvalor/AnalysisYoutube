@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy import or_, select
 
-from app.api.deps import CurrentUserDep, DBSessionDep
+from app.api.deps import CurrentUserDep, DBSessionDep, enforce_user_quota
 from app.services.mix_task_service import MIX_OUTPUT_DIR
 from app.constants.asset_source import (
     ALLOWED_ASSET_SOURCES,
@@ -140,6 +140,7 @@ async def upload_material(
         final_path = temp_path
         process_info = "未启用去水印"
         if remove_watermark:
+            await enforce_user_quota(db, current_user, "cv_api")
             inpaint_cfg = await resolve_inpaint_runtime_config(
                 db,
                 user_id=current_user.id,

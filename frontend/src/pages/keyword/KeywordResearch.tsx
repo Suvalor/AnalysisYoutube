@@ -50,16 +50,16 @@ export default function KeywordResearch() {
 
   /** 地区选项（i18n） */
   const REGION_OPTIONS = useMemo(() => [
-    { value: "US", label: `🇺🇸 ${t('research.regionUS')}` },
-    { value: "GB", label: `🇬🇧 ${t('research.regionGB')}` },
-    { value: "JP", label: `🇯🇵 ${t('research.regionJP')}` },
-    { value: "KR", label: `🇰🇷 ${t('research.regionKR')}` },
-    { value: "DE", label: `🇩🇪 ${t('research.regionDE')}` },
-    { value: "FR", label: `🇫🇷 ${t('research.regionFR')}` },
-    { value: "BR", label: `🇧🇷 ${t('research.regionBR')}` },
-    { value: "IN", label: `🇮🇳 ${t('research.regionIN')}` },
-    { value: "CA", label: `🇨🇦 ${t('research.regionCA')}` },
-    { value: "AU", label: `🇦🇺 ${t('research.regionAU')}` },
+    { value: "US", label: `🇺🇸 ${t('research.country.US')}` },
+    { value: "GB", label: `🇬🇧 ${t('research.country.GB')}` },
+    { value: "JP", label: `🇯🇵 ${t('research.country.JP')}` },
+    { value: "KR", label: `🇰🇷 ${t('research.country.KR')}` },
+    { value: "DE", label: `🇩🇪 ${t('research.country.DE')}` },
+    { value: "FR", label: `🇫🇷 ${t('research.country.FR')}` },
+    { value: "BR", label: `🇧🇷 ${t('research.country.BR')}` },
+    { value: "IN", label: `🇮🇳 ${t('research.country.IN')}` },
+    { value: "CA", label: `🇨🇦 ${t('research.country.CA')}` },
+    { value: "AU", label: `🇦🇺 ${t('research.country.AU')}` },
   ], [t]);
 
   /** 语言选项（i18n） */
@@ -219,7 +219,7 @@ export default function KeywordResearch() {
     <div className="p-6 max-w-[1200px] mx-auto">
       <Title level={3} style={{ marginBottom: 24 }}>
         <SearchOutlined style={{ marginRight: 8, color: "var(--color-primary)" }} />
-        {t('research.title')}
+        {t('title')}
       </Title>
 
       {/* 搜索区 */}

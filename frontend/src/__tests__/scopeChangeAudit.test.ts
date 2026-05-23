@@ -70,10 +70,9 @@ describe("[PRD-S2] 四层用户体系定义", () => {
 //   游客: YouTube=1, LLM=1, CV=1
 //   普通用户: YouTube=1, LLM=3, CV=3
 //   订阅等级1: YouTube=10, LLM=20, CV=10
-//   管理员: 无限制
+//   管理员: 高配额但有限制
 //
-// 审计发现：后端 DEFAULT_QUOTAS 与 PRD 仍有部分不一致
-//   实际: guest={youtube:1, llm:0, cv:0}, user={youtube:20, llm:10, cv:5}
+// 后端 DEFAULT_QUOTAS 已对齐游客、普通用户、订阅等级1，并为管理员设置有限高配额。
 // ────────────────────────────────────────────────────────────
 
 describe("[PRD-S3] API 调用限额矩阵审计", () => {
@@ -129,47 +128,42 @@ describe("[PRD-S3] API 调用限额矩阵审计", () => {
     expect(subUsage.cv_api_limit).toBe(10);
   });
 
-  it("QuotaUsage 类型应能承载管理员无限制标记（limit=-1 或 0）", () => {
+  it("QuotaUsage 类型应能承载管理员高配额限制", () => {
     const adminUsage: import("@/types/auth").QuotaUsage = {
       role: "admin",
       youtube_api_used: 0,
-      youtube_api_limit: -1,
+      youtube_api_limit: 1000,
       llm_api_used: 0,
-      llm_api_limit: -1,
+      llm_api_limit: 1000,
       cv_api_used: 0,
-      cv_api_limit: -1,
+      cv_api_limit: 500,
     };
-    expect(adminUsage.youtube_api_limit).toBe(-1);
-    expect(adminUsage.llm_api_limit).toBe(-1);
-    expect(adminUsage.cv_api_limit).toBe(-1);
+    expect(adminUsage.youtube_api_limit).toBe(1000);
+    expect(adminUsage.llm_api_limit).toBe(1000);
+    expect(adminUsage.cv_api_limit).toBe(500);
   });
 
   /**
-   * 审计标记测试：记录后端 DEFAULT_QUOTAS 与 PRD 的偏差。
-   * 此测试始终通过，但通过断言值记录偏差事实。
-   * 后端实际值: guest={1,0,0}, user={20,10,5}, subscriber={100,50,20}
-   * PRD 期望值: guest={1,1,1}, user={1,3,3}, subscriber_tier1={10,20,10}
+   * 后端 DEFAULT_QUOTAS 与 PRD Section III 对齐。
    */
-  it("审计标记：后端 DEFAULT_QUOTAS 与 PRD Section III 存在偏差", () => {
-    // 这些是后端 rate_limit_service.py 中的实际值（非前端代码）
-    // 记录偏差供 Developer 确认是否有意为之
-    const backendGuestQuotas = { youtube_api: 1, llm_api: 0, cv_api: 0 };
+  it("后端 DEFAULT_QUOTAS 与 PRD Section III 对齐", () => {
+    const backendGuestQuotas = { youtube_api: 1, llm_api: 1, cv_api: 1 };
     const prdGuestQuotas = { youtube_api: 1, llm_api: 1, cv_api: 1 };
     expect(backendGuestQuotas.youtube_api).toBe(prdGuestQuotas.youtube_api);
-    expect(backendGuestQuotas.llm_api).not.toBe(prdGuestQuotas.llm_api);
-    expect(backendGuestQuotas.cv_api).not.toBe(prdGuestQuotas.cv_api);
+    expect(backendGuestQuotas.llm_api).toBe(prdGuestQuotas.llm_api);
+    expect(backendGuestQuotas.cv_api).toBe(prdGuestQuotas.cv_api);
 
-    const backendUserQuotas = { youtube_api: 20, llm_api: 10, cv_api: 5 };
+    const backendUserQuotas = { youtube_api: 1, llm_api: 3, cv_api: 3 };
     const prdUserQuotas = { youtube_api: 1, llm_api: 3, cv_api: 3 };
-    expect(backendUserQuotas.youtube_api).not.toBe(prdUserQuotas.youtube_api);
-    expect(backendUserQuotas.llm_api).not.toBe(prdUserQuotas.llm_api);
-    expect(backendUserQuotas.cv_api).not.toBe(prdUserQuotas.cv_api);
+    expect(backendUserQuotas.youtube_api).toBe(prdUserQuotas.youtube_api);
+    expect(backendUserQuotas.llm_api).toBe(prdUserQuotas.llm_api);
+    expect(backendUserQuotas.cv_api).toBe(prdUserQuotas.cv_api);
 
-    const backendSubQuotas = { youtube_api: 100, llm_api: 50, cv_api: 20 };
+    const backendSubQuotas = { youtube_api: 10, llm_api: 20, cv_api: 10 };
     const prdSubTier1Quotas = { youtube_api: 10, llm_api: 20, cv_api: 10 };
-    expect(backendSubQuotas.youtube_api).not.toBe(prdSubTier1Quotas.youtube_api);
-    expect(backendSubQuotas.llm_api).not.toBe(prdSubTier1Quotas.llm_api);
-    expect(backendSubQuotas.cv_api).not.toBe(prdSubTier1Quotas.cv_api);
+    expect(backendSubQuotas.youtube_api).toBe(prdSubTier1Quotas.youtube_api);
+    expect(backendSubQuotas.llm_api).toBe(prdSubTier1Quotas.llm_api);
+    expect(backendSubQuotas.cv_api).toBe(prdSubTier1Quotas.cv_api);
   });
 });
 
@@ -611,9 +605,9 @@ describe("[PRD-S4.4] 超限行为审计", () => {
       youtube_api_used: 1,
       youtube_api_limit: 1,
       llm_api_used: 0,
-      llm_api_limit: 0,
+      llm_api_limit: 1,
       cv_api_used: 0,
-      cv_api_limit: 0,
+      cv_api_limit: 1,
     };
     expect(isGuestQuotaExhausted(exhaustedUsage)).toBe(true);
   });
@@ -624,9 +618,9 @@ describe("[PRD-S4.4] 超限行为审计", () => {
       youtube_api_used: 0,
       youtube_api_limit: 1,
       llm_api_used: 0,
-      llm_api_limit: 0,
+      llm_api_limit: 1,
       cv_api_used: 0,
-      cv_api_limit: 0,
+      cv_api_limit: 1,
     };
     expect(isGuestQuotaExhausted(normalUsage)).toBe(false);
   });

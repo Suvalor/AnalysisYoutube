@@ -4,7 +4,7 @@ from typing import Literal
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy import asc, desc, func, nulls_first, nulls_last, select
 
-from app.api.deps import CurrentUserDep, DBSessionDep
+from app.api.deps import CurrentUserDep, DBSessionDep, enforce_user_quota
 from app.constants.asset_source import ALLOWED_ASSET_SOURCES, ASSET_SOURCE_MANUAL
 from app.crud.library import create_with_user, delete_with_user, ensure_owned_or_404, get_by_user, update_with_user
 from app.models.library import AssetLibrary
@@ -179,6 +179,7 @@ async def upload_asset(
         final_path = temp_path
         process_info = "未启用去水印"
         if remove_watermark:
+            await enforce_user_quota(db, current_user, "cv_api")
             inpaint_cfg = await resolve_inpaint_runtime_config(
                 db,
                 user_id=current_user.id,

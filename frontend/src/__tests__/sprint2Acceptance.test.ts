@@ -107,9 +107,9 @@ describe("[AC-3] 游客配额耗尽判断 — isGuestQuotaExhausted", () => {
         youtube_api_used: 0,
         youtube_api_limit: 1,
       llm_api_used: 0,
-      llm_api_limit: 0,
+      llm_api_limit: 1,
       cv_api_used: 0,
-      cv_api_limit: 0,
+      cv_api_limit: 1,
       ...overrides,
     };
   }
@@ -151,14 +151,14 @@ describe("[AC-3] 游客配额耗尽判断 — isGuestQuotaExhausted", () => {
     expect(isGuestQuotaExhausted(usage)).toBe(true);
   });
 
-  it("游客 LLM/CV 配额为 0 时，used=0 不算耗尽", () => {
+  it("游客 LLM/CV 配额未用完时返回 false", () => {
     const usage = makeUsage({
       youtube_api_used: 0,
       youtube_api_limit: 1,
       llm_api_used: 0,
-      llm_api_limit: 0,
+      llm_api_limit: 1,
       cv_api_used: 0,
-      cv_api_limit: 0,
+      cv_api_limit: 1,
     });
     expect(isGuestQuotaExhausted(usage)).toBe(false);
   });
@@ -314,9 +314,9 @@ describe("[AC-3/AC-6] QuotaUsage 类型与后端 QuotaUsageRead 一致", () => {
       youtube_api_used: 0,
       youtube_api_limit: 1,
       llm_api_used: 0,
-      llm_api_limit: 0,
+      llm_api_limit: 1,
       cv_api_used: 0,
-      cv_api_limit: 0,
+      cv_api_limit: 1,
     };
     // 验证所有字段存在
     expect(usage.role).toBe("guest");
@@ -328,19 +328,19 @@ describe("[AC-3/AC-6] QuotaUsage 类型与后端 QuotaUsageRead 一致", () => {
     expect(typeof usage.cv_api_limit).toBe("number");
   });
 
-  it("游客默认配额与 PRD 一致：YouTube=1, LLM=0, CV=0", () => {
+  it("游客默认配额与 PRD 一致：YouTube=1, LLM=1, CV=1", () => {
     const guestUsage: QuotaUsage = {
       role: "guest",
       youtube_api_used: 0,
       youtube_api_limit: 1,
       llm_api_used: 0,
-      llm_api_limit: 0,
+      llm_api_limit: 1,
       cv_api_used: 0,
-      cv_api_limit: 0,
+      cv_api_limit: 1,
     };
     expect(guestUsage.youtube_api_limit).toBe(1);
-    expect(guestUsage.llm_api_limit).toBe(0);
-    expect(guestUsage.cv_api_limit).toBe(0);
+    expect(guestUsage.llm_api_limit).toBe(1);
+    expect(guestUsage.cv_api_limit).toBe(1);
   });
 });
 

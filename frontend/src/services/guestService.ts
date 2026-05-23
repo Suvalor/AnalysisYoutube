@@ -12,7 +12,7 @@ export async function fetchGuestQuotaUsage(): Promise<QuotaUsage> {
 
 /**
  * 检查游客配额是否已用完。
- * limit<=0 表示该类 API 不开放，不计入耗尽判断。
+ * limit=0 表示该类 API 不开放，limit<0 表示无限制；两者都不计入耗尽判断。
  * 返回 true 表示至少有一类已开放的配额已达到上限。
  */
 export function isGuestQuotaExhausted(usage: QuotaUsage): boolean {

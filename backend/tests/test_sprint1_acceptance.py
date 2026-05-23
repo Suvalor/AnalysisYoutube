@@ -167,57 +167,57 @@ class TestAC2QuotaLimits:
         """AC-2: 游客每日 YouTube API 调用上限 1 次"""
         assert DEFAULT_QUOTAS[UserRole.GUEST]["youtube_api"] == 1
 
-    def test_guest_llm_api_limit_is_0(self):
-        """AC-2: 游客 LLM API 配额为 0"""
-        assert DEFAULT_QUOTAS[UserRole.GUEST]["llm_api"] == 0
+    def test_guest_llm_api_limit_is_1(self):
+        """AC-2: 游客 LLM API 配额为 1"""
+        assert DEFAULT_QUOTAS[UserRole.GUEST]["llm_api"] == 1
 
-    def test_guest_cv_api_limit_is_0(self):
-        """AC-2: 游客 CV API 配额为 0"""
-        assert DEFAULT_QUOTAS[UserRole.GUEST]["cv_api"] == 0
+    def test_guest_cv_api_limit_is_1(self):
+        """AC-2: 游客 CV API 配额为 1"""
+        assert DEFAULT_QUOTAS[UserRole.GUEST]["cv_api"] == 1
 
-    def test_user_youtube_api_limit_is_20(self):
-        """AC-2: 普通用户每日 YouTube API 调用上限 20 次"""
-        assert DEFAULT_QUOTAS[UserRole.USER]["youtube_api"] == 20
+    def test_user_youtube_api_limit_is_1(self):
+        """AC-2: 普通用户每日 YouTube API 调用上限 1 次"""
+        assert DEFAULT_QUOTAS[UserRole.USER]["youtube_api"] == 1
 
-    def test_user_llm_api_limit_is_10(self):
-        """AC-2: 普通用户 LLM API 上限 10 次"""
-        assert DEFAULT_QUOTAS[UserRole.USER]["llm_api"] == 10
+    def test_user_llm_api_limit_is_3(self):
+        """AC-2: 普通用户 LLM API 上限 3 次"""
+        assert DEFAULT_QUOTAS[UserRole.USER]["llm_api"] == 3
 
-    def test_user_cv_api_limit_is_5(self):
-        """AC-2: 普通用户 CV API 上限 5 次"""
-        assert DEFAULT_QUOTAS[UserRole.USER]["cv_api"] == 5
+    def test_user_cv_api_limit_is_3(self):
+        """AC-2: 普通用户 CV API 上限 3 次"""
+        assert DEFAULT_QUOTAS[UserRole.USER]["cv_api"] == 3
 
-    def test_subscriber_youtube_api_limit_is_100(self):
-        """AC-2: 付费用户每日 YouTube API 调用上限 100 次"""
-        assert DEFAULT_QUOTAS[UserRole.SUBSCRIBER]["youtube_api"] == 100
+    def test_subscriber_youtube_api_limit_is_10(self):
+        """AC-2: 付费用户每日 YouTube API 调用上限 10 次"""
+        assert DEFAULT_QUOTAS[UserRole.SUBSCRIBER]["youtube_api"] == 10
 
-    def test_subscriber_llm_api_limit_is_50(self):
-        """AC-2: 付费用户 LLM API 上限 50 次"""
-        assert DEFAULT_QUOTAS[UserRole.SUBSCRIBER]["llm_api"] == 50
+    def test_subscriber_llm_api_limit_is_20(self):
+        """AC-2: 付费用户 LLM API 上限 20 次"""
+        assert DEFAULT_QUOTAS[UserRole.SUBSCRIBER]["llm_api"] == 20
 
-    def test_subscriber_cv_api_limit_is_20(self):
-        """AC-2: 付费用户 CV API 上限 20 次"""
-        assert DEFAULT_QUOTAS[UserRole.SUBSCRIBER]["cv_api"] == 20
+    def test_subscriber_cv_api_limit_is_10(self):
+        """AC-2: 付费用户 CV API 上限 10 次"""
+        assert DEFAULT_QUOTAS[UserRole.SUBSCRIBER]["cv_api"] == 10
 
-    def test_admin_no_quota_limit(self):
-        """AC-2: 管理员无配额限制（-1 表示无限制）"""
-        assert DEFAULT_QUOTAS[UserRole.ADMIN]["youtube_api"] == -1
-        assert DEFAULT_QUOTAS[UserRole.ADMIN]["llm_api"] == -1
-        assert DEFAULT_QUOTAS[UserRole.ADMIN]["cv_api"] == -1
+    def test_admin_has_finite_quota_limit(self):
+        """AC-2: 管理员也有较高但有限的每日配额"""
+        assert DEFAULT_QUOTAS[UserRole.ADMIN]["youtube_api"] == 1000
+        assert DEFAULT_QUOTAS[UserRole.ADMIN]["llm_api"] == 1000
+        assert DEFAULT_QUOTAS[UserRole.ADMIN]["cv_api"] == 500
 
     def test_get_role_limits_guest(self):
         """AC-2: get_role_limits 返回游客配额"""
         limits = get_role_limits(UserRole.GUEST)
         assert limits["youtube_api"] == 1
-        assert limits["llm_api"] == 0
-        assert limits["cv_api"] == 0
+        assert limits["llm_api"] == 1
+        assert limits["cv_api"] == 1
 
     def test_get_role_limits_user(self):
         """AC-2: get_role_limits 返回普通用户配额"""
         limits = get_role_limits(UserRole.USER)
-        assert limits["youtube_api"] == 20
-        assert limits["llm_api"] == 10
-        assert limits["cv_api"] == 5
+        assert limits["youtube_api"] == 1
+        assert limits["llm_api"] == 3
+        assert limits["cv_api"] == 3
 
     def test_get_role_limits_subscriber_with_custom_quotas(self):
         """AC-2: 订阅用户优先使用订阅套餐配额"""
@@ -229,13 +229,13 @@ class TestAC2QuotaLimits:
     def test_get_role_limits_subscriber_without_custom_quotas(self):
         """AC-2: 订阅用户无自定义配额时使用默认配额"""
         limits = get_role_limits(UserRole.SUBSCRIBER, subscription_quotas=None)
-        assert limits["youtube_api"] == 100
+        assert limits["youtube_api"] == 10
 
-    def test_get_role_limits_admin_always_unlimited(self):
-        """AC-2: 管理员始终无限制，即使传入自定义配额"""
+    def test_get_role_limits_admin_uses_default_finite_quota(self):
+        """AC-2: 管理员使用默认高配额，不使用订阅自定义配额"""
         custom_quotas = {"youtube_api": 50}
         limits = get_role_limits(UserRole.ADMIN, subscription_quotas=custom_quotas)
-        assert limits["youtube_api"] == -1
+        assert limits["youtube_api"] == 1000
 
     @pytest.mark.asyncio
     async def test_check_quota_guest_within_limit(self):
@@ -318,8 +318,8 @@ class TestAC2QuotaLimits:
         assert limit == 20
 
     @pytest.mark.asyncio
-    async def test_check_quota_admin_always_allowed(self):
-        """AC-2: 管理员始终允许调用"""
+    async def test_check_quota_admin_uses_finite_limit(self):
+        """AC-2: 管理员使用有限每日配额"""
         mock_session = AsyncMock()
         allowed, used, limit = await check_quota(
             mock_session,
@@ -328,11 +328,11 @@ class TestAC2QuotaLimits:
             api_type="youtube_api",
         )
         assert allowed is True
-        assert limit == -1
+        assert limit == 1000
 
     @pytest.mark.asyncio
-    async def test_check_quota_guest_llm_api_always_blocked(self):
-        """AC-2: 游客 LLM API 配额为 0，始终不允许"""
+    async def test_check_quota_guest_llm_api_within_limit(self):
+        """AC-2: 游客 LLM API 配额为 1，未使用时允许"""
         mock_session = AsyncMock()
         mock_guest = MagicMock()
         mock_guest.daily_quotas = {"youtube_api": 0, "llm_api": 0, "cv_api": 0, "date": "2026-05-19"}
@@ -346,12 +346,12 @@ class TestAC2QuotaLimits:
             guest_id="test-guest-id",
             api_type="llm_api",
         )
-        assert allowed is False
-        assert limit == 0
+        assert allowed is True
+        assert limit == 1
 
     @pytest.mark.asyncio
-    async def test_check_quota_guest_cv_api_always_blocked(self):
-        """AC-2: 游客 CV API 配额为 0，始终不允许"""
+    async def test_check_quota_guest_cv_api_within_limit(self):
+        """AC-2: 游客 CV API 配额为 1，未使用时允许"""
         mock_session = AsyncMock()
         mock_guest = MagicMock()
         mock_guest.daily_quotas = {"youtube_api": 0, "llm_api": 0, "cv_api": 0, "date": "2026-05-19"}
@@ -365,8 +365,8 @@ class TestAC2QuotaLimits:
             guest_id="test-guest-id",
             api_type="cv_api",
         )
-        assert allowed is False
-        assert limit == 0
+        assert allowed is True
+        assert limit == 1
 
     def test_daily_quota_reset_mechanism(self):
         """AC-2: 配额每日 0 点自动重置（通过日期比对实现）"""
@@ -977,16 +977,16 @@ class TestRequirementsTraceability:
         assert DEFAULT_QUOTAS[UserRole.GUEST]["youtube_api"] == 1
 
     def test_ac2_user_youtube_limit(self):
-        """AC-2[2]: 普通用户每日 YouTube API 调用上限 20 次"""
-        assert DEFAULT_QUOTAS[UserRole.USER]["youtube_api"] == 20
+        """AC-2[2]: 普通用户每日 YouTube API 调用上限 1 次"""
+        assert DEFAULT_QUOTAS[UserRole.USER]["youtube_api"] == 1
 
     def test_ac2_subscriber_youtube_limit(self):
-        """AC-2[3]: 付费用户每日 YouTube API 调用上限 100 次"""
-        assert DEFAULT_QUOTAS[UserRole.SUBSCRIBER]["youtube_api"] == 100
+        """AC-2[3]: 付费用户每日 YouTube API 调用上限 10 次"""
+        assert DEFAULT_QUOTAS[UserRole.SUBSCRIBER]["youtube_api"] == 10
 
-    def test_ac2_admin_unlimited(self):
-        """AC-2[4]: 管理员无配额限制"""
-        assert DEFAULT_QUOTAS[UserRole.ADMIN]["youtube_api"] == -1
+    def test_ac2_admin_finite_limit(self):
+        """AC-2[4]: 管理员也有有限配额"""
+        assert DEFAULT_QUOTAS[UserRole.ADMIN]["youtube_api"] == 1000
 
     def test_ac2_daily_reset_mechanism(self):
         """AC-2[5]: 配额每日 0 点自动重置"""
@@ -997,10 +997,10 @@ class TestRequirementsTraceability:
 
     def test_ac2_llm_cv_limits(self):
         """AC-2[6]: LLM/CV API 同理按角色限额"""
-        assert DEFAULT_QUOTAS[UserRole.GUEST]["llm_api"] == 0
-        assert DEFAULT_QUOTAS[UserRole.GUEST]["cv_api"] == 0
-        assert DEFAULT_QUOTAS[UserRole.USER]["llm_api"] == 10
-        assert DEFAULT_QUOTAS[UserRole.USER]["cv_api"] == 5
+        assert DEFAULT_QUOTAS[UserRole.GUEST]["llm_api"] == 1
+        assert DEFAULT_QUOTAS[UserRole.GUEST]["cv_api"] == 1
+        assert DEFAULT_QUOTAS[UserRole.USER]["llm_api"] == 3
+        assert DEFAULT_QUOTAS[UserRole.USER]["cv_api"] == 3
 
     def test_ac3_guest_cookie_generation(self):
         """AC-3[1]: 未登录用户首次访问自动生成 guest_id Cookie"""

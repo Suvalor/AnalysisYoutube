@@ -6,11 +6,11 @@ import uuid
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi import status
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import CurrentUserDep, DBSessionDep
+from app.api.deps import CurrentUserDep, DBSessionDep, create_quota_guard
 from app.crud.sop import (
     create_sop_asset,
     create_sop_media,
@@ -173,6 +173,7 @@ async def _run_ai_split_task(task_id: str) -> None:
 async def ai_split_segments_start(
     payload: SopAiSplitStartRequest,
     current_user: CurrentUserDep,
+    _quota: bool = Depends(create_quota_guard("llm_api")),
 ) -> SopAiSplitStartResponse:
     await _cleanup_ai_split_tasks()
     task_id = uuid.uuid4().hex
@@ -244,6 +245,7 @@ async def ai_split_segments(
     payload: SopAiSplitRequest,
     db: DBSessionDep,
     current_user: CurrentUserDep,
+    _quota: bool = Depends(create_quota_guard("llm_api")),
 ) -> StreamingResponse:
     outline = payload.outline_markdown.strip()
     if not outline:

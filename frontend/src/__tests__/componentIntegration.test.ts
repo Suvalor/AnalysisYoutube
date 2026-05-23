@@ -18,14 +18,15 @@ import type { QuotaUsage } from "@/types/auth";
 // 辅助函数：镜像 QuotaProgress 组件内部逻辑，用于纯函数测试
 // ────────────────────────────────────────────────────────────
 
-/** 判断配额项是否为无限制（limit <= 0） */
+/** 判断配额项是否为无限制（limit < 0） */
 function isUnlimited(limit: number): boolean {
-  return limit <= 0;
+  return limit < 0;
 }
 
 /** 计算配额使用百分比，无限制时返回 0 */
 function calcPercent(used: number, limit: number): number {
   if (isUnlimited(limit)) return 0;
+  if (limit === 0) return 0;
   return Math.round((used / limit) * 100);
 }
 
@@ -131,9 +132,9 @@ describe("QuotaProgress 进度条判断逻辑", () => {
     expect(isUnlimited(1)).toBe(false);
   });
 
-  /** limit <= 0 时显示"无限制" */
-  it("limit <= 0 时应显示无限制", () => {
-    expect(isUnlimited(0)).toBe(true);
+  /** limit < 0 时显示"无限制"，limit=0 表示无可用配额 */
+  it("limit < 0 时应显示无限制，limit=0 不应显示无限制", () => {
+    expect(isUnlimited(0)).toBe(false);
     expect(isUnlimited(-1)).toBe(true);
     expect(isUnlimited(-100)).toBe(true);
   });
@@ -145,9 +146,9 @@ describe("QuotaProgress 进度条判断逻辑", () => {
       youtube_api_used: 3,
       youtube_api_limit: 100,
       llm_api_used: 0,
-      llm_api_limit: 0,
+      llm_api_limit: -1,
       cv_api_used: 0,
-      cv_api_limit: 0,
+      cv_api_limit: -1,
     };
     expect(isUnlimited(usage.youtube_api_limit)).toBe(false);
     expect(isUnlimited(usage.llm_api_limit)).toBe(true);
@@ -177,9 +178,9 @@ describe("QuotaProgress 进度条判断逻辑", () => {
     expect(calcDisplayPercent(12, 10)).toBe(100);
   });
 
-  /** C-03: limit=0 的 isUnlimited 分支，百分比应为 0 */
-  it("limit=0 时 isUnlimited 为 true，百分比应为 0", () => {
-    expect(isUnlimited(0)).toBe(true);
+  /** C-03: limit=0 表示无可用配额，百分比应为 0 */
+  it("limit=0 时 isUnlimited 为 false，百分比应为 0", () => {
+    expect(isUnlimited(0)).toBe(false);
     expect(calcPercent(5, 0)).toBe(0);
     expect(calcDisplayPercent(5, 0)).toBe(0);
   });

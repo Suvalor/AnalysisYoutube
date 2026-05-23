@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.crud.library import get_by_user
 from app.crud.youtube import create_youtube_channel_insight, update_channel_ai_insight
 from app.models.library import ModelLibrary, PromptLibrary
+from app.models.user import User, UserRole
 from app.models.youtube import YouTubeChannel, YouTubeComment, YouTubeVideo
 from app.services.field_encryption import try_decrypt
 from app.services.llm_openai_factory import (
@@ -27,8 +28,45 @@ from app.services.youtube_ai_service import (
     analyze_channel_info_sync,
     build_channel_ai_messages,
 )
+from app.services.rate_limit_service import check_quota, increment_usage
 
 logger = logging.getLogger(__name__)
+
+
+async def _try_consume_background_llm_quota(session: AsyncSession, user_id: int) -> bool:
+    """后台 AI 补全前消费一次 LLM 配额；超限时跳过 AI，不影响基础数据入库。"""
+    user = await session.get(User, user_id)
+    if user is None:
+        logger.warning("后台 LLM 配额检查失败：用户不存在 user_id=%s", user_id)
+        return False
+
+    subscription_quotas = None
+    if user.role == UserRole.SUBSCRIBER:
+        from app.crud.subscription_crud import get_active_user_subscription
+
+        sub = await get_active_user_subscription(session, user_id)
+        if sub and sub.plan:
+            subscription_quotas = sub.plan.quotas_json
+
+    allowed, used, limit = await check_quota(
+        session,
+        user_id=user_id,
+        role=user.role,
+        api_type="llm_api",
+        subscription_quotas=subscription_quotas,
+    )
+    if not allowed:
+        logger.warning("后台 LLM 配额已用尽：user_id=%s used=%s limit=%s", user_id, used, limit)
+        return False
+
+    await increment_usage(
+        session,
+        user_id=user_id,
+        role=user.role,
+        api_type="llm_api",
+    )
+    await session.commit()
+    return True
 
 
 async def load_channel_ai_context(
@@ -182,6 +220,8 @@ async def enrich_youtube_channel_ai_sync(
     if creds is None:
         logger.warning("enrich_youtube_channel_ai_sync：无可用 LLM 配置，降级跳过（user_id=%s）", user_id)
         return False
+    if not await _try_consume_background_llm_quota(session, user_id):
+        return False
 
     api_key, base_url, model_name, protocol = creds
     top_video_titles, merged_tags, hot_comments = await load_channel_ai_context(session, channel)
@@ -230,6 +270,8 @@ async def enrich_youtube_channel_info_ai_sync(
     creds = await _resolve_default_llm_credentials(session, user_id)
     if creds is None:
         logger.warning("enrich_youtube_channel_info_ai_sync：无可用 LLM 配置，降级跳过（user_id=%s）", user_id)
+        return False
+    if not await _try_consume_background_llm_quota(session, user_id):
         return False
 
     api_key, base_url, model_name, protocol = creds

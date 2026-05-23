@@ -113,6 +113,41 @@ async def require_admin(
 AdminDep = Annotated[User, Depends(require_admin)]
 
 
+async def enforce_user_quota(db: DBSessionDep, user: User, api_type: str) -> None:
+    """对已登录用户执行一次指定 API 类型的配额检查并计数。"""
+    from app.services.rate_limit_service import check_quota, increment_usage
+    from app.crud.subscription_crud import get_active_user_subscription
+
+    subscription_quotas = None
+    if user.role == UserRole.SUBSCRIBER:
+        sub = await get_active_user_subscription(db, user.id)
+        if sub and sub.plan:
+            subscription_quotas = sub.plan.quotas_json
+
+    allowed, used, limit = await check_quota(
+        db,
+        user_id=user.id,
+        role=user.role,
+        guest_id=None,
+        api_type=api_type,
+        subscription_quotas=subscription_quotas,
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"配额已用尽：{api_type} 已用 {used}/{limit}，请升级套餐或明日再试",
+        )
+
+    await increment_usage(
+        db,
+        user_id=user.id,
+        role=user.role,
+        guest_id=None,
+        api_type=api_type,
+    )
+    await db.commit()
+
+
 async def get_guest_info(
     request: Request,
     db: DBSessionDep,
@@ -138,18 +173,10 @@ def create_quota_guard(api_type: str):
     ) -> bool:
         """执行配额检查，超限则抛出 429。"""
         from app.services.rate_limit_service import check_quota, increment_usage
-        from app.crud.subscription_crud import get_active_user_subscription
 
         if user:
-            role = user.role
-            user_id = user.id
-            guest_id = None
-            # 订阅用户获取套餐配额
-            subscription_quotas = None
-            if role == UserRole.SUBSCRIBER:
-                sub = await get_active_user_subscription(db, user_id)
-                if sub and sub.plan:
-                    subscription_quotas = sub.plan.quotas_json
+            await enforce_user_quota(db, user, api_type)
+            return True
         else:
             role = UserRole.GUEST
             user_id = None

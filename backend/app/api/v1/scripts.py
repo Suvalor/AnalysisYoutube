@@ -2,12 +2,12 @@ import json
 from collections import OrderedDict
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUserDep
-from app.api.deps import DBSessionDep
+from app.api.deps import DBSessionDep, create_quota_guard
 from app.crud.library import get_by_user, list_by_user
 from app.services.llm_openai_factory import LLMClientFactory, LLMClientConfig, normalize_base_url
 from app.models.library import ModelLibrary
@@ -93,6 +93,7 @@ async def generate_script(
     payload: ScriptGenerateRequest,
     db: DBSessionDep,
     current_user: CurrentUserDep,
+    _quota: bool = Depends(create_quota_guard("llm_api")),
 ) -> StreamingResponse:
     creds = user_custom_openai_credentials(current_user)
     if creds:

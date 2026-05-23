@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 
-from app.api.deps import CurrentUserDep, DBSessionDep, GuestInfoDep, OptionalUserDep
+from app.api.deps import CurrentUserDep, DBSessionDep, GuestInfoDep, OptionalUserDep, enforce_user_quota
 from app.core.config import get_settings
 from app.models.seo_score import SeoScoreRecord
 from app.models.library import ModelLibrary
@@ -91,6 +91,8 @@ async def seo_scoring_endpoint(
     model_library = None
     if current_user and body.model_library_id:
         model_library = await get_by_user(db, ModelLibrary, current_user.id, body.model_library_id)
+        if model_library is not None:
+            await enforce_user_quota(db, current_user, "llm_api")
 
     # 执行评分
     result = await calculate_seo_score(

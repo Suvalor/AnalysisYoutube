@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.deps import CurrentUserDep, DBSessionDep
+from app.api.deps import CurrentUserDep, DBSessionDep, create_quota_guard
 from app.crud.video_project import (
     create_video_project,
     delete_video_project,
@@ -102,6 +102,7 @@ async def ai_suggest(
     body: dict,
     db: DBSessionDep,
     current_user: CurrentUserDep,
+    _quota: bool = Depends(create_quota_guard("llm_api")),
 ) -> dict:
     """
     基于视频看板项目数据，调用 LLM 生成内容策略建议。
@@ -144,4 +145,3 @@ async def ai_suggest(
         "suggestion": result.get("suggestion", {}),
         "conversation_id": f"{entity_type}:{entity_id}",
     }
-

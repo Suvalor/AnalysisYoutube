@@ -1,9 +1,9 @@
 import json
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-from app.api.deps import CurrentUserDep, DBSessionDep
+from app.api.deps import CurrentUserDep, DBSessionDep, create_quota_guard
 from app.crud.library import get_by_user
 from app.models.library import ModelLibrary, PromptLibrary, StyleLibrary
 from app.schemas.library import GenerateScriptStreamRequest
@@ -27,6 +27,7 @@ async def generate_script_stream(
     payload: GenerateScriptStreamRequest,
     db: DBSessionDep,
     current_user: CurrentUserDep,
+    _quota: bool = Depends(create_quota_guard("llm_api")),
 ) -> StreamingResponse:
     prompt = await get_by_user(db, PromptLibrary, current_user.id, payload.prompt_id)
     style = await get_by_user(db, StyleLibrary, current_user.id, payload.style_id)
@@ -143,4 +144,3 @@ async def generate_script_stream(
             "X-Accel-Buffering": "no",
         },
     )
-

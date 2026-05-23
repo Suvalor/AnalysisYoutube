@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.api.deps import CurrentUserDep, DBSessionDep
+from app.api.deps import CurrentUserDep, DBSessionDep, create_quota_guard
 from app.crud.library import get_by_user, list_by_user
 from app.crud.video_highlight import create_highlight, get_highlights_by_video, delete_highlight
 from app.crud.youtube import get_video_for_user, get_video_analysis_for_org, upsert_video_analysis, batch_check_video_analysis
@@ -68,6 +68,7 @@ async def analyze_video(
     payload: YouTubeVideoAnalyzeRequest,
     db: DBSessionDep,
     current_user: CurrentUserDep,
+    _quota: bool = Depends(create_quota_guard("llm_api")),
 ) -> YouTubeVideoAnalysisResponse:
     video = await get_video_for_user(db, user_id=current_user.id, video_id=payload.video_id)
     if video is None:
@@ -203,6 +204,7 @@ async def extract_highlights(
     video_id: int,
     db: DBSessionDep,
     current_user: CurrentUserDep,
+    _quota: bool = Depends(create_quota_guard("llm_api")),
 ) -> ExtractHighlightsResponse:
     """Use AI to extract highlight segments from a video."""
     video = await get_video_for_user(db, user_id=current_user.id, video_id=video_id)
