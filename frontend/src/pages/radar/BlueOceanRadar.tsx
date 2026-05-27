@@ -395,14 +395,14 @@ export default function BlueOceanRadar() {
   return (
     <div className="min-h-screen bg-yc-bg-base p-6 md:p-10 text-yc-text-primary">
       <div className="max-w-7xl mx-auto space-y-6">
-        <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm">
+        {/* <Card className="!bg-yc-bg-card !border-yc-border !shadow-sm">
           <Title level={3} style={{ color: "var(--color-text-primary)", marginBottom: 8 }}>
             {t("title")}
           </Title>
           <Text style={{ color: "var(--color-text-secondary)" }}>
             {t("desc")}
           </Text>
-        </Card>
+        </Card> */}
 
         <Tabs
           defaultActiveKey="scan"
@@ -495,13 +495,13 @@ export default function BlueOceanRadar() {
                           <Button type="primary" size="large" loading={scanning} onClick={() => void onScan()}>
                             {t("form.submit")}
                           </Button>
-                          <Button
+                          {/* <Button
                             size="large"
                             className="!text-yc-accent !border-yc-accent-bg hover:!border-yc-accent hover:!text-yc-accent"
                             onClick={() => void openAiDrawer()}
                           >
                             {t("message.aiRetrospective")}
-                          </Button>
+                          </Button> */}
                         </Space>
                       </Form.Item>
                     </Form>
